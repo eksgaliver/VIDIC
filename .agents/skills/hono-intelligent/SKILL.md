@@ -105,3 +105,4 @@ Enterprise-grade best practices, type safety, and architectural standards for Ho
   4. Authentication middleware (setting `c.set('userId', ...)`).
   5. Route handlers
 - Avoid reading `await c.req.json()` or `await c.req.text()` multiple times; use `c.req.valid()` or store the parsed result.
+

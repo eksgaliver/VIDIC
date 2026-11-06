@@ -65,3 +65,4 @@ High-performance standards and architectural patterns for modern Next.js (App Ro
 - Never export secrets or sensitive environment variables with `NEXT_PUBLIC_` prefix.
 - Enforce session and authorization checks inside every Server Action; never assume an action is private just because its calling UI is hidden.
 - Validate incoming params and searchParams properly (in Next.js 15, `params` and `searchParams` are Promises: `const { id } = await params`).
+

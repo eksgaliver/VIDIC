@@ -76,3 +76,4 @@ Production-grade relational database design, indexing strategy, and query perfor
 - Create indexes on production tables with `CREATE INDEX CONCURRENTLY`.
 - When adding columns, PostgreSQL 11+ supports adding columns with constant defaults without rewriting the table.
 - When renaming columns, follow the expand-and-contract pattern across releases rather than immediate renames.
+

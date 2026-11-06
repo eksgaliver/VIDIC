@@ -29,3 +29,4 @@ This skill instructs the agent on how to manage context and conversation memory 
 5. **Deduplication of Information**:
    - Avoid re-quoting long code snippets or restating user requirements verbatim.
    - Refer to file paths with line numbers (e.g. `src/server.ts#L45-L60`).
+

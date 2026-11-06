@@ -50,3 +50,4 @@ When visual demarcation, direction, or status markers are needed, use intentiona
 - Prefer sentence case for headings and UI controls.
 - Maintain equal visual weight and spacing around symbols.
 </EXTREMELY_IMPORTANT>
+

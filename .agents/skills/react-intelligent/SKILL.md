@@ -59,3 +59,4 @@ Modern React engineering practices, state discipline, and component architecture
   Do not blindly wrap every primitive calculation in `useMemo` or every handler in `useCallback`. Use them when passing callbacks to heavy, memoized child trees (`React.memo`) or as dependencies to effects.
 - **Component Decomposition**:
   Break large monolithic components into focused, single-responsibility units. Keep leaf components dumb and presentational.
+
