@@ -438,6 +438,7 @@ export function DepartmentsPage() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onRequestClose={() => setIsCreateOpen(false)}
+        width={520}
       >
         <div className="p-6">
           <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
@@ -517,6 +518,7 @@ export function DepartmentsPage() {
         isOpen={!!editItem}
         onClose={() => setEditItem(null)}
         onRequestClose={() => setEditItem(null)}
+        width={520}
       >
         <div className="p-6">
           <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">

@@ -11,7 +11,7 @@
     }
   
     &.inline {
-      @apply md:inline-flex! mr-3 rtl:ml-3;
+      @apply md:inline-flex mr-3 rtl:ml-3;
     }
   }
   
@@ -29,7 +29,7 @@
   
   .form-container {
     &.inline {
-      @apply md:flex! items-center;
+      @apply md:flex items-center;
     }
   }  
 }

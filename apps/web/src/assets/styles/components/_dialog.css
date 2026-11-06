@@ -1,16 +1,16 @@
 @layer components {
   .dialog {
     outline: none;
-    @apply mx-auto;
+    @apply outline-none relative mx-auto my-auto max-w-full focus:outline-none;
   }
   
   .dialog-content {
-    @apply p-6 rounded-2xl shadow-xl mx-4 my-8 sm:mx-0 sm:my-16 relative h-full bg-white dark:bg-gray-800;
+    @apply rounded-2xl shadow-2xl relative bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 overflow-hidden;
   }
   
   .dialog-overlay {
-    transition: all 0.15s ease-in-out;
-    @apply inset-0 fixed z-40 bg-black/60 dark:bg-black/80 backdrop-blur-md;
+    transition: opacity 0.15s ease-in-out;
+    @apply inset-0 fixed z-[100] flex items-center justify-center overflow-y-auto p-4 sm:p-6 bg-black/60 dark:bg-black/80 backdrop-blur-sm;
   }
   
   .dialog-overlay-after-open {

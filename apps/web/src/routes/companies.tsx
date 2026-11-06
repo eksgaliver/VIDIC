@@ -867,6 +867,7 @@ export function CompaniesPage() {
         isOpen={!!editCompany}
         onClose={() => setEditCompany(null)}
         onRequestClose={() => setEditCompany(null)}
+        width={560}
       >
         <div className="p-6">
           <div className="pb-4 border-b border-neutral-200 dark:border-neutral-800">
