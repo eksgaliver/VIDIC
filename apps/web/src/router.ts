@@ -2,7 +2,9 @@ import { createRouter } from '@tanstack/react-router'
 import { rootRoute } from './routes/__root'
 import { indexRoute } from './routes/index'
 import { loginRoute } from './routes/login'
+import { authenticatedRoute } from './routes/_authenticated'
 import { dashboardRoute } from './routes/dashboard'
+import { companiesRoute } from './routes/companies'
 import { QueryClient } from '@tanstack/react-query'
 
 export const queryClient = new QueryClient({
@@ -14,11 +16,14 @@ export const queryClient = new QueryClient({
   }
 })
 
-// Perakitan pohon rute TanStack Router
+// Perakitan pohon rute TanStack Router hierarkis & mudah dirawat
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  dashboardRoute
+  authenticatedRoute.addChildren([
+    dashboardRoute,
+    companiesRoute
+  ])
 ])
 
 export const router = createRouter({

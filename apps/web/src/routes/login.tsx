@@ -1,14 +1,21 @@
 import * as React from 'react'
-import { createRoute, useNavigate } from '@tanstack/react-router'
+import { createRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { rootRoute } from './__root'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { HiOutlineMail, HiOutlineLockClosed } from 'react-icons/hi'
 import Alert from '@/components/ui/Alert'
+import { DASHBOARD_PATH, LOGIN_PATH } from '@/constants/route.constant'
 
 export const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/login',
+  path: LOGIN_PATH,
+  beforeLoad: () => {
+    const { isAuthenticated } = useAuthStore.getState()
+    if (isAuthenticated) {
+      throw redirect({ to: DASHBOARD_PATH })
+    }
+  },
   component: LoginPage
 })
 
