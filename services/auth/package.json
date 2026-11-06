@@ -1,0 +1,25 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.2.25",
+    "@elysiajs/jwt": "^1.2.0",
+    "@elysiajs/cors": "^1.2.0",
+    "drizzle-orm": "^0.40.0",
+    "drizzle-zod": "^0.7.0",
+    "postgres": "^3.4.5",
+    "shared-types": "workspace:*",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.30.5",
+    "typescript": "^5.8.2"
+  }
+}
+

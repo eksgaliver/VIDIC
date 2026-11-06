@@ -1,0 +1,20 @@
+{
+  "name": "gateway",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.2.25",
+    "@elysiajs/cors": "^1.2.0",
+    "auth-service": "workspace:*",
+    "shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.8.2"
+  }
+}
+

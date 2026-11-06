@@ -189,3 +189,4 @@ Perintah Drizzle Kit:
 - Terapkan migrasi ke database: `bunx drizzle-kit migrate`
 - Sinkronisasi langsung (prototyping): `bunx drizzle-kit push`
 - Drizzle Studio (inspeksi GUI): `bunx drizzle-kit studio`
+

@@ -227,3 +227,4 @@ function DashboardPage() {
     *   Gunakan **Redis Pub/Sub** atau **Redis Streams** untuk peristiwa bisnis yang tidak memerlukan respon instan (misal: `user.registered` → memicu pembuatan notifikasi selamat datang atau pengiriman surel).
 3.  **Database Isolation**:
     *   Setiap service memiliki skema Drizzle tersendiri dan kredensial database terisolasi untuk memastikan prinsip *loose coupling*.
+

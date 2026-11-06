@@ -1,0 +1,15 @@
+{
+  "name": "srikaya-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:gateway": "bun --cwd services/gateway run dev",
+    "dev:auth": "bun --cwd services/auth run dev",
+    "dev:web": "bun --cwd apps/web run dev"
+  }
+}
+
