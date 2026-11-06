@@ -30,30 +30,30 @@ const DEFAULT_TYPE = 'warning'
 
 const TYPE_MAP = {
     success: {
-        backgroundColor: 'bg-success-subtle',
-        titleColor: 'text-success',
-        textColor: 'text-success',
+        backgroundColor: 'bg-success-subtle border border-success/20 dark:border-success/30',
+        titleColor: 'text-success font-semibold',
+        textColor: 'text-neutral-800 dark:text-neutral-200',
         iconColor: 'text-success',
         icon: <HiCheckCircle />,
     },
     info: {
-        backgroundColor: 'bg-info-subtle',
-        titleColor: 'text-info',
-        textColor: 'text-info',
+        backgroundColor: 'bg-info-subtle border border-info/20 dark:border-info/30',
+        titleColor: 'text-info font-semibold',
+        textColor: 'text-neutral-800 dark:text-neutral-200',
         iconColor: 'text-info',
         icon: <HiInformationCircle />,
     },
     warning: {
-        backgroundColor: 'bg-warning-subtle',
-        titleColor: 'text-warning',
-        textColor: 'text-warning',
+        backgroundColor: 'bg-warning-subtle border border-warning/20 dark:border-warning/30',
+        titleColor: 'text-warning font-semibold',
+        textColor: 'text-neutral-800 dark:text-neutral-200',
         iconColor: 'text-warning',
         icon: <HiExclamation />,
     },
     danger: {
-        backgroundColor: 'bg-error-subtle',
-        titleColor: 'text-error',
-        textColor: 'text-error',
+        backgroundColor: 'bg-error-subtle border border-error/25 dark:border-error/40',
+        titleColor: 'text-error font-semibold',
+        textColor: 'text-neutral-800 dark:text-neutral-200',
         iconColor: 'text-error',
         icon: <HiXCircle />,
     },
@@ -148,6 +148,7 @@ const Alert = (props: AlertProps) => {
     return (
         <motion.div
             ref={ref}
+            role="alert"
             className={alertClass}
             initial={{ opacity: 1 }}
             animate={display === 'hiding' ? 'exit' : 'animate'}
@@ -164,30 +165,33 @@ const Alert = (props: AlertProps) => {
         >
             <div
                 className={classNames(
-                    'flex gap-2',
-                    !title && children ? 'items-center' : '',
-                    title && children ? 'mt-0.5' : '',
+                    'flex flex-1 gap-3',
+                    !title && children ? 'items-center' : 'items-start',
                 )}
             >
                 {showIcon && (
-                    <StatusIcon
-                        iconColor={typeMap.iconColor}
-                        custom={customIcon}
-                        type={type}
-                    />
+                    <div className="shrink-0 mt-0.5">
+                        <StatusIcon
+                            iconColor={typeMap.iconColor}
+                            custom={customIcon}
+                            type={type}
+                        />
+                    </div>
                 )}
-                <div>
+                <div className="flex-1 min-w-0 text-xs">
                     {title ? (
                         <div
                             className={classNames(
-                                'font-semibold text-lg mb-1',
+                                'font-semibold text-sm mb-1 leading-snug',
                                 typeMap.titleColor,
                             )}
                         >
                             {title}
                         </div>
                     ) : null}
-                    {children}
+                    <div className={classNames('leading-relaxed', typeMap.textColor)}>
+                        {children}
+                    </div>
                 </div>
             </div>
             {closable ? renderClose() : null}

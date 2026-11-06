@@ -4,6 +4,7 @@ import { rootRoute } from './__root'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { HiOutlineMail, HiOutlineLockClosed } from 'react-icons/hi'
+import Alert from '@/components/ui/Alert'
 
 export const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -103,15 +104,16 @@ export function LoginPage() {
           </div>
 
           {errorMsg && (
-            <div
-              role="alert"
-              className="mb-6 rounded-xl border border-red-200 bg-red-50/80 p-4 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+            <Alert
+              type="danger"
+              showIcon
+              title="Permintaan Ditolak"
+              className="mb-6 shadow-sm"
+              closable
+              onClose={() => setErrorMsg(null)}
             >
-              <div className="font-semibold flex items-center gap-1.5">
-                <span>&#x2715; Permintaan Ditolak</span>
-              </div>
-              <div className="mt-1 pl-4 text-neutral-700 dark:text-neutral-300">{errorMsg}</div>
-            </div>
+              {errorMsg}
+            </Alert>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
