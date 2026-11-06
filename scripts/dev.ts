@@ -2,43 +2,68 @@ import { spawn, type Subprocess } from 'bun'
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
+const appName = process.env.APP_NAME || 'Srikaya Enterprise'
+const authPort = Number(process.env.AUTH_SERVICE_PORT || 3001)
+const gatewayPort = Number(process.env.GATEWAY_PORT || 3000)
+const clientPort = Number(process.env.CLIENT_PORT || 5173)
+
 interface ServiceConfig {
   name: string
   port: number
   runtime: 'bun' | 'node'
   cmd: string[]
   cwd: string
+  env?: Record<string, string>
 }
 
 const services: ServiceConfig[] = [
   {
     name: 'AUTH   ',
-    port: 3001,
+    port: authPort,
     runtime: 'bun',
     cmd: ['bun', 'run', 'src/index.ts'],
-    cwd: 'services/auth'
+    cwd: 'services/auth',
+    env: {
+      AUTH_SERVICE_PORT: String(authPort),
+      PORT: String(authPort),
+      APP_NAME: appName
+    }
   },
   {
     name: 'GATEWAY',
-    port: 3000,
+    port: gatewayPort,
     runtime: 'bun',
     cmd: ['bun', 'run', 'src/index.ts'],
-    cwd: 'services/gateway'
+    cwd: 'services/gateway',
+    env: {
+      GATEWAY_PORT: String(gatewayPort),
+      PORT: String(gatewayPort),
+      AUTH_SERVICE_PORT: String(authPort),
+      AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL || `http://localhost:${authPort}`,
+      APP_NAME: appName
+    }
   },
   {
     name: 'CLIENT ',
-    port: 5173,
+    port: clientPort,
     runtime: 'node',
     cmd: [npmCmd, 'run', 'dev'],
-    cwd: 'apps/web'
+    cwd: 'apps/web',
+    env: {
+      CLIENT_PORT: String(clientPort),
+      VITE_PORT: String(clientPort),
+      PORT: String(clientPort),
+      VITE_APP_NAME: process.env.VITE_APP_NAME || appName,
+      VITE_API_URL: process.env.VITE_API_URL || `http://localhost:${gatewayPort}/api`
+    }
   }
 ]
 
 console.log('================================================================')
-console.log('  SRIKAYA MICROSERVICES ORCHESTRATOR')
-console.log('  • Auth Service   : http://localhost:3001 (Runtime: Bun)')
-console.log('  • API Gateway    : http://localhost:3000/api (Runtime: Bun)')
-console.log('  • Client SPA     : http://localhost:5173 (Runtime: Node.js)')
+console.log(`  ${appName.toUpperCase()} MICROSERVICES ORCHESTRATOR`)
+console.log(`  • Auth Service   : http://localhost:${authPort} (Runtime: Bun)`)
+console.log(`  • API Gateway    : http://localhost:${gatewayPort}/api (Runtime: Bun)`)
+console.log(`  • Client SPA     : http://localhost:${clientPort} (Runtime: Node.js)`)
 console.log('================================================================\n')
 
 const processes: Subprocess[] = []
@@ -69,7 +94,7 @@ for (const svc of services) {
       cwd: svc.cwd,
       env: {
         ...process.env,
-        PORT: String(svc.port)
+        ...svc.env
       },
       stdout: 'pipe',
       stderr: 'pipe'
@@ -98,4 +123,3 @@ function cleanup() {
 
 process.on('SIGINT', cleanup)
 process.on('SIGTERM', cleanup)
-

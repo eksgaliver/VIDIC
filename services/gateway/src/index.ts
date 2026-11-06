@@ -16,7 +16,7 @@ export const gateway = new Elysia({ prefix: '/api' })
   )
   .get('/health', () => ({
     status: 'online',
-    gatewayPort: 3000,
+    gatewayPort: Number(process.env.GATEWAY_PORT || process.env.PORT || 3000),
     services: {
       auth: AUTH_SERVICE_URL
     },
@@ -26,9 +26,9 @@ export const gateway = new Elysia({ prefix: '/api' })
   .use(authService)
 
 if (import.meta.main) {
-  const port = process.env.PORT || 3000
+  const port = Number(process.env.GATEWAY_PORT || process.env.PORT || 3000)
   gateway.listen(port)
-  console.log(`API Gateway aktif pada http://localhost:${port}/api (Port terpisah dari Auth :3001)`)
+  console.log(`API Gateway aktif pada http://localhost:${port}/api (Port terpisah dari Auth :${process.env.AUTH_SERVICE_PORT || 3001})`)
 }
 
 export type GatewayApp = typeof gateway

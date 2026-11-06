@@ -18,7 +18,7 @@ interface AuthUser {
 // Inisialisasi user demo untuk lingkungan pengembangan
 const DEMO_USER: AuthUser = {
   id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-  name: 'Srikaya Operator',
+  name: process.env.APP_NAME ? `${process.env.APP_NAME} Operator` : 'Srikaya Operator',
   email: 'admin@srikaya.id',
   passwordHash: await Bun.password.hash('rahasia123', { algorithm: 'bcrypt', cost: 10 }),
   role: 'admin',
@@ -134,7 +134,7 @@ export const authService = new Elysia({ prefix: '/auth' })
 
 // Jalankan server jika dieksekusi langsung
 if (import.meta.main) {
-  const port = process.env.PORT || 3001
+  const port = Number(process.env.AUTH_SERVICE_PORT || process.env.PORT || 3001)
   authService.listen(port)
   console.log(`Layanan Auth berjalan pada port ${port}`)
 }
