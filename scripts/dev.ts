@@ -21,7 +21,7 @@ const services: ServiceConfig[] = [
     name: 'AUTH   ',
     port: authPort,
     runtime: 'bun',
-    cmd: ['bun', 'run', 'src/index.ts'],
+    cmd: ['bun', '--watch', 'src/index.ts'],
     cwd: 'services/auth',
     env: {
       AUTH_SERVICE_PORT: String(authPort),
@@ -33,7 +33,7 @@ const services: ServiceConfig[] = [
     name: 'GATEWAY',
     port: gatewayPort,
     runtime: 'bun',
-    cmd: ['bun', 'run', 'src/index.ts'],
+    cmd: ['bun', '--watch', 'src/index.ts'],
     cwd: 'services/gateway',
     env: {
       GATEWAY_PORT: String(gatewayPort),
@@ -113,7 +113,11 @@ function cleanup() {
   console.log('\n[ORCHESTRATOR] Menghentikan seluruh proses mikroservis...')
   for (const proc of processes) {
     try {
-      proc.kill()
+      if (process.platform === 'win32' && proc.pid) {
+        spawn(['taskkill', '/F', '/T', '/PID', String(proc.pid)])
+      } else {
+        proc.kill()
+      }
     } catch {
       // Ignored
     }

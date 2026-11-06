@@ -204,11 +204,18 @@ export const authService = new Elysia({ prefix: '/auth' })
     }
   })
 
+// Aplikasi Layanan Auth lengkap (Termasuk Otentikasi, Perusahaan & Departemen)
+export const authApp = new Elysia()
+  .use(authService)
+  .use(companyRoutes)
+  .use(departmentRoutes)
+
 // Jalankan server jika dieksekusi langsung
 if (import.meta.main) {
   const port = Number(process.env.AUTH_SERVICE_PORT || process.env.PORT || 3001)
-  authService.listen(port)
-  console.log(`Layanan Auth berjalan pada port ${port}`)
+  authApp.listen(port)
+  console.log(`Layanan Auth & Organisasi berjalan pada port ${port}`)
 }
 
 export type AuthService = typeof authService
+export type AuthApp = typeof authApp

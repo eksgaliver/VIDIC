@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
-import { authService, companyRoutes, departmentRoutes } from 'auth-service'
+import { authApp } from 'auth-service'
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3001'
 
@@ -23,9 +23,7 @@ export const gateway = new Elysia({ prefix: '/api' })
     timestamp: new Date().toISOString()
   }))
   // Hubungkan Layanan Auth, Perusahaan & Departemen ke Gateway untuk type-safety Eden Treaty & routing terpadu
-  .use(authService)
-  .use(companyRoutes)
-  .use(departmentRoutes)
+  .use(authApp)
 
 if (import.meta.main) {
   const port = Number(process.env.GATEWAY_PORT || process.env.PORT || 3000)
