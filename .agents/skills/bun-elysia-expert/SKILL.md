@@ -74,3 +74,4 @@ Panduan arsitektur backend berkinerja tinggi menggunakan Bun runtime dan ElysiaJ
   })
   ```
 - Lindungi CORS, rate-limiting, dan header keamanan sebelum mendaftarkan rute publik.
+

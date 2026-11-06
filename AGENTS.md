@@ -16,10 +16,18 @@
 - Write direct, human, active voice copy.
 
 ## 3. Technology Stack Best Practices
-- **Hono**: Modular route architecture (`app.route()`), type-safe RPC client (`hc<AppType>()`), Zod validation with `@hono/zod-validator`, explicit `HTTPException`.
-- **Next.js (App Router)**: Server Components by default, Client Components at leaf nodes with `'use client'`, Server Actions with `'use server'`, granular Suspense boundaries, strict cache invalidation (`revalidateTag`).
-- **React**: Modern React 19 primitives (`useActionState`, `useOptimistic`, `use()`), pure render cycles, clean state derivation without redundant `useEffect`.
-- **PostgreSQL**: UUIDv7 / Identity keys, explicit foreign key cascades, indexed foreign keys, compound indexes ordered (equality → range → sort), partial indexes, `EXPLAIN (ANALYZE, BUFFERS)` for slow queries.
+- **Bun & ElysiaJS**: Native Bun performance, modular plugin routing, type-safe RPC via Eden Treaty (`treaty<App>()`), Zod/TypeBox validation, explicit `onError` handling.
+- **Drizzle ORM & PostgreSQL**:
+  - Drizzle ORM as the primary database layer (replacing Prisma).
+  - PostgreSQL with explicit foreign key cascades (`onDelete: 'cascade'`).
+  - Indexed foreign keys and compound indexes ordered (equality → range → sort).
+  - Schema-to-Zod generation via `drizzle-zod` for zero-overhead validation across backend routes and client forms.
+  - Relational queries (`db.query`) for nested reads; core builder (`db.select`) for analytics/aggregations.
+  - Zero-downtime migrations managed via `drizzle-kit`.
+- **Next.js & React**:
+  - Modern React 19 primitives (`useActionState`, `useOptimistic`, `use()`), pure render cycles, clean state derivation without redundant `useEffect`.
+  - Client state with Zustand, server state synchronization with TanStack Query.
+  - UI components built on shadcn/ui and Radix UI primitives.
 
 ## 4. Context & Token Preservation
 - Follow the **Memory Saver** and **Token Saver** skills.

@@ -99,3 +99,4 @@ Standar implementasi antarmuka berbasis shadcn/ui, Tailwind CSS, dan ekosistem R
 
 - Gunakan pola tabel headless dari TanStack Table yang dibungkus oleh komponen Table dari shadcn/ui (`<Table>`, `<TableHeader>`, `<TableRow>`, `<TableCell>`).
 - Pisahkan definisi kolom (`columns.tsx`) dari render komponen tabel (`data-table.tsx`).
+

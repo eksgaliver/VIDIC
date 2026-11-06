@@ -14,9 +14,14 @@ d:/srikaya/
 │   ├── api/                     # Backend Bun + ElysiaJS
 │   │   ├── src/
 │   │   │   ├── routes/          # Rute API modular (users, auth, dll.)
-│   │   │   ├── db/              # Schema & koneksi database PostgreSQL
+│   │   │   ├── db/              # Drizzle ORM client, skema, & validasi
+│   │   │   │   ├── index.ts     # Inisialisasi koneksi postgres.js + Drizzle
+│   │   │   │   ├── schema.ts    # Definisi tabel PostgreSQL & relations
+│   │   │   │   └── validation.ts# Validasi Zod via drizzle-zod
 │   │   │   ├── middleware/      # Auth, CORS, logger
 │   │   │   └── index.ts         # Inisialisasi Elysia & export type App
+│   │   ├── drizzle/             # Berkas migrasi SQL dari drizzle-kit
+│   │   ├── drizzle.config.ts    # Konfigurasi Drizzle Kit
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
@@ -97,3 +102,4 @@ Salah satu keunggulan utama ElysiaJS adalah kemampuannya menyediakan tipe API la
 | Formulir & Validasi | `react-hook-form` + `zod` | Pengelolaan form berkinerja tinggi terintegrasi skema validasi |
 | Tabel Data Kompleks | `@tanstack/react-table` | Headless table untuk data tabular, filtering, dan sorting |
 | Animasi / Interaksi | `motion` | Transisi dan interaksi mikro yang halus |
+
