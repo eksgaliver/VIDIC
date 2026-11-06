@@ -62,3 +62,4 @@ export const insertUserSchema = createInsertSchema(users, {
 })
 
 export const selectUserSchema = createSelectSchema(users)
+
