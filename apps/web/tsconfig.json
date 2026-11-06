@@ -18,9 +18,10 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "gateway": ["../../services/gateway/src/index.ts"],
+      "shared-types": ["../../packages/shared-types/src/index.ts"]
     }
   },
   "include": ["src"]
 }
-

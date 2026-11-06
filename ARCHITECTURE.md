@@ -1,105 +1,108 @@
-# Arsitektur Proyek: Bun + ElysiaJS + React shadcn/ui
+# Arsitektur Proyek: Bun (Backend) + Node.js (Client) + React shadcn/ui
 
-Dokumen ini memuat cetak biru teknis dan arsitektur integrasi sistem antara backend Bun + ElysiaJS dengan client React modern.
+Dokumen ini memuat cetak biru teknis dan arsitektur integrasi sistem dengan pemisahan runtime:
+- **Backend Runtime**: Bun (ElysiaJS, Drizzle ORM, native cryptographic hashing, high-throughput HTTP).
+- **Client Runtime**: Node.js v24+ / npm (Vite, React 19, TanStack Router, Tailwind CSS, shadcn/ui).
 
 ---
 
-## 1. Topologi Repositori (Monorepo Workspace)
+## 1. Topologi Repositori & Pemisahan Runtime
 
-Struktur monorepo menggunakan Bun workspaces untuk memfasilitasi type-sharing secara instan antara server dan client:
+Struktur repositori memisahkan runtime backend dan client secara independen:
 
 ```text
 d:/srikaya/
 ├── apps/
-│   ├── api/                     # Backend Bun + ElysiaJS
-│   │   ├── src/
-│   │   │   ├── routes/          # Rute API modular (users, auth, dll.)
-│   │   │   ├── db/              # Drizzle ORM client, skema, & validasi
-│   │   │   │   ├── index.ts     # Inisialisasi koneksi postgres.js + Drizzle
-│   │   │   │   ├── schema.ts    # Definisi tabel PostgreSQL & relations
-│   │   │   │   └── validation.ts# Validasi Zod via drizzle-zod
-│   │   │   ├── middleware/      # Auth, CORS, logger
-│   │   │   └── index.ts         # Inisialisasi Elysia & export type App
-│   │   ├── drizzle/             # Berkas migrasi SQL dari drizzle-kit
-│   │   ├── drizzle.config.ts    # Konfigurasi Drizzle Kit
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   └── web/                     # Frontend Client (Vite + React 19 + shadcn/ui)
+│   └── web/                     # Client Runtime: Node.js (npm / pnpm)
 │       ├── src/
-│       │   ├── components/
-│       │   │   ├── ui/          # Komponen primitif shadcn (Button, Dialog, dll.)
-│       │   │   └── common/      # Komponen aplikasi bersama
+│       │   ├── components/ui/   # Komponen primitif shadcn (Button, Card, Input)
 │       │   ├── lib/
-│       │   │   ├── api.ts       # Klien Eden Treaty terikat ke type App
+│       │   │   ├── api.ts       # Klien Eden Treaty terikat ke type GatewayApp
 │       │   │   └── utils.ts     # Utilitas styling (cn)
-│       │   ├── routes/          # Halaman & TanStack Router
-│       │   ├── stores/          # Zustand global UI state
-│       │   ├── App.tsx
+│       │   ├── routes/          # TanStack Router (login, dashboard, root)
+│       │   ├── stores/          # Zustand auth & UI state
+│       │   ├── router.ts        # Konfigurasi router pohon rute
 │       │   └── main.tsx
-│       ├── index.html
-│       ├── package.json
+│       ├── package.json         # Dependensi Node.js client terisolasi
 │       ├── tailwind.config.js
+│       ├── tsconfig.json        # Path mapping ke kontrak tipe backend
 │       └── vite.config.ts
 │
-├── packages/
-│   └── shared/                  # Skema validasi bersama (Zod) & types
+├── services/                    # Backend Runtime: Bun
+│   ├── gateway/                 # ElysiaJS API Gateway (Port 3000)
+│   │   ├── src/index.ts         # Inisialisasi Gateway & export type GatewayApp
+│   │   └── package.json
+│   │
+│   └── auth/                    # Layanan Autentikasi (Port 3001)
 │       ├── src/
-│       │   └── index.ts
+│       │   ├── db/              # Drizzle ORM & skema PostgreSQL
+│       │   └── index.ts         # Sub-app Elysia auth
 │       └── package.json
 │
-├── .agents/                     # Konfigurasi skill dan rules agent
+├── packages/
+│   └── shared-types/            # Skema validasi bersama (Zod) & types
+│       └── src/index.ts
+│
 ├── AGENTS.md                    # Aturan global workspace
 ├── GEMINI.md                    # Aturan mirror Gemini
-└── package.json                 # Root monorepo workspace
+├── MICROSERVICES.md             # Cetak biru klaster microservices
+└── package.json                 # Skrip pengendali Bun & Node.js
 ```
 
 ---
 
 ## 2. Jembatan Komunikasi: Eden Treaty (Type-Safe RPC)
 
-Salah satu keunggulan utama ElysiaJS adalah kemampuannya menyediakan tipe API langsung ke client tanpa build step terpisah:
+Meskipun client berjalan di runtime Node.js dan backend di Bun, kontrak tipe data tetap tersinkronisasi 100%:
 
-- **Pada Backend (`apps/api/src/index.ts`)**:
+- **Pada Backend (`services/gateway/src/index.ts`)**:
   ```typescript
   import { Elysia } from 'elysia'
-  import { usersPlugin } from './routes/users'
+  import { authService } from 'auth-service'
 
-  const app = new Elysia()
-    .use(usersPlugin)
-    .listen(3001)
+  export const gateway = new Elysia({ prefix: '/api' })
+    .use(authService)
 
-  export type App = typeof app
+  export type GatewayApp = typeof gateway
+  ```
+
+- **Pada Client (`apps/web/tsconfig.json`)**:
+  Path alias TypeScript memetakan tipe `GatewayApp` langsung dari berkas gateway tanpa memerlukan ketergantungan paket monorepo khusus:
+  ```json
+  {
+    "compilerOptions": {
+      "paths": {
+        "@/*": ["src/*"],
+        "gateway": ["../../services/gateway/src/index.ts"],
+        "shared-types": ["../../packages/shared-types/src/index.ts"]
+      }
+    }
+  }
   ```
 
 - **Pada Client (`apps/web/src/lib/api.ts`)**:
   ```typescript
   import { treaty } from '@elysiajs/eden'
-  import type { App } from 'api'
+  import type { GatewayApp } from 'gateway'
 
-  export const api = treaty<App>('localhost:3001')
-  ```
-
-- **Penggunaan di Komponen React**:
-  ```typescript
-  // Autocomplete otomatis, parameter URL otomatis tervalidasi,
-  // dan tipe respons sesuai dengan handler Elysia
-  const { data, error } = await api.users.get()
+  const client = treaty<GatewayApp>('http://localhost:3000')
+  export const api = client.api
   ```
 
 ---
 
-## 3. Ekosistem Library React Utama
+## 3. Skrip Menjalankan Proyek
 
-| Kategori | Library Terpilih | Peran Utama |
-|---|---|---|
-| UI Component Kit | `shadcn/ui` + `@radix-ui/react-*` | Komponen aksesibel WAI-ARIA, copy-paste architecture |
-| Styling Engine | `tailwindcss` + `tailwind-merge` + `cva` | Utility-first styling dan penggabungan class dinamis |
-| Ikonografi | `lucide-react` | Koleksi ikon konsisten tanpa bobot bundle besar |
-| Routing | `@tanstack/react-router` | Routing berbasis TypeScript dengan full type-safety |
-| Server State & Caching | `@tanstack/react-query` | Sinkronisasi data backend, background caching, optimistik update |
-| Client State | `zustand` | State UI global minimalis tanpa overhead context provider |
-| Formulir & Validasi | `react-hook-form` + `zod` | Pengelolaan form berkinerja tinggi terintegrasi skema validasi |
-| Tabel Data Kompleks | `@tanstack/react-table` | Headless table untuk data tabular, filtering, dan sorting |
-| Animasi / Interaksi | `motion` | Transisi dan interaksi mikro yang halus |
+Root `package.json` memisahkan perintah berdasarkan runtime masing-masing:
 
+```json
+{
+  "scripts": {
+    "backend:gateway": "bun run --cwd services/gateway src/index.ts",
+    "backend:auth": "bun run --cwd services/auth src/index.ts",
+    "client:install": "npm --prefix apps/web install",
+    "client:dev": "npm --prefix apps/web run dev",
+    "client:build": "npm --prefix apps/web run build"
+  }
+}
+```
