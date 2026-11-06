@@ -2,8 +2,13 @@ import { Elysia, t } from 'elysia'
 import { jwt } from '@elysiajs/jwt'
 import { cors } from '@elysiajs/cors'
 import { db } from './db'
-import { users } from './db/schema'
+import { users, companies, departments, companyLocations } from './db/schema'
 import { eq } from 'drizzle-orm'
+import { companyRoutes } from './routes/companies'
+import { departmentRoutes } from './routes/departments'
+
+export { companyRoutes } from './routes/companies'
+export { departmentRoutes } from './routes/departments'
 
 interface AuthUser {
   id: string
@@ -26,6 +31,77 @@ const DEMO_USER: AuthUser = {
   updatedAt: new Date()
 }
 
+// Fungsi inisialisasi data bawaan (Perusahaan & Departemen Wajib HR)
+async function seedDefaultData() {
+  try {
+    const existing = await db.select().from(companies).limit(1)
+    if (existing.length === 0) {
+      console.log('[SEED] Menginisialisasi data bawaan perusahaan dan departemen wajib HR...')
+      const [comp] = await db.insert(companies).values({
+        code: 'SRK',
+        name: 'PT Srikaya Digital Solusindo',
+        brandName: 'Srikaya Tech',
+        email: 'kontak@srikaya.id',
+        phone: '021-5550123',
+        industry: 'Teknologi Informasi',
+        website: 'https://srikaya.id',
+        status: 'active'
+      }).returning()
+
+      // Buat Departemen Wajib: HR dan departemen awal lainnya
+      await db.insert(departments).values([
+        {
+          companyId: comp.id,
+          code: 'HR',
+          name: 'Human Resources',
+          description: 'Pengelolaan Sumber Daya Manusia, Personalia & Rekrutmen (Departemen Wajib)',
+          isMandatory: true,
+          status: 'active'
+        },
+        {
+          companyId: comp.id,
+          code: 'IT',
+          name: 'Teknologi Informasi & Rekayasa',
+          description: 'Pengembangan arsitektur sistem, infrastruktur & pemeliharaan aplikasi',
+          isMandatory: false,
+          status: 'active'
+        },
+        {
+          companyId: comp.id,
+          code: 'OPS',
+          name: 'Operasional & Layanan',
+          description: 'Manajemen operasional harian, kepatuhan & logistik',
+          isMandatory: false,
+          status: 'active'
+        }
+      ])
+
+      // Buat Lokasi Geofence Primer
+      await db.insert(companyLocations).values({
+        companyId: comp.id,
+        name: 'Kantor Pusat Jakarta',
+        address: 'Jl. Jenderal Sudirman Kav. 52-53, Senayan',
+        city: 'Jakarta Selatan',
+        province: 'DKI Jakarta',
+        postalCode: '12190',
+        latitude: '-6.2250140',
+        longitude: '106.8097560',
+        radiusMeters: 100,
+        timezone: 'Asia/Jakarta',
+        isPrimary: true,
+        status: 'active'
+      })
+
+      console.log('[SEED] Inisialisasi selesai: PT Srikaya Digital Solusindo + Departemen Wajib HR siap digunakan.')
+    }
+  } catch (err) {
+    // Database connection or table might be synchronizing
+  }
+}
+
+// Jalankan seed saat servis dimuat
+seedDefaultData()
+
 export const authService = new Elysia({ prefix: '/auth' })
   .use(cors())
   .use(
@@ -35,7 +111,7 @@ export const authService = new Elysia({ prefix: '/auth' })
       exp: '7d'
     })
   )
-  .onError(({ code, error, set }) => {
+  .onError(({ code, set }) => {
     if (code === 'VALIDATION') {
       set.status = 400
       return { success: false, message: 'Validasi gagal: format input tidak sesuai' }
@@ -47,7 +123,6 @@ export const authService = new Elysia({ prefix: '/auth' })
   .post('/login', async ({ body, jwt, set }) => {
     const { email, password } = body
 
-    // 1. Cari user di basis data atau fallback ke demo user
     let foundUser: AuthUser | null = null
 
     try {
@@ -59,7 +134,6 @@ export const authService = new Elysia({ prefix: '/auth' })
         }
       }
     } catch {
-      // Fallback untuk development lokal saat PostgreSQL belum aktif
       if (email.toLowerCase() === DEMO_USER.email.toLowerCase()) {
         foundUser = DEMO_USER
       }
@@ -74,14 +148,12 @@ export const authService = new Elysia({ prefix: '/auth' })
       return { success: false, message: 'Kombinasi surel atau kata sandi salah' }
     }
 
-    // 2. Verifikasi kata sandi via Bun native password verification
     const isPasswordValid = await Bun.password.verify(password, foundUser.passwordHash)
     if (!isPasswordValid) {
       set.status = 401
       return { success: false, message: 'Kombinasi surel atau kata sandi salah' }
     }
 
-    // 3. Terbitkan token JWT
     const token = await jwt.sign({
       sub: foundUser.id,
       email: foundUser.email,
@@ -106,7 +178,7 @@ export const authService = new Elysia({ prefix: '/auth' })
       password: t.String({ minLength: 6 })
     })
   })
-  // Endpoint Verifikasi Sesi / Profil Pengguna
+  // Endpoint Verifikasi Sesi
   .get('/me', async ({ headers, jwt, set }) => {
     const authHeader = headers['authorization']
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

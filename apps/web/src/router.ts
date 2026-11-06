@@ -5,6 +5,7 @@ import { loginRoute } from './routes/login'
 import { authenticatedRoute } from './routes/_authenticated'
 import { dashboardRoute } from './routes/dashboard'
 import { companiesRoute } from './routes/companies'
+import { departmentsRoute } from './routes/departments'
 import { QueryClient } from '@tanstack/react-query'
 
 export const queryClient = new QueryClient({
@@ -22,7 +23,8 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   authenticatedRoute.addChildren([
     dashboardRoute,
-    companiesRoute
+    companiesRoute,
+    departmentsRoute
   ])
 ])
 

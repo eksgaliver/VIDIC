@@ -1,9 +1,10 @@
 import type { IconType } from 'react-icons'
 import {
   HiOutlineHome,
-  HiOutlineOfficeBuilding
+  HiOutlineOfficeBuilding,
+  HiOutlineViewGrid
 } from 'react-icons/hi'
-import { DASHBOARD_PATH, COMPANIES_PATH } from '@/constants/route.constant'
+import { DASHBOARD_PATH, COMPANIES_PATH, DEPARTMENTS_PATH } from '@/constants/route.constant'
 
 export interface NavigationItem {
   key: string
@@ -25,5 +26,11 @@ export const navigationConfig: NavigationItem[] = [
     title: 'Perusahaan',
     path: COMPANIES_PATH,
     icon: HiOutlineOfficeBuilding
+  },
+  {
+    key: 'departments',
+    title: 'Departemen',
+    path: DEPARTMENTS_PATH,
+    icon: HiOutlineViewGrid
   }
 ]

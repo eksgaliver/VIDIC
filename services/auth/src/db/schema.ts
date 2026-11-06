@@ -44,11 +44,32 @@ export const companyLocations = pgTable('company_locations', {
   index('idx_company_locations_is_primary').on(table.isPrimary)
 ])
 
-// 3. Tabel Pengguna & Karyawan (Users)
+// 3. Tabel Departemen Perusahaan (Departments - Wajib ada HR)
+export const departments = pgTable('departments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  code: varchar('code', { length: 50 }).notNull(),
+  name: varchar('name', { length: 150 }).notNull(),
+  description: text('description'),
+  isMandatory: boolean('is_mandatory').default(false).notNull(), // Untuk departemen wajib seperti HR (tidak boleh dihapus)
+  status: varchar('status', { length: 20 }).default('active').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_departments_company_id').on(table.companyId),
+  index('idx_departments_code').on(table.code),
+  index('idx_departments_is_mandatory').on(table.isMandatory)
+])
+
+// 4. Tabel Pengguna & Karyawan (Users)
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id')
     .references(() => companies.id, { onDelete: 'set null' }),
+  departmentId: uuid('department_id')
+    .references(() => departments.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
@@ -57,12 +78,14 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 }, (table) => [
   index('idx_auth_users_email').on(table.email),
-  index('idx_auth_users_company_id').on(table.companyId)
+  index('idx_auth_users_company_id').on(table.companyId),
+  index('idx_auth_users_department_id').on(table.departmentId)
 ])
 
 // Relasi untuk Drizzle Relational Queries API (db.query)
 export const companiesRelations = relations(companies, ({ many }) => ({
   locations: many(companyLocations),
+  departments: many(departments),
   employees: many(users)
 }))
 
@@ -73,10 +96,22 @@ export const companyLocationsRelations = relations(companyLocations, ({ one }) =
   })
 }))
 
+export const departmentsRelations = relations(departments, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [departments.companyId],
+    references: [companies.id]
+  }),
+  employees: many(users)
+}))
+
 export const usersRelations = relations(users, ({ one }) => ({
   company: one(companies, {
     fields: [users.companyId],
     references: [companies.id]
+  }),
+  department: one(departments, {
+    fields: [users.departmentId],
+    references: [departments.id]
   })
 }))
 
@@ -85,5 +120,7 @@ export type Company = typeof companies.$inferSelect
 export type NewCompany = typeof companies.$inferInsert
 export type CompanyLocation = typeof companyLocations.$inferSelect
 export type NewCompanyLocation = typeof companyLocations.$inferInsert
+export type Department = typeof departments.$inferSelect
+export type NewDepartment = typeof departments.$inferInsert
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert

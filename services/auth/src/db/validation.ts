@@ -1,6 +1,6 @@
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { z } from 'zod'
-import { companies, companyLocations, users } from './schema'
+import { companies, companyLocations, departments, users } from './schema'
 
 // 1. Skema Validasi Perusahaan
 export const insertCompanySchema = createInsertSchema(companies, {
@@ -51,7 +51,26 @@ export const selectCompanyLocationSchema = createSelectSchema(companyLocations)
 export type InsertCompanyLocation = z.infer<typeof insertCompanyLocationSchema>
 export type SelectCompanyLocation = z.infer<typeof selectCompanyLocationSchema>
 
-// 3. Skema Validasi Pengguna
+// 3. Skema Validasi Departemen (Wajib ada HR)
+export const insertDepartmentSchema = createInsertSchema(departments, {
+  companyId: (schema) => schema.uuid('ID Perusahaan tidak valid'),
+  code: (schema) => schema.min(2, 'Kode departemen minimal 2 karakter').max(50, 'Kode maksimal 50 karakter'),
+  name: (schema) => schema.min(2, 'Nama departemen minimal 2 karakter').max(150, 'Nama maksimal 150 karakter'),
+  description: (schema) => schema.max(500, 'Deskripsi maksimal 500 karakter').optional(),
+  isMandatory: (schema) => z.boolean().default(false),
+  status: (schema) => z.enum(['active', 'inactive']).default('active')
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+})
+
+export const selectDepartmentSchema = createSelectSchema(departments)
+
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>
+export type SelectDepartment = z.infer<typeof selectDepartmentSchema>
+
+// 4. Skema Validasi Pengguna
 export const insertUserSchema = createInsertSchema(users, {
   name: (schema) => schema.min(2, 'Nama minimal 2 karakter'),
   email: (schema) => schema.email('Format surel tidak valid')
@@ -62,4 +81,3 @@ export const insertUserSchema = createInsertSchema(users, {
 })
 
 export const selectUserSchema = createSelectSchema(users)
-

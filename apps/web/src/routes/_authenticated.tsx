@@ -15,3 +15,4 @@ export const authenticatedRoute = createRoute({
   },
   component: AppLayout
 })
+
