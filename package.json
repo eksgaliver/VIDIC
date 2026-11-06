@@ -6,9 +6,9 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "bun run scripts/dev.ts",
     "backend:gateway": "bun run --cwd services/gateway src/index.ts",
     "backend:auth": "bun run --cwd services/auth src/index.ts",
-    "client:install": "npm --prefix apps/web install",
     "client:dev": "npm --prefix apps/web run dev",
     "client:build": "npm --prefix apps/web run build"
   }

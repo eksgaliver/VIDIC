@@ -2,7 +2,9 @@ import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
 import { authService } from 'auth-service'
 
-// Inisialisasi API Gateway terpusat
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3001'
+
+// API Gateway berjalan pada Port 3000
 export const gateway = new Elysia({ prefix: '/api' })
   .use(
     cors({
@@ -14,16 +16,19 @@ export const gateway = new Elysia({ prefix: '/api' })
   )
   .get('/health', () => ({
     status: 'online',
+    gatewayPort: 3000,
+    services: {
+      auth: AUTH_SERVICE_URL
+    },
     timestamp: new Date().toISOString()
   }))
-  // Hubungkan rute autentikasi ke dalam gateway
+  // Hubungkan AuthService ke dalam Gateway untuk type-safety Eden Treaty & routing terpadu
   .use(authService)
 
 if (import.meta.main) {
   const port = process.env.PORT || 3000
   gateway.listen(port)
-  console.log(`API Gateway aktif pada http://localhost:${port}/api`)
+  console.log(`API Gateway aktif pada http://localhost:${port}/api (Port terpisah dari Auth :3001)`)
 }
 
 export type GatewayApp = typeof gateway
-
