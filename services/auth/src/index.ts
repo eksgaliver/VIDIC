@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 import { jwt } from '@elysiajs/jwt'
 import { cors } from '@elysiajs/cors'
 import { db } from './db'
-import { users, companies, departments, companyLocations, companyOperationalAreas } from './db/schema'
+import { users, companies, departments, companyLocations, companyOperationalAreas, mail, biodata } from './db/schema'
 import { and, eq } from 'drizzle-orm'
 import { companyRoutes } from './routes/companies'
 import { departmentRoutes } from './routes/departments'
@@ -17,6 +17,7 @@ export { uploadRoutes } from './routes/upload'
 
 interface AuthUser {
   id: string
+  companyId?: string | null
   name: string
   email: string
   passwordHash: string
@@ -216,6 +217,36 @@ async function seedDefaultData() {
           }
         ])
         console.log('[SEED] Menambahkan karyawan aktif default untuk perusahaan yang ada.')
+      }
+    }
+
+    // Pastikan setiap karyawan memiliki relasi dengan tabel mail dan baris biodata
+    const allUsers = await db.select().from(users)
+    for (const u of allUsers) {
+      const [existingBiodata] = await db.select().from(biodata).where(eq(biodata.userId, u.id)).limit(1)
+      if (!existingBiodata) {
+        await db.insert(biodata).values({
+          userId: u.id,
+          companyId: u.companyId,
+          isCompleted: false
+        })
+      }
+
+      const [existingMail] = await db.select().from(mail).where(eq(mail.userId, u.id)).limit(1)
+      if (!existingMail) {
+        await db.insert(mail).values({
+          userId: u.id,
+          companyId: u.companyId,
+          senderEmail: 'hr@srikaya.id',
+          senderName: 'Departemen HR & Personalia',
+          recipientEmail: u.email,
+          recipientName: u.name,
+          subject: 'Selamat Datang di Srikaya Platform - Informasi Akun & Pengisian Biodata',
+          body: `Halo ${u.name},\n\nSelamat bergabung di perusahaan kami! Akun karyawan Anda telah aktif dengan posisi ${u.position || 'Staff'}.\n\nSilakan masuk (login) ke platform menggunakan surel Anda (${u.email}).\n\nSetelah berhasil masuk, mohon segera lengkapi Biodata Karyawan Anda pada menu Profil untuk kelengkapan administrasi kepegawaian, BPJS, dan perpajakan.\n\nSalam hangat,\nDepartemen HR & Personalia`,
+          category: 'inbox',
+          isRead: false,
+          isStarred: true
+        })
       }
     }
   } catch (err) {
@@ -534,6 +565,210 @@ export const authService = new Elysia({ prefix: '/auth' })
       user: toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
       message: 'Foto profil berhasil dihapus'
     }
+  })
+  // Ambil Biodata Karyawan yang Sedang Login
+  .get('/biodata', async ({ headers, jwt, set }) => {
+    const authHeader = headers['authorization']
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401
+      return { success: false, message: 'Token otorisasi tidak ditemukan' }
+    }
+
+    const payload = await jwt.verify(authHeader.slice(7))
+    const current = await resolveSessionUser(payload)
+
+    if (!current) {
+      set.status = 401
+      return { success: false, message: 'Sesi tidak lagi valid. Silakan masuk kembali.' }
+    }
+
+    const [row] = await db
+      .select()
+      .from(biodata)
+      .where(eq(biodata.userId, current.id))
+      .limit(1)
+
+    return {
+      success: true,
+      data: row || {
+        userId: current.id,
+        isCompleted: false
+      }
+    }
+  })
+  // Lengkapi atau Perbarui Biodata Karyawan Setelah Login
+  .put('/biodata', async ({ headers, body, jwt, set }) => {
+    const authHeader = headers['authorization']
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401
+      return { success: false, message: 'Token otorisasi tidak ditemukan' }
+    }
+
+    const payload = await jwt.verify(authHeader.slice(7))
+    const current = await resolveSessionUser(payload)
+
+    if (!current) {
+      set.status = 401
+      return { success: false, message: 'Sesi tidak lagi valid. Silakan masuk kembali.' }
+    }
+
+    const [existing] = await db
+      .select()
+      .from(biodata)
+      .where(eq(biodata.userId, current.id))
+      .limit(1)
+
+    const payloadValues = {
+      nik: body.nik?.trim() || null,
+      kkNumber: body.kkNumber?.trim() || null,
+      npwp: body.npwp?.trim() || null,
+      bpjsKetenagakerjaan: body.bpjsKetenagakerjaan?.trim() || null,
+      bpjsKesehatan: body.bpjsKesehatan?.trim() || null,
+      gender: body.gender?.trim() || null,
+      placeOfBirth: body.placeOfBirth?.trim() || null,
+      dateOfBirth: body.dateOfBirth?.trim() || null,
+      religion: body.religion?.trim() || null,
+      bloodType: body.bloodType?.trim() || null,
+      maritalStatus: body.maritalStatus?.trim() || null,
+      phone: body.phone?.trim() || null,
+      emergencyContactName: body.emergencyContactName?.trim() || null,
+      emergencyContactPhone: body.emergencyContactPhone?.trim() || null,
+      emergencyContactRelation: body.emergencyContactRelation?.trim() || null,
+      addressKtp: body.addressKtp?.trim() || null,
+      addressCurrent: body.addressCurrent?.trim() || null,
+      postalCode: body.postalCode?.trim() || null,
+      city: body.city?.trim() || null,
+      province: body.province?.trim() || null,
+      lastEducation: body.lastEducation?.trim() || null,
+      major: body.major?.trim() || null,
+      institution: body.institution?.trim() || null,
+      bankName: body.bankName?.trim() || null,
+      bankAccountNumber: body.bankAccountNumber?.trim() || null,
+      bankAccountHolder: body.bankAccountHolder?.trim() || null,
+      isCompleted: true,
+      completedAt: new Date(),
+      updatedAt: new Date()
+    }
+
+    if (existing) {
+      const [updated] = await db
+        .update(biodata)
+        .set(payloadValues)
+        .where(eq(biodata.userId, current.id))
+        .returning()
+
+      return {
+        success: true,
+        data: updated,
+        message: 'Biodata karyawan berhasil disimpan dan diverifikasi lengkap.'
+      }
+    }
+
+    const [created] = await db
+      .insert(biodata)
+      .values({
+        userId: current.id,
+        companyId: current.companyId || null,
+        ...payloadValues
+      })
+      .returning()
+
+    return {
+      success: true,
+      data: created,
+      message: 'Biodata karyawan berhasil dilengkapi.'
+    }
+  }, {
+    body: t.Object({
+      nik: t.Optional(t.String()),
+      kkNumber: t.Optional(t.String()),
+      npwp: t.Optional(t.String()),
+      bpjsKetenagakerjaan: t.Optional(t.String()),
+      bpjsKesehatan: t.Optional(t.String()),
+      gender: t.Optional(t.String()),
+      placeOfBirth: t.Optional(t.String()),
+      dateOfBirth: t.Optional(t.String()),
+      religion: t.Optional(t.String()),
+      bloodType: t.Optional(t.String()),
+      maritalStatus: t.Optional(t.String()),
+      phone: t.Optional(t.String()),
+      emergencyContactName: t.Optional(t.String()),
+      emergencyContactPhone: t.Optional(t.String()),
+      emergencyContactRelation: t.Optional(t.String()),
+      addressKtp: t.Optional(t.String()),
+      addressCurrent: t.Optional(t.String()),
+      postalCode: t.Optional(t.String()),
+      city: t.Optional(t.String()),
+      province: t.Optional(t.String()),
+      lastEducation: t.Optional(t.String()),
+      major: t.Optional(t.String()),
+      institution: t.Optional(t.String()),
+      bankName: t.Optional(t.String()),
+      bankAccountNumber: t.Optional(t.String()),
+      bankAccountHolder: t.Optional(t.String())
+    })
+  })
+  // Ambil Seluruh Surat / Pesan Internal Karyawan yang Login
+  .get('/mail', async ({ headers, jwt, set }) => {
+    const authHeader = headers['authorization']
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401
+      return { success: false, message: 'Token otorisasi tidak ditemukan' }
+    }
+
+    const payload = await jwt.verify(authHeader.slice(7))
+    const current = await resolveSessionUser(payload)
+
+    if (!current) {
+      set.status = 401
+      return { success: false, message: 'Sesi tidak lagi valid. Silakan masuk kembali.' }
+    }
+
+    const mails = await db
+      .select()
+      .from(mail)
+      .where(eq(mail.userId, current.id))
+      .orderBy(mail.createdAt)
+
+    return {
+      success: true,
+      data: mails
+    }
+  })
+  // Tandai Surat Sebagai Dibaca
+  .patch('/mail/:id/read', async ({ headers, params, jwt, set }) => {
+    const authHeader = headers['authorization']
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401
+      return { success: false, message: 'Token otorisasi tidak ditemukan' }
+    }
+
+    const payload = await jwt.verify(authHeader.slice(7))
+    const current = await resolveSessionUser(payload)
+
+    if (!current) {
+      set.status = 401
+      return { success: false, message: 'Sesi tidak lagi valid. Silakan masuk kembali.' }
+    }
+
+    const [updated] = await db
+      .update(mail)
+      .set({ isRead: true, updatedAt: new Date() })
+      .where(and(eq(mail.id, params.id), eq(mail.userId, current.id)))
+      .returning()
+
+    if (!updated) {
+      set.status = 404
+      return { success: false, message: 'Surat tidak ditemukan.' }
+    }
+
+    return {
+      success: true,
+      data: updated,
+      message: 'Surat ditandai telah dibaca.'
+    }
+  }, {
+    params: t.Object({ id: t.String() })
   })
 
 // Aplikasi Layanan Auth lengkap (Termasuk Otentikasi, Perusahaan & Departemen)

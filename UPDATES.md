@@ -308,10 +308,53 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
 • **Halaman Karyawan (`employees.tsx`)**:
   - Formulir penambahan & pengubahan karyawan dilengkapi pemilih shift kerja (`SelectField` Shift kerja).
   - Tabel karyawan menampilkan kolom shift kerja aktif dengan nama shift, kode badge, dan jam kerja.
+  - Menampilkan kolom status kelengkapan biodata (`Lengkap ✓` / `Belum Diisi ○`) serta indikator relasi tabel mail aktif.
 
 ---
 
-## § 8. Panduan Perintah Operasional
+## § 8. Relasi Tabel Mail & Biodata Karyawan Pasca-Login
+
+Untuk mendukung tata kelola administrasi kepegawaian Indonesia dan korespondensi internal resmi:
+
+### 1. Tabel `mail` (Surat & Pesan Internal Karyawan)
+• **Struktur Skema Drizzle**:
+  - `id` (UUID PRIMARY KEY DEFAULT gen_random_uuid())
+  - `user_id` (UUID NOT NULL, REFERENCES users(id) ON DELETE CASCADE)
+  - `company_id` (UUID, REFERENCES companies(id) ON DELETE CASCADE)
+  - `sender_email` (VARCHAR 255 NOT NULL)
+  - `sender_name` (VARCHAR 255)
+  - `recipient_email` (VARCHAR 255 NOT NULL)
+  - `recipient_name` (VARCHAR 255)
+  - `subject` (VARCHAR 255 NOT NULL)
+  - `body` (TEXT NOT NULL)
+  - `category` (VARCHAR 50 DEFAULT 'inbox' NOT NULL)
+  - `is_read` (BOOLEAN DEFAULT false NOT NULL)
+  - `is_starred` (BOOLEAN DEFAULT false NOT NULL)
+  - `metadata` (JSONB)
+  - `sent_at`, `created_at`, `updated_at` (TIMESTAMPTZ)
+• **Relasi 1:N Antara Karyawan & Mail**:
+  - Setiap pendaftaran karyawan baru (`POST /api/employees`) otomatis menerbitkan surat onboarding awal dari Departemen HR & Personalia yang masuk ke tabel `mail`.
+  - Memastikan seluruh karyawan terikat secara relasional dengan tabel `mail`.
+  - Tersedia endpoint `GET /api/auth/mail` untuk membaca kotak surat personal dan `PATCH /api/auth/mail/:id/read` untuk menandai surat telah dibaca.
+
+### 2. Tabel `biodata` (Biodata Lengkap Karyawan Pasca-Login)
+• **Struktur Skema Drizzle**:
+  - `id` (UUID PRIMARY KEY DEFAULT gen_random_uuid())
+  - `user_id` (UUID NOT NULL UNIQUE, REFERENCES users(id) ON DELETE CASCADE)
+  - `company_id` (UUID, REFERENCES companies(id) ON DELETE CASCADE)
+  - **Identitas Kependudukan & Pajak**: `nik` (16 digit), `kk_number`, `npwp`, `bpjs_ketenagakerjaan`, `bpjs_kesehatan`.
+  - **Pribadi & Demografi**: `gender`, `place_of_birth`, `date_of_birth`, `religion`, `blood_type`, `marital_status`.
+  - **Kontak & Domisili**: `phone`, `emergency_contact_name`, `emergency_contact_phone`, `emergency_contact_relation`, `address_ktp`, `address_current`, `postal_code`, `city`, `province`.
+  - **Pendidikan & Bank**: `last_education`, `major`, `institution`, `bank_name`, `bank_account_number`, `bank_account_holder`.
+  - **Status Kelengkapan**: `is_completed` (BOOLEAN DEFAULT false), `completed_at` (TIMESTAMPTZ).
+• **Alur Pengisian Pasca-Login**:
+  - Saat karyawan didaftarkan oleh HR, baris awal biodata langsung dibuat dengan status `is_completed: false`.
+  - Ketika karyawan masuk (*login*) ke portal, mereka membuka tab **Biodata Karyawan** pada halaman Profil (`/profile`) untuk melengkapi data kependudukan, nomor BPJS, kontak darurat, dan rekening gaji.
+  - Endpoint `PUT /api/auth/biodata` memvalidasi input NIK 16 digit, menyimpan seluruh atribut, menandai `is_completed: true`, dan mencatat `completed_at`.
+
+---
+
+## § 9. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):

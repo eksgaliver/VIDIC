@@ -109,12 +109,101 @@ export const companyOperationalAreas = pgTable('company_operational_areas', {
   index('idx_comp_op_areas_city').on(table.city)
 ])
 
+// 6. Tabel Surat / Surel / Pesan Internal Karyawan (Mail)
+// Setiap karyawan memiliki relasi dengan tabel mail untuk komunikasi internal, pesan onboarding, dan notifikasi tugas.
+export const mail = pgTable('mail', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id')
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  senderEmail: varchar('sender_email', { length: 255 }).notNull(),
+  senderName: varchar('sender_name', { length: 255 }),
+  recipientEmail: varchar('recipient_email', { length: 255 }).notNull(),
+  recipientName: varchar('recipient_name', { length: 255 }),
+  subject: varchar('subject', { length: 255 }).notNull(),
+  body: text('body').notNull(),
+  category: varchar('category', { length: 50 }).default('inbox').notNull(), // 'inbox' | 'sent' | 'announcement' | 'system'
+  isRead: boolean('is_read').default(false).notNull(),
+  isStarred: boolean('is_starred').default(false).notNull(),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_mail_user_id').on(table.userId),
+  index('idx_mail_company_id').on(table.companyId),
+  index('idx_mail_recipient_email').on(table.recipientEmail),
+  index('idx_mail_category').on(table.category),
+  index('idx_mail_is_read').on(table.isRead)
+])
+
+// 7. Tabel Biodata Karyawan (Biodata)
+// Dibuat saat pendaftaran karyawan awal dan akan dilengkapi oleh karyawan bersangkutan setelah berhasil login.
+export const biodata = pgTable('biodata', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id')
+    .references(() => companies.id, { onDelete: 'cascade' }),
+
+  // 1. Identitas Kependudukan & Pajak
+  nik: varchar('nik', { length: 20 }), // 16 digit NIK KTP
+  kkNumber: varchar('kk_number', { length: 20 }), // No. Kartu Keluarga
+  npwp: varchar('npwp', { length: 30 }),
+  bpjsKetenagakerjaan: varchar('bpjs_ketenagakerjaan', { length: 30 }),
+  bpjsKesehatan: varchar('bpjs_kesehatan', { length: 30 }),
+
+  // 2. Data Pribadi & Demografi
+  gender: varchar('gender', { length: 20 }), // 'male' | 'female'
+  placeOfBirth: varchar('place_of_birth', { length: 100 }),
+  dateOfBirth: varchar('date_of_birth', { length: 20 }), // Format YYYY-MM-DD
+  religion: varchar('religion', { length: 50 }), // Islam, Kristen, Katolik, Hindu, Buddha, Khonghucu
+  bloodType: varchar('blood_type', { length: 10 }), // A, B, AB, O
+  maritalStatus: varchar('marital_status', { length: 30 }), // single, married, widow, widower
+
+  // 3. Kontak & Domisili
+  phone: varchar('phone', { length: 30 }),
+  emergencyContactName: varchar('emergency_contact_name', { length: 150 }),
+  emergencyContactPhone: varchar('emergency_contact_phone', { length: 30 }),
+  emergencyContactRelation: varchar('emergency_contact_relation', { length: 50 }),
+  addressKtp: text('address_ktp'),
+  addressCurrent: text('address_current'),
+  postalCode: varchar('postal_code', { length: 10 }),
+  city: varchar('city', { length: 100 }),
+  province: varchar('province', { length: 100 }),
+
+  // 4. Pendidikan Terakhir & Rekening Bank
+  lastEducation: varchar('last_education', { length: 50 }), // SMA/SMK, D3, S1, S2, S3
+  major: varchar('major', { length: 100 }),
+  institution: varchar('institution', { length: 150 }),
+  bankName: varchar('bank_name', { length: 50 }),
+  bankAccountNumber: varchar('bank_account_number', { length: 50 }),
+  bankAccountHolder: varchar('bank_account_holder', { length: 150 }),
+
+  // 5. Status Kelengkapan Pengisian Biodata
+  isCompleted: boolean('is_completed').default(false).notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_biodata_user_id').on(table.userId),
+  index('idx_biodata_company_id').on(table.companyId),
+  index('idx_biodata_nik').on(table.nik),
+  index('idx_biodata_is_completed').on(table.isCompleted)
+])
+
 // Relasi untuk Drizzle Relational Queries API (db.query)
 export const companiesRelations = relations(companies, ({ many }) => ({
   locations: many(companyLocations),
   departments: many(departments),
   employees: many(users),
-  operationalAreas: many(companyOperationalAreas)
+  operationalAreas: many(companyOperationalAreas),
+  mails: many(mail),
+  biodatas: many(biodata)
 }))
 
 export const companyOperationalAreasRelations = relations(companyOperationalAreas, ({ one }) => ({
@@ -139,7 +228,7 @@ export const departmentsRelations = relations(departments, ({ one, many }) => ({
   employees: many(users)
 }))
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   company: one(companies, {
     fields: [users.companyId],
     references: [companies.id]
@@ -147,6 +236,33 @@ export const usersRelations = relations(users, ({ one }) => ({
   department: one(departments, {
     fields: [users.departmentId],
     references: [departments.id]
+  }),
+  biodata: one(biodata, {
+    fields: [users.id],
+    references: [biodata.userId]
+  }),
+  mails: many(mail)
+}))
+
+export const mailRelations = relations(mail, ({ one }) => ({
+  user: one(users, {
+    fields: [mail.userId],
+    references: [users.id]
+  }),
+  company: one(companies, {
+    fields: [mail.companyId],
+    references: [companies.id]
+  })
+}))
+
+export const biodataRelations = relations(biodata, ({ one }) => ({
+  user: one(users, {
+    fields: [biodata.userId],
+    references: [users.id]
+  }),
+  company: one(companies, {
+    fields: [biodata.companyId],
+    references: [companies.id]
   })
 }))
 
@@ -161,4 +277,8 @@ export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type CompanyOperationalArea = typeof companyOperationalAreas.$inferSelect
 export type NewCompanyOperationalArea = typeof companyOperationalAreas.$inferInsert
+export type Mail = typeof mail.$inferSelect
+export type NewMail = typeof mail.$inferInsert
+export type Biodata = typeof biodata.$inferSelect
+export type NewBiodata = typeof biodata.$inferInsert
 

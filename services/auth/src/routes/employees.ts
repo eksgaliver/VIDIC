@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 import { and, eq, type SQL } from 'drizzle-orm'
 import { alias, pgTable, time, uuid, varchar } from 'drizzle-orm/pg-core'
 import { db } from '../db'
-import { companies, departments, users } from '../db/schema'
+import { companies, departments, users, mail, biodata } from '../db/schema'
 
 // Referensi tabel shifts untuk relasi penugasan shift pada karyawan
 const shifts = pgTable('shifts', {
@@ -126,11 +126,13 @@ function mapEmployee(row: Record<string, any>) {
     shiftCode,
     shiftStartTime,
     shiftEndTime,
+    biodataCompleted,
     ...employee
   } = row
 
   return {
     ...employee,
+    biodataCompleted: Boolean(biodataCompleted),
     department: employee.departmentId
       ? { id: employee.departmentId, name: departmentName, code: departmentCode }
       : null,
@@ -177,19 +179,40 @@ async function listEmployeeRows(companyId?: string, employeeId?: string) {
       shiftName: shifts.name,
       shiftCode: shifts.code,
       shiftStartTime: shifts.startTime,
-      shiftEndTime: shifts.endTime
+      shiftEndTime: shifts.endTime,
+      biodataCompleted: biodata.isCompleted
     })
     .from(users)
     .leftJoin(departments, eq(users.departmentId, departments.id))
     .leftJoin(supervisor, eq(users.supervisorId, supervisor.id))
     .leftJoin(shifts, eq(users.shiftId, shifts.id))
+    .leftJoin(biodata, eq(users.id, biodata.userId))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(users.name)
 }
 
 async function getEmployeeDetail(id: string) {
   const rows = await listEmployeeRows(undefined, id)
-  return rows[0] ? mapEmployee(rows[0]) : null
+  if (!rows[0]) return null
+  const base = mapEmployee(rows[0])
+
+  const [biodataRow] = await db
+    .select()
+    .from(biodata)
+    .where(eq(biodata.userId, id))
+    .limit(1)
+
+  const mailRows = await db
+    .select()
+    .from(mail)
+    .where(eq(mail.userId, id))
+    .orderBy(mail.createdAt)
+
+  return {
+    ...base,
+    biodata: biodataRow || null,
+    mails: mailRows
+  }
 }
 
 const createEmployeeSchema = {
@@ -292,6 +315,28 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       })
       .returning({ id: users.id })
 
+    // Inisialisasi baris biodata karyawan awal (akan diisi nanti saat login)
+    await db.insert(biodata).values({
+      userId: created.id,
+      companyId: body.companyId,
+      isCompleted: false
+    })
+
+    // Buat relasi surat onboarding di tabel mail
+    await db.insert(mail).values({
+      userId: created.id,
+      companyId: body.companyId,
+      senderEmail: 'hr@srikaya.id',
+      senderName: 'Departemen HR & Personalia',
+      recipientEmail: email,
+      recipientName: name,
+      subject: 'Selamat Datang di Srikaya Platform - Informasi Akun & Pengisian Biodata',
+      body: `Halo ${name},\n\nSelamat bergabung di perusahaan kami! Akun karyawan Anda telah berhasil didaftarkan dengan posisi ${position}.\n\nSilakan masuk (login) ke platform menggunakan surel Anda (${email}) dan kata sandi sementara "${INITIAL_PASSWORD}".\n\nSetelah berhasil masuk, mohon segera lengkapi Biodata Karyawan Anda pada menu Profil untuk keperluan kelengkapan administrasi kepegawaian, BPJS, dan perpajakan.\n\nSalam hangat,\nDepartemen HR & Personalia`,
+      category: 'inbox',
+      isRead: false,
+      isStarred: true
+    })
+
     set.status = 201
     return {
       success: true,
@@ -348,6 +393,28 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
         status: 'active'
       })
       .returning({ id: users.id })
+
+    // Inisialisasi baris biodata karyawan awal (akan diisi nanti saat login)
+    await db.insert(biodata).values({
+      userId: created.id,
+      companyId: body.companyId,
+      isCompleted: false
+    })
+
+    // Buat relasi surat onboarding di tabel mail
+    await db.insert(mail).values({
+      userId: created.id,
+      companyId: body.companyId,
+      senderEmail: 'hr@srikaya.id',
+      senderName: 'Departemen HR & Personalia',
+      recipientEmail: email,
+      recipientName: name,
+      subject: 'Selamat Datang di Srikaya Platform - Informasi Akun & Pengisian Biodata',
+      body: `Halo ${name},\n\nSelamat bergabung di perusahaan kami! Akun karyawan Anda telah berhasil didaftarkan dengan posisi ${position}.\n\nSilakan masuk (login) ke platform menggunakan surel Anda (${email}) dan kata sandi sementara "${INITIAL_PASSWORD}".\n\nSetelah berhasil masuk, mohon segera lengkapi Biodata Karyawan Anda pada menu Profil untuk keperluan kelengkapan administrasi kepegawaian, BPJS, dan perpajakan.\n\nSalam hangat,\nDepartemen HR & Personalia`,
+      category: 'inbox',
+      isRead: false,
+      isStarred: true
+    })
 
     set.status = 201
     return {
@@ -441,6 +508,32 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       success: true,
       message: `Karyawan ${existing.name} berhasil dihapus beserta seluruh shift miliknya.`
     }
+  }, {
+    params: t.Object({ id: t.String() })
+  })
+  .get('/:id/biodata', async ({ params, set }) => {
+    const [row] = await db
+      .select()
+      .from(biodata)
+      .where(eq(biodata.userId, params.id))
+      .limit(1)
+
+    if (!row) {
+      set.status = 404
+      return { success: false, message: 'Biodata karyawan tidak ditemukan.' }
+    }
+    return { success: true, data: row }
+  }, {
+    params: t.Object({ id: t.String() })
+  })
+  .get('/:id/mails', async ({ params }) => {
+    const mails = await db
+      .select()
+      .from(mail)
+      .where(eq(mail.userId, params.id))
+      .orderBy(mail.createdAt)
+
+    return { success: true, data: mails }
   }, {
     params: t.Object({ id: t.String() })
   })

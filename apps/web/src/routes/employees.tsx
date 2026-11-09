@@ -3,6 +3,7 @@ import { Link, createRoute } from '@tanstack/react-router'
 import {
   HiOutlineArrowRight,
   HiOutlineClock,
+  HiOutlineMail,
   HiOutlinePencil,
   HiOutlinePlus,
   HiOutlineTrash,
@@ -426,6 +427,7 @@ export function EmployeesPage() {
                       <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Karyawan</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Posisi & departemen</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Shift kerja</th>
+                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Biodata & Mail</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Atasan</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Status</th>
                       <th className="px-4 py-2.5 text-right font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Aksi</th>
@@ -473,6 +475,23 @@ export function EmployeesPage() {
                           ) : (
                             <span className="text-xs text-ink-3 italic">Belum diatur</span>
                           )}
+                        </td>
+                        <td className="px-4 py-3.5 align-top 2xl:py-4">
+                          <div className="space-y-1">
+                            {employee.biodataCompleted ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">
+                                Lengkap ✓
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded bg-surface-3 px-2 py-0.5 text-xs font-medium text-ink-3">
+                                Belum Diisi ○
+                              </span>
+                            )}
+                            <p className="flex items-center gap-1 text-[11px] text-ink-3">
+                              <HiOutlineMail className="h-3.5 w-3.5 text-primary" />
+                              <span>Relasi Mail Aktif</span>
+                            </p>
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 align-top text-ink-2 2xl:py-4">
                           {employee.supervisor ? (

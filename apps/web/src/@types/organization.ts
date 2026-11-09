@@ -83,6 +83,64 @@ export interface Employee {
     startTime: string
     endTime: string
   } | null
+  biodataCompleted?: boolean
+  biodata?: Biodata | null
+  mails?: Mail[]
+  createdAt?: string | Date
+  updatedAt?: string | Date
+}
+
+export interface Biodata {
+  id?: string
+  userId: string
+  companyId?: string | null
+  nik?: string | null
+  kkNumber?: string | null
+  npwp?: string | null
+  bpjsKetenagakerjaan?: string | null
+  bpjsKesehatan?: string | null
+  gender?: string | null
+  placeOfBirth?: string | null
+  dateOfBirth?: string | null
+  religion?: string | null
+  bloodType?: string | null
+  maritalStatus?: string | null
+  phone?: string | null
+  emergencyContactName?: string | null
+  emergencyContactPhone?: string | null
+  emergencyContactRelation?: string | null
+  addressKtp?: string | null
+  addressCurrent?: string | null
+  postalCode?: string | null
+  city?: string | null
+  province?: string | null
+  lastEducation?: string | null
+  major?: string | null
+  institution?: string | null
+  bankName?: string | null
+  bankAccountNumber?: string | null
+  bankAccountHolder?: string | null
+  isCompleted: boolean
+  completedAt?: string | Date | null
+  createdAt?: string | Date
+  updatedAt?: string | Date
+}
+
+export interface Mail {
+  id: string
+  userId: string
+  companyId?: string | null
+  senderEmail: string
+  senderName?: string | null
+  recipientEmail: string
+  recipientName?: string | null
+  subject: string
+  body: string
+  category: string
+  isRead: boolean
+  isStarred: boolean
+  metadata?: Record<string, unknown> | null
+  sentAt: string | Date
   createdAt?: string | Date
   updatedAt?: string | Date
 }
