@@ -237,7 +237,11 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
 • **Titik Penting Geolokasi Absensi (*Geofence Attendance*)**:
   - Setiap shift wajib memiliki minimal satu titik lokasi absensi (`attendanceLocationIds`).
   - Mendukung penugasan multi-lokasi (karyawan diizinkan absensi di beberapa kantor cabang yang valid).
-  - Setiap titik absensi mengikat koordinat geolokasi (`latitude`, `longitude`, `radiusMeters`, `coordinatesType`, `polygonCoordinates`, dan `timezone`).
+  - Setiap titik absensi mengikat skema geolokasi mandiri yang identik dengan lokasi operasional perusahaan (`name`, `address`, `city`, `province`, `latitude`, `longitude`, `radius_meters`, `coordinates_type`, `polygon_coordinates`, dan `timezone`).
+  - Mengantisipasi kondisi perusahaan memiliki lebih dari satu cabang fisik di dalam satu kota yang sama tanpa kerancuan.
+• **Algoritma Verifikasi Presensi Geofence**:
+  - *Haversine Formula*: Menghitung deviasi jarak meter terhadap titik pusat kantor radius lingkaran.
+  - *Ray Casting (Even-Odd)*: Memvalidasi apakah koordinat GPS pengguna berada di dalam batas perimeter poligon tapak kantor.
 • **Pendeteksian Shift Lintas Hari (*Overnight Shift*)**:
   Sistem secara otomatis mendeteksi dan memberi indikasi jika jam selesai lebih awal dari jam mulai (`endTime <= startTime`), menandakan shift melewati tengah malam.
 
@@ -258,26 +262,36 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
   - `created_at`, `updated_at` (TIMESTAMPTZ)
 • **Tabel `users` (Pembaruan)**:
   - `shift_id` (UUID, FK `shifts.id`, `ON DELETE SET NULL`, Berindeks)
-• **Tabel `shift_attendance_locations`**:
+• **Tabel `shift_attendance_locations` (Skema Geolokasi Lengkap)**:
   - `id` (UUID PK)
   - `shift_id` (FK `shifts.id`, `ON DELETE CASCADE`)
-  - `location_id` (FK `company_locations.id`, `ON DELETE RESTRICT`)
+  - `location_id` (FK `company_locations.id`, nullable, `ON DELETE SET NULL`)
+  - `name` (VARCHAR 150, Nama lokasi kantor/cabang)
+  - `address` (TEXT, Alamat lengkap)
+  - `city` (VARCHAR 100, Kota/Kabupaten)
+  - `province` (VARCHAR 100, Provinsi)
+  - `latitude` (NUMERIC 10,7, Titik lintang GPS)
+  - `longitude` (NUMERIC 10,7, Titik bujur GPS)
+  - `radius_meters` (INTEGER, Radius toleransi presensi dalam meter, default 50)
+  - `coordinates_type` (VARCHAR 20, `'point'` atau `'polygon'`, default `'point'`)
+  - `polygon_coordinates` (JSONB, Array pasangan koordinat `[[lat, lng], ...]`)
+  - `timezone` (VARCHAR 50, default `'Asia/Jakarta'`)
   - `created_at` (TIMESTAMPTZ)
-  - Indeks unik majemuk: `(shift_id, location_id)`
 
-### 3. Kontrak Endpoint CRUD Shift
-• `GET /api/shifting/shifts`: Mengambil daftar master shift beserta relasi lokasi kerja, titik geofence absensi, jumlah karyawan bertugas (`assignedCount`), dan daftar karyawan bertugas (`assignedEmployees`).
+### 3. Kontrak Endpoint CRUD & Verifikasi Shift
+• `GET /api/shifting/shifts`: Mengambil daftar master shift beserta relasi lokasi kerja, titik geofence absensi lengkap, jumlah karyawan bertugas (`assignedCount`), dan daftar karyawan bertugas (`assignedEmployees`).
 • `GET /api/shifting/shifts/:id`: Mengambil rincian spesifik satu master shift.
 • `POST /api/shifting/shifts`: Membuat master shift baru tanpa keharusan adanya karyawan (hanya membutuhkan nama, kode, jam kerja, lokasi kerja, dan titik geofence absensi).
-• `PUT /api/shifting/shifts/:id`: Memperbarui data shift dan memperbarui relasi lokasi absensi secara transaksional (`db.transaction`).
+• `PUT /api/shifting/shifts/:id`: Memperbarui data shift dan menyelaraskan titik lokasi absensi secara transaksional (`db.transaction`).
 • `DELETE /api/shifting/shifts/:id`: Menghapus data shift dan me-reset penugasan `shift_id` pada karyawan terkait menjadi null.
+• `POST /api/shifting/shifts/:id/verify-attendance`: Endpoint verifikasi absensi geolokasi berbasis posisi GPS pengguna (`latitude`, `longitude`). Mengembalikan status `verified: true/false`, deviasi jarak meter (`distanceMeters`), serta data titik lokasi yang cocok (`matchedLocation`).
 
 ### 4. Integrasi Frontend (`apps/web/src/routes/shifts.tsx` & `employees.tsx`)
 • **Halaman Master Shift (`shifts.tsx`)**:
   - Tombol "Buat Shift" aktif selama perusahaan memiliki lokasi kantor aktif (tidak terblokir oleh ketiadaan karyawan).
-  - Banner informasi bahwa shift dapat dibuat sebelum karyawan didaftarkan.
-  - Formulir dialog pembuatan & pengubahan shift: Nama, Kode, Jam Mulai, Jam Selesai, Lokasi Kerja Utama, Titik Absensi Geofence, Deskripsi, dan penugasan karyawan opsional jika ada karyawan aktif.
-  - Tabel master shift dengan lencana kode, jam kerja, lokasi utama, titik geofence, dan jumlah karyawan bertugas.
+  - Pengelompokan lokasi kantor per kota (`locationsByCity`) untuk mempermudah pemilihan saat perusahaan memiliki lebih dari satu cabang di kota yang sama.
+  - Kartu pemilih geofence menampilkan nama cabang, alamat, tipe geofence (`Point` radius atau `Polygon`), koordinat GPS, dan timezone.
+  - Tabel master shift menampilkan rincian titik geofence per baris shift beserta badge tipe koordinat.
 • **Halaman Karyawan (`employees.tsx`)**:
   - Formulir penambahan & pengubahan karyawan dilengkapi pemilih shift kerja (`SelectField` Shift kerja).
   - Tabel karyawan menampilkan kolom shift kerja aktif dengan nama shift, kode badge, dan jam kerja.

@@ -31,7 +31,7 @@ import {
   TextField,
 } from '@/components/base'
 import { errorText } from '@/utils/apiError'
-import type { Company, Employee, Shift, ShiftLocation } from '@/@types/organization'
+import type { Company, CompanyLocation, Employee, Shift, ShiftLocation } from '@/@types/organization'
 import {
   COMPANIES_PATH,
   EMPLOYEES_PATH,
@@ -69,7 +69,7 @@ function isOvernight(startTime: string, endTime: string) {
   return endTime <= startTime
 }
 
-function locationLine(location: ShiftLocation) {
+function locationLine(location: ShiftLocation | CompanyLocation) {
   return `${location.name} · ${location.city} · radius ${location.radiusMeters} m`
 }
 
@@ -98,6 +98,18 @@ export function ShiftsPage() {
   )
   const primaryLocation = locations.find((location) => location.isPrimary) ?? locations[0]
   const activeEmployees = employees.filter((employee) => employee.status === 'active')
+
+  // Mengelompokkan lokasi kantor berdasarkan kota untuk mengantisipasi > 1 lokasi di 1 kota
+  const locationsByCity = React.useMemo(() => {
+    const map = new Map<string, CompanyLocation[]>()
+    for (const loc of locations) {
+      const key = loc.city || 'Lainnya'
+      const list = map.get(key) ?? []
+      list.push(loc)
+      map.set(key, list)
+    }
+    return map
+  }, [locations])
 
   const fetchCompanies = React.useCallback(async () => {
     try {
@@ -540,17 +552,32 @@ export function ShiftsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="max-w-[280px] px-4 py-3.5 align-top 2xl:py-4">
+                        <td className="max-w-[320px] px-4 py-3.5 align-top 2xl:py-4">
                           <p className="text-xs font-semibold text-ink">
                             {shift.attendanceLocations.length} titik geofence
                           </p>
-                          <ul className="mt-1 space-y-0.5">
-                            {shift.attendanceLocations.map((location) => (
-                              <li key={location.id} className="truncate text-xs text-ink-2">
-                                • {location.name} ({location.city})
-                              </li>
-                            ))}
-                          </ul>
+                          <div className="mt-1.5 space-y-1.5">
+                            {shift.attendanceLocations.map((loc) => {
+                              const isPolygon = loc.coordinatesType === 'polygon'
+                              const polygonPoints = loc.polygonCoordinates?.length ?? 0
+                              return (
+                                <div
+                                  key={loc.id}
+                                  className="rounded border border-line bg-surface-1 px-2.5 py-1.5 text-xs shadow-xs"
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="font-medium text-ink truncate">{loc.name}</span>
+                                    <span className="shrink-0 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-2">
+                                      {isPolygon ? `Polygon (${polygonPoints} t)` : `Point (${loc.radiusMeters}m)`}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-ink-3 truncate mt-0.5">
+                                    {loc.city} · {loc.address}
+                                  </p>
+                                </div>
+                              )
+                            })}
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 align-top text-ink-2 2xl:py-4">
                           <div className="flex items-center gap-1.5">
@@ -612,7 +639,7 @@ export function ShiftsPage() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onRequestClose={() => setIsCreateOpen(false)}
-        width={720}
+        width={780}
       >
         <DialogHeading
           title="Buat Master Shift"
@@ -714,16 +741,21 @@ export function ShiftsPage() {
                 placeholder="Catatan operasional shift, toleransi presensi, atau penugasan khusus"
               />
 
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold text-ink-2">
-                    Lokasi absensi berizin (Geofence)
-                    <span className="ml-1 text-error" aria-hidden="true">
-                      *
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-ink-2">
+                      Lokasi absensi berizin (Geofence Geolocation)
+                      <span className="ml-1 text-error" aria-hidden="true">
+                        *
+                      </span>
+                    </p>
+                    <span className="text-[11px] font-medium text-ink-3">
+                      {createForm.attendanceLocationIds.length} titik terpilih
                     </span>
-                  </p>
+                  </div>
                   <p className="mt-1 text-[11px] leading-snug text-ink-3">
-                    Pilih minimal satu titik lokasi kantor. Karyawan yang menggunakan shift ini dapat melakukan presensi di lokasi yang dicentang.
+                    Lokasi dikelompokkan per kota untuk mengantisipasi beberapa lokasi kantor/gudang dalam satu kota yang sama. Centang titik yang diizinkan untuk shift ini.
                   </p>
                 </div>
 
@@ -732,17 +764,62 @@ export function ShiftsPage() {
                     Belum ada lokasi kantor aktif. Atur lokasi perusahaan terlebih dahulu.
                   </p>
                 ) : (
-                  <div className="grid gap-2.5 rounded-panel border border-line p-3 sm:grid-cols-2">
-                    {locations.map((location) => (
-                      <CheckboxField
-                        key={location.id}
-                        label={location.name}
-                        checked={createForm.attendanceLocationIds.includes(location.id)}
-                        onChange={(event) =>
-                          toggleCreateAttendance(location.id, event.target.checked)
-                        }
-                        hint={`${location.city} · radius ${location.radiusMeters} m`}
-                      />
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    {Array.from(locationsByCity.entries()).map(([cityName, cityLocations]) => (
+                      <div key={cityName} className="rounded-panel border border-line bg-surface-2 p-3 space-y-2">
+                        <div className="flex items-center justify-between border-b border-line pb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <HiOutlineLocationMarker className="h-4 w-4 text-primary shrink-0" />
+                            <span className="text-xs font-semibold text-ink">{cityName}</span>
+                            {cityLocations[0]?.province ? (
+                              <span className="text-[11px] text-ink-3">({cityLocations[0].province})</span>
+                            ) : null}
+                          </div>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3">
+                            {cityLocations.length} titik lokasi
+                          </span>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {cityLocations.map((location) => {
+                            const isChecked = createForm.attendanceLocationIds.includes(location.id)
+                            const isPolygon = location.coordinatesType === 'polygon'
+                            const polygonPoints = location.polygonCoordinates?.length ?? 0
+
+                            return (
+                              <label
+                                key={location.id}
+                                className={`flex items-start gap-2.5 rounded-panel border p-2.5 cursor-pointer transition-colors ${
+                                  isChecked
+                                    ? 'border-primary bg-primary-subtle/15'
+                                    : 'border-line hover:border-line-hover bg-surface'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => toggleCreateAttendance(location.id, e.target.checked)}
+                                  className="mt-0.5 h-4 w-4 rounded border-line text-primary focus:ring-primary shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <p className="truncate text-xs font-semibold text-ink">{location.name}</p>
+                                    <span className="shrink-0 text-[10px] font-semibold uppercase px-1 py-0.2 rounded bg-surface-2 border border-line text-ink-2">
+                                      {isPolygon ? `Polygon (${polygonPoints} t)` : `Point (${location.radiusMeters}m)`}
+                                    </span>
+                                  </div>
+                                  <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-3">{location.address}</p>
+                                  <div className="mt-1 flex items-center gap-1.5 text-[10px] text-ink-3">
+                                    <span className="font-mono">{Number(location.latitude).toFixed(4)}, {Number(location.longitude).toFixed(4)}</span>
+                                    <span>·</span>
+                                    <span>{location.timezone || 'WIB'}</span>
+                                  </div>
+                                </div>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -798,7 +875,7 @@ export function ShiftsPage() {
         isOpen={!!editItem}
         onClose={() => setEditItem(null)}
         onRequestClose={() => setEditItem(null)}
-        width={720}
+        width={780}
       >
         <DialogHeading
           title={`Ubah Shift ${editItem?.name ?? ''}`}
@@ -896,30 +973,80 @@ export function ShiftsPage() {
                 }
               />
 
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold text-ink-2">
-                    Lokasi absensi berizin (Geofence)
-                    <span className="ml-1 text-error" aria-hidden="true">
-                      *
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-ink-2">
+                      Lokasi absensi berizin (Geofence Geolocation)
+                      <span className="ml-1 text-error" aria-hidden="true">
+                        *
+                      </span>
+                    </p>
+                    <span className="text-[11px] font-medium text-ink-3">
+                      {editForm.attendanceLocationIds.length} titik terpilih
                     </span>
-                  </p>
+                  </div>
                   <p className="mt-1 text-[11px] leading-snug text-ink-3">
-                    Pilih minimal satu titik lokasi kantor untuk presensi shift ini.
+                    Lokasi dikelompokkan per kota untuk mengantisipasi beberapa lokasi kantor/gudang dalam satu kota yang sama.
                   </p>
                 </div>
 
-                <div className="grid gap-2.5 rounded-panel border border-line p-3 sm:grid-cols-2">
-                  {locations.map((location) => (
-                    <CheckboxField
-                      key={location.id}
-                      label={location.name}
-                      checked={editForm.attendanceLocationIds.includes(location.id)}
-                      onChange={(event) =>
-                        toggleEditAttendance(location.id, event.target.checked)
-                      }
-                      hint={`${location.city} · radius ${location.radiusMeters} m`}
-                    />
+                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  {Array.from(locationsByCity.entries()).map(([cityName, cityLocations]) => (
+                    <div key={cityName} className="rounded-panel border border-line bg-surface-2 p-3 space-y-2">
+                      <div className="flex items-center justify-between border-b border-line pb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <HiOutlineLocationMarker className="h-4 w-4 text-primary shrink-0" />
+                          <span className="text-xs font-semibold text-ink">{cityName}</span>
+                          {cityLocations[0]?.province ? (
+                            <span className="text-[11px] text-ink-3">({cityLocations[0].province})</span>
+                          ) : null}
+                        </div>
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3">
+                          {cityLocations.length} titik lokasi
+                        </span>
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {cityLocations.map((location) => {
+                          const isChecked = editForm.attendanceLocationIds.includes(location.id)
+                          const isPolygon = location.coordinatesType === 'polygon'
+                          const polygonPoints = location.polygonCoordinates?.length ?? 0
+
+                          return (
+                            <label
+                              key={location.id}
+                              className={`flex items-start gap-2.5 rounded-panel border p-2.5 cursor-pointer transition-colors ${
+                                isChecked
+                                  ? 'border-primary bg-primary-subtle/15'
+                                  : 'border-line hover:border-line-hover bg-surface'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => toggleEditAttendance(location.id, e.target.checked)}
+                                className="mt-0.5 h-4 w-4 rounded border-line text-primary focus:ring-primary shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-1">
+                                  <p className="truncate text-xs font-semibold text-ink">{location.name}</p>
+                                  <span className="shrink-0 text-[10px] font-semibold uppercase px-1 py-0.2 rounded bg-surface-2 border border-line text-ink-2">
+                                    {isPolygon ? `Polygon (${polygonPoints} t)` : `Point (${location.radiusMeters}m)`}
+                                  </span>
+                                </div>
+                                <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-3">{location.address}</p>
+                                <div className="mt-1 flex items-center gap-1.5 text-[10px] text-ink-3">
+                                  <span className="font-mono">{Number(location.latitude).toFixed(4)}, {Number(location.longitude).toFixed(4)}</span>
+                                  <span>·</span>
+                                  <span>{location.timezone || 'WIB'}</span>
+                                </div>
+                              </div>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>

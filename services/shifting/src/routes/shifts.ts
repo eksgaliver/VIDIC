@@ -18,6 +18,56 @@ function normalizeTime(value: string): string | null {
   return trimmed.length === 5 ? `${trimmed}:00` : trimmed
 }
 
+// Rumus Haversine untuk menghitung jarak antara koordinat pengguna dan pusat geofence
+function haversineDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3
+  const phi1 = (lat1 * Math.PI) / 180
+  const phi2 = (lat2 * Math.PI) / 180
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+  return R * c
+}
+
+// Algoritma Ray Casting untuk memverifikasi apakah koordinat berada di dalam poligon geofence
+function isInsidePolygon(point: [number, number], polygon: [number, number][]): boolean {
+  if (!polygon || polygon.length < 3) return false
+  const [x, y] = point
+  let inside = false
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0]
+    const yi = polygon[i][1]
+    const xj = polygon[j][0]
+    const yj = polygon[j][1]
+
+    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
+    if (intersect) inside = !inside
+  }
+
+  return inside
+}
+
+interface LocationGeoSnapshot {
+  id: string
+  companyId: string
+  name: string
+  address: string
+  city: string
+  province: string | null
+  latitude: string | number
+  longitude: string | number
+  radiusMeters: number
+  coordinatesType: string
+  polygonCoordinates: [number, number][] | null
+  timezone: string
+}
+
 interface ShiftInput {
   companyId: string
   name: string
@@ -45,6 +95,7 @@ type ValidationResult =
       endTime: string
       workLocationId: string
       attendanceLocationIds: string[]
+      locations: LocationGeoSnapshot[]
       status: string
       employeeId: string | null
       position: string | null
@@ -100,10 +151,22 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     return { ok: false, status: 400, message: 'Pilih minimal satu lokasi absensi.' }
   }
 
+  // Mengambil skema geolokasi lengkap dari company_locations untuk mengantisipasi
+  // adanya lebih dari satu lokasi fisik dalam satu kota yang sama.
   const locations = await db
     .select({
       id: companyLocations.id,
       companyId: companyLocations.companyId,
+      name: companyLocations.name,
+      address: companyLocations.address,
+      city: companyLocations.city,
+      province: companyLocations.province,
+      latitude: companyLocations.latitude,
+      longitude: companyLocations.longitude,
+      radiusMeters: companyLocations.radiusMeters,
+      coordinatesType: companyLocations.coordinatesType,
+      polygonCoordinates: companyLocations.polygonCoordinates,
+      timezone: companyLocations.timezone,
       status: companyLocations.status
     })
     .from(companyLocations)
@@ -163,6 +226,7 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     endTime,
     workLocationId: workLocation.id,
     attendanceLocationIds,
+    locations: locations as LocationGeoSnapshot[],
     status: input.status === 'inactive' ? 'inactive' : 'active',
     employeeId,
     position,
@@ -228,22 +292,22 @@ async function attachAttendance<T extends { id: string }>(rows: T[]) {
     db
       .select({
         shiftId: shiftAttendanceLocations.shiftId,
-        id: companyLocations.id,
-        name: companyLocations.name,
-        address: companyLocations.address,
-        city: companyLocations.city,
-        province: companyLocations.province,
-        latitude: companyLocations.latitude,
-        longitude: companyLocations.longitude,
-        radiusMeters: companyLocations.radiusMeters,
-        coordinatesType: companyLocations.coordinatesType,
-        polygonCoordinates: companyLocations.polygonCoordinates,
-        timezone: companyLocations.timezone
+        id: shiftAttendanceLocations.id,
+        locationId: shiftAttendanceLocations.locationId,
+        name: shiftAttendanceLocations.name,
+        address: shiftAttendanceLocations.address,
+        city: shiftAttendanceLocations.city,
+        province: shiftAttendanceLocations.province,
+        latitude: shiftAttendanceLocations.latitude,
+        longitude: shiftAttendanceLocations.longitude,
+        radiusMeters: shiftAttendanceLocations.radiusMeters,
+        coordinatesType: shiftAttendanceLocations.coordinatesType,
+        polygonCoordinates: shiftAttendanceLocations.polygonCoordinates,
+        timezone: shiftAttendanceLocations.timezone
       })
       .from(shiftAttendanceLocations)
-      .innerJoin(companyLocations, eq(shiftAttendanceLocations.locationId, companyLocations.id))
       .where(inArray(shiftAttendanceLocations.shiftId, shiftIds))
-      .orderBy(companyLocations.name),
+      .orderBy(shiftAttendanceLocations.city, shiftAttendanceLocations.name),
 
     db
       .select({
@@ -328,7 +392,8 @@ async function attachAttendance<T extends { id: string }>(rows: T[]) {
         timezone: workLocationTimezone
       },
       attendanceLocations: (groupedAttendance.get(row.id) ?? []).map((location) => ({
-        id: location.id,
+        id: location.locationId || location.id,
+        attendanceLocationId: location.id,
         name: location.name,
         address: location.address,
         city: location.city,
@@ -396,6 +461,60 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
   }, {
     params: t.Object({ id: t.String() })
   })
+  // Endpoint verifikasi koordinat absensi geofence (point radius & polygon)
+  .post('/:id/verify-attendance', async ({ params, body, set }) => {
+    const shift = await getShiftDetail(params.id)
+    if (!shift) {
+      set.status = 404
+      return { success: false, message: 'Shift tidak ditemukan.' }
+    }
+
+    const userLat = Number(body.latitude)
+    const userLng = Number(body.longitude)
+
+    if (Number.isNaN(userLat) || Number.isNaN(userLng)) {
+      set.status = 400
+      return { success: false, message: 'Koordinat lintang dan bujur tidak valid.' }
+    }
+
+    for (const loc of shift.attendanceLocations) {
+      if (loc.coordinatesType === 'polygon' && loc.polygonCoordinates && loc.polygonCoordinates.length >= 3) {
+        if (isInsidePolygon([userLat, userLng], loc.polygonCoordinates)) {
+          return {
+            success: true,
+            verified: true,
+            message: `Presensi valid di area polygon: ${loc.name} (${loc.city})`,
+            matchedLocation: loc
+          }
+        }
+      } else {
+        const centerLat = Number(loc.latitude)
+        const centerLng = Number(loc.longitude)
+        const distance = haversineDistanceMeters(userLat, userLng, centerLat, centerLng)
+        if (distance <= loc.radiusMeters) {
+          return {
+            success: true,
+            verified: true,
+            message: `Presensi valid di titik radius: ${loc.name} (${loc.city})`,
+            distanceMeters: Math.round(distance),
+            matchedLocation: loc
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      verified: false,
+      message: 'Koordinat GPS Anda berada di luar seluruh radius / perimeter geofence yang diizinkan untuk shift ini.'
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      latitude: t.Number(),
+      longitude: t.Number()
+    })
+  })
   .post('', async ({ body, set }) => {
     const validated = await validateShiftInput(body)
     if (!validated.ok) {
@@ -421,10 +540,21 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
         })
         .returning()
 
+      // Menyimpan skema geolokasi lengkap ke shift_attendance_locations
       await tx.insert(shiftAttendanceLocations).values(
-        validated.attendanceLocationIds.map((locationId) => ({
+        validated.locations.map((loc) => ({
           shiftId: shift.id,
-          locationId
+          locationId: loc.id,
+          name: loc.name,
+          address: loc.address,
+          city: loc.city,
+          province: loc.province,
+          latitude: String(loc.latitude),
+          longitude: String(loc.longitude),
+          radiusMeters: loc.radiusMeters,
+          coordinatesType: loc.coordinatesType,
+          polygonCoordinates: loc.polygonCoordinates,
+          timezone: loc.timezone
         }))
       )
 
@@ -474,9 +604,19 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
         .returning()
 
       await tx.insert(shiftAttendanceLocations).values(
-        validated.attendanceLocationIds.map((locationId) => ({
+        validated.locations.map((loc) => ({
           shiftId: shift.id,
-          locationId
+          locationId: loc.id,
+          name: loc.name,
+          address: loc.address,
+          city: loc.city,
+          province: loc.province,
+          latitude: String(loc.latitude),
+          longitude: String(loc.longitude),
+          radiusMeters: loc.radiusMeters,
+          coordinatesType: loc.coordinatesType,
+          polygonCoordinates: loc.polygonCoordinates,
+          timezone: loc.timezone
         }))
       )
 
@@ -542,9 +682,19 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
         .where(eq(shiftAttendanceLocations.shiftId, params.id))
 
       await tx.insert(shiftAttendanceLocations).values(
-        validated.attendanceLocationIds.map((locationId) => ({
+        validated.locations.map((loc) => ({
           shiftId: params.id,
-          locationId
+          locationId: loc.id,
+          name: loc.name,
+          address: loc.address,
+          city: loc.city,
+          province: loc.province,
+          latitude: String(loc.latitude),
+          longitude: String(loc.longitude),
+          radiusMeters: loc.radiusMeters,
+          coordinatesType: loc.coordinatesType,
+          polygonCoordinates: loc.polygonCoordinates,
+          timezone: loc.timezone
         }))
       )
 

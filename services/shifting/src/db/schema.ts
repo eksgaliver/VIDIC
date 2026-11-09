@@ -1,6 +1,10 @@
 import {
   index,
+  integer,
+  jsonb,
+  numeric,
   pgTable,
+  text,
   time,
   timestamp,
   uniqueIndex,
@@ -40,8 +44,10 @@ export const shifts = pgTable('shifts', {
   index('idx_shifts_status').on(table.status)
 ])
 
-// Titik absensi geofence untuk satu shift. Minimal satu titik dijaga di
-// lapisan validasi API; tabel ini mengizinkan lebih dari satu titik.
+// Titik absensi geofence untuk satu shift. Skema geolokasi identik dengan
+// lokasi operasional perusahaan (coordinatesType, polygonCoordinates, radiusMeters,
+// latitude, longitude, timezone, address, city, province). Hal ini mengantisipasi
+// jika suatu perusahaan memiliki lebih dari 1 lokasi fisik dalam 1 kota yang sama.
 export const shiftAttendanceLocations = pgTable('shift_attendance_locations', {
   id: uuid('id').defaultRandom().primaryKey(),
   shiftId: uuid('shift_id')
@@ -49,12 +55,23 @@ export const shiftAttendanceLocations = pgTable('shift_attendance_locations', {
     .references(() => shifts.id, { onDelete: 'cascade' }),
   locationId: uuid('location_id')
     .notNull()
-    .references(() => companyLocations.id, { onDelete: 'restrict' }),
+    .references(() => companyLocations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 150 }).notNull(),
+  address: text('address').notNull(),
+  city: varchar('city', { length: 100 }).notNull(),
+  province: varchar('province', { length: 100 }),
+  latitude: numeric('latitude', { precision: 10, scale: 7 }).notNull(),
+  longitude: numeric('longitude', { precision: 10, scale: 7 }).notNull(),
+  radiusMeters: integer('radius_meters').default(100).notNull(),
+  coordinatesType: varchar('coordinates_type', { length: 20 }).default('point').notNull(),
+  polygonCoordinates: jsonb('polygon_coordinates').$type<[number, number][]>(),
+  timezone: varchar('timezone', { length: 50 }).default('Asia/Jakarta').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
 }, (table) => [
   uniqueIndex('uq_shift_attendance_location').on(table.shiftId, table.locationId),
   index('idx_shift_attendance_shift_id').on(table.shiftId),
-  index('idx_shift_attendance_location_id').on(table.locationId)
+  index('idx_shift_attendance_location_id').on(table.locationId),
+  index('idx_shift_attendance_city').on(table.city)
 ])
 
 export type Shift = typeof shifts.$inferSelect
