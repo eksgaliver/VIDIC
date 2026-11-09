@@ -54,8 +54,7 @@ export const shiftAttendanceLocations = pgTable('shift_attendance_locations', {
     .notNull()
     .references(() => shifts.id, { onDelete: 'cascade' }),
   locationId: uuid('location_id')
-    .notNull()
-    .references(() => companyLocations.id, { onDelete: 'cascade' }),
+    .references(() => companyLocations.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 150 }).notNull(),
   address: text('address').notNull(),
   city: varchar('city', { length: 100 }).notNull(),
@@ -68,7 +67,6 @@ export const shiftAttendanceLocations = pgTable('shift_attendance_locations', {
   timezone: varchar('timezone', { length: 50 }).default('Asia/Jakarta').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
 }, (table) => [
-  uniqueIndex('uq_shift_attendance_location').on(table.shiftId, table.locationId),
   index('idx_shift_attendance_shift_id').on(table.shiftId),
   index('idx_shift_attendance_location_id').on(table.locationId),
   index('idx_shift_attendance_city').on(table.city)

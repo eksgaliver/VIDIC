@@ -18,7 +18,6 @@ import { authenticatedRoute } from './_authenticated'
 import { api } from '@/lib/api'
 import Dialog from '@/components/ui/Dialog'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
-import { LeafletMapPicker } from '@/components/shared/LeafletMapPicker'
 import {
   OperationalAreaSelector,
   type SelectedOperationalArea,
@@ -45,7 +44,6 @@ import {
 } from '@/components/base'
 import { errorText } from '@/utils/apiError'
 import {
-  coordinateText,
   departmentCount,
   locationCount,
   operationalAreaCount,
@@ -89,16 +87,9 @@ const INITIAL_COMPANY_FORM = {
     { province: 'DKI Jakarta', city: 'Jakarta Selatan' },
     { province: 'DKI Jakarta', city: 'Jakarta Pusat' },
   ] as SelectedOperationalArea[],
-  locationName: 'Kantor Pusat Jakarta',
-  locationAddress: 'Jl. Jenderal Sudirman Kav. 52-53, Senayan',
   locationCity: 'Jakarta Selatan',
   locationProvince: 'DKI Jakarta',
   locationPostalCode: '12190',
-  locationLatitude: -6.225014,
-  locationLongitude: 106.809756,
-  locationRadius: 100,
-  locationCoordinatesType: 'point' as 'point' | 'polygon',
-  locationPolygon: [] as [number, number][],
   locationTimezone: 'Asia/Jakarta',
 }
 
@@ -108,11 +99,6 @@ const INITIAL_BRANCH_FORM = {
   city: 'Kota Bandung',
   province: 'Jawa Barat',
   postalCode: '40115',
-  latitude: -6.917464,
-  longitude: 107.619123,
-  radius: 100,
-  coordinatesType: 'point' as 'point' | 'polygon',
-  polygon: [] as [number, number][],
   timezone: 'Asia/Jakarta',
   isPrimary: false,
 }
@@ -214,16 +200,7 @@ export function CompaniesPage() {
       return
     }
 
-    if (createStep === 3) {
-      if (!form.locationName.trim() || !form.locationAddress.trim()) {
-        setErrorMsg('Nama titik dan alamat fisik kantor primer wajib diisi.')
-        return
-      }
-      setCreateStep(4)
-      return
-    }
-
-    // Step 4: Submit final
+    // Step 3: Submit final
     handleCreateCompanySubmit()
   }
 
@@ -236,6 +213,10 @@ export function CompaniesPage() {
     setIsSubmitting(true)
     setErrorMsg(null)
 
+    const primaryArea = form.operationalAreas[0]
+    const primaryCity = primaryArea?.city || form.locationCity || 'Jakarta Selatan'
+    const primaryProv = primaryArea?.province || form.locationProvince || 'DKI Jakarta'
+
     try {
       const res = await api.companies.post({
         code: form.code.trim().toUpperCase(),
@@ -247,19 +228,11 @@ export function CompaniesPage() {
         website: form.website.trim() || undefined,
         logoUrl: form.logoUrl.trim() || undefined,
         operationalAreas: form.operationalAreas,
-        locationName: form.locationName.trim(),
-        locationAddress: form.locationAddress.trim(),
-        locationCity: form.locationCity.trim(),
-        locationProvince: form.locationProvince.trim() || undefined,
+        locationName: `Kantor Operasional ${primaryCity}`,
+        locationAddress: `Kota ${primaryCity}, ${primaryProv}`,
+        locationCity: primaryCity,
+        locationProvince: primaryProv,
         locationPostalCode: form.locationPostalCode.trim() || undefined,
-        locationLatitude: String(form.locationLatitude),
-        locationLongitude: String(form.locationLongitude),
-        locationRadiusMeters: Number(form.locationRadius),
-        locationCoordinatesType: form.locationCoordinatesType,
-        locationPolygonCoordinates:
-          form.locationCoordinatesType === 'polygon' && form.locationPolygon.length > 0
-            ? form.locationPolygon
-            : undefined,
         locationTimezone: form.locationTimezone,
       })
 
@@ -269,7 +242,7 @@ export function CompaniesPage() {
       }
 
       setSuccessMsg(
-        `Perusahaan '${form.name}' berhasil didaftarkan beserta ${form.operationalAreas.length} kota operasional, lokasi primer, dan departemen HR.`
+        `Perusahaan '${form.name}' berhasil didaftarkan beserta ${form.operationalAreas.length} kota operasional dan departemen HR.`
       )
       setIsCreateOpen(false)
       setCreateStep(1)
@@ -391,18 +364,14 @@ export function CompaniesPage() {
     try {
       const res = await api.companies({ id: locationModalCompany.id }).locations.post({
         name: branch.name.trim(),
-        address: branch.address.trim(),
+        address: branch.address.trim() || `Kantor Cabang ${branch.city.trim()}`,
         city: branch.city.trim(),
         province: branch.province.trim() || undefined,
         postalCode: branch.postalCode.trim() || undefined,
-        latitude: String(branch.latitude),
-        longitude: String(branch.longitude),
-        radiusMeters: Number(branch.radius),
-        coordinatesType: branch.coordinatesType,
-        polygonCoordinates:
-          branch.coordinatesType === 'polygon' && branch.polygon.length > 0
-            ? branch.polygon
-            : undefined,
+        latitude: '0',
+        longitude: '0',
+        radiusMeters: 100,
+        coordinatesType: 'point',
         timezone: branch.timezone,
         isPrimary: branch.isPrimary,
       })
@@ -413,18 +382,10 @@ export function CompaniesPage() {
       }
 
       setSuccessMsg(
-        `Titik lokasi '${branch.name}' berhasil ditambahkan ke ${locationModalCompany.name}.`
+        `Lokasi kantor cabang '${branch.name}' berhasil ditambahkan ke ${locationModalCompany.name}.`
       )
       setIsAddBranchOpen(false)
-      setBranch((current) => ({
-        ...INITIAL_BRANCH_FORM,
-        latitude: current.latitude,
-        longitude: current.longitude,
-        radius: current.radius,
-        timezone: current.timezone,
-        province: current.province,
-        postalCode: current.postalCode,
-      }))
+      setBranch(INITIAL_BRANCH_FORM)
       await fetchCompanies()
       const refreshed = await api.companies({ id: locationModalCompany.id }).get()
       if (refreshed.data && 'data' in refreshed.data) {
@@ -643,11 +604,7 @@ export function CompaniesPage() {
                               <span className="font-semibold text-ink">{home.name}</span>
                               <span className="text-ink-3">
                                 {' '}
-                                — {home.city} ·{' '}
-                                {home.coordinatesType === 'polygon'
-                                  ? 'geofence poligon'
-                                  : `radius ${home.radiusMeters} m`}{' '}
-                                · {timezoneLabel(home.timezone)}
+                                — {home.city}{home.province ? `, ${home.province}` : ''} · {timezoneLabel(home.timezone)}
                               </span>
                             </span>
                           </p>
@@ -744,24 +701,21 @@ export function CompaniesPage() {
       >
         <DialogHeading
           title="Pendaftaran Badan Usaha & Wilayah Operasional"
-          description={`Langkah ${createStep} dari 4 · ${createStep === 1
+          description={`Langkah ${createStep} dari 3 · ${createStep === 1
               ? 'Profil & Identitas Badan Usaha'
               : createStep === 2
                 ? 'Cakupan Wilayah & Kota Operasional Indonesia'
-                : createStep === 3
-                  ? 'Titik Geofence & Peta Kantor Primer'
-                  : 'Rekapitulasi & Konfirmasi Pendaftaran'
+                : 'Rekapitulasi & Konfirmasi Pendaftaran'
             }`}
         />
 
         {/* Stepper Header Navigation */}
         <div className="border-b border-line bg-surface-2/60 px-4 py-2.5 sm:px-6">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {[
               { num: 1, label: 'Profil' },
-              { num: 2, label: 'Wilayah' },
-              { num: 3, label: 'Peta Geofence' },
-              { num: 4, label: 'Konfirmasi' },
+              { num: 2, label: 'Kota Operasional' },
+              { num: 3, label: 'Konfirmasi' },
             ].map((s) => {
               const isPassed = createStep > s.num
               const isCurrent = createStep === s.num
@@ -890,127 +844,19 @@ export function CompaniesPage() {
                   value={form.operationalAreas}
                   onChange={(areas) => patchForm('operationalAreas', areas)}
                   onSelectPrimaryCity={(city, prov) => {
-                    // Sinkronisasi otomatis ke konfigurasi kantor primer jika belum diubah
                     patchForm('locationCity', city.name)
                     patchForm('locationProvince', prov.name)
-                    patchForm('locationLatitude', city.latitude)
-                    patchForm('locationLongitude', city.longitude)
                     patchForm('locationTimezone', prov.timezone)
                   }}
                 />
               </div>
             )}
 
-            {/* LANGKAH 3: PETA GEOFENCE & TITIK KANTOR PRIMER */}
+            {/* LANGKAH 3: KONFIRMASI & REKAPITULASI DATA */}
             {createStep === 3 && (
               <div className="space-y-4">
-                <div className="rounded-control border border-line/80 bg-surface-2/40 p-3 text-xs text-ink-2">
-                  Tentukan titik lokasi kantor pusat/primer. Lingkaran biru menandai batas radius toleransi absensi karyawan (geofence).
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <TextField
-                    label="Nama titik kantor"
-                    value={form.locationName}
-                    onChange={(e) => patchForm('locationName', e.target.value)}
-                    placeholder="Kantor Pusat Jakarta"
-                    required
-                  />
-                  <TextField
-                    label="Kota operasional primer"
-                    value={form.locationCity}
-                    onChange={(e) => patchForm('locationCity', e.target.value)}
-                    placeholder="Jakarta Selatan"
-                    required
-                  />
-                  <TextField
-                    label="Provinsi"
-                    value={form.locationProvince}
-                    onChange={(e) => patchForm('locationProvince', e.target.value)}
-                    placeholder="DKI Jakarta"
-                  />
-                  <TextField
-                    label="Kode pos"
-                    value={form.locationPostalCode}
-                    onChange={(e) => patchForm('locationPostalCode', e.target.value)}
-                    placeholder="12190"
-                    mono
-                  />
-                </div>
-
-                <TextAreaField
-                  label="Alamat fisik lengkap (otomatis terisi dari peta)"
-                  value={form.locationAddress}
-                  onChange={(e) => patchForm('locationAddress', e.target.value)}
-                  placeholder="Gedung, jalan, lantai, nomor (otomatis terisi saat peta diklik)"
-                  rows={2}
-                  required
-                />
-
-                {/* Komponen Peta Interaktif Bergaya Google Maps (Point & Polygon Geofence) */}
-                <div>
-                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1 text-xs">
-                    <span className="font-semibold text-ink">
-                      Peta Interaktif Presisi Geofence (Gaya Google Maps)
-                    </span>
-                    <span className="text-[11px] text-ink-3">
-                      Klik pada peta untuk mengisi alamat dan memosisikan titik secara otomatis
-                    </span>
-                  </div>
-                  <LeafletMapPicker
-                    latitude={Number(form.locationLatitude)}
-                    longitude={Number(form.locationLongitude)}
-                    radiusMeters={Number(form.locationRadius)}
-                    polygon={form.locationPolygon}
-                    mode={form.locationCoordinatesType}
-                    cityName={form.locationCity}
-                    provinceName={form.locationProvince}
-                    onChange={({ latitude, longitude, radiusMeters, coordinatesType, polygonCoordinates }) => {
-                      patchForm('locationLatitude', latitude)
-                      patchForm('locationLongitude', longitude)
-                      patchForm('locationRadius', radiusMeters)
-                      patchForm('locationCoordinatesType', coordinatesType)
-                      patchForm('locationPolygon', polygonCoordinates)
-                    }}
-                    onAddressSelect={(resolved) => {
-                      if (resolved.fullAddress) {
-                        patchForm('locationAddress', resolved.fullAddress)
-                      }
-                      if (resolved.city && (!form.locationCity || form.locationCity === 'Jakarta Selatan')) {
-                        patchForm('locationCity', resolved.city)
-                      }
-                      if (resolved.province && (!form.locationProvince || form.locationProvince === 'DKI Jakarta')) {
-                        patchForm('locationProvince', resolved.province)
-                      }
-                      if (resolved.postalCode) {
-                        patchForm('locationPostalCode', resolved.postalCode)
-                      }
-                    }}
-                    height={360}
-                  />
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <SelectField
-                    label="Zona waktu operasional"
-                    value={form.locationTimezone}
-                    onChange={(e) => patchForm('locationTimezone', e.target.value)}
-                  >
-                    {TIMEZONES.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </SelectField>
-                </div>
-              </div>
-            )}
-
-            {/* LANGKAH 4: KONFIRMASI & REKAPITULASI DATA */}
-            {createStep === 4 && (
-              <div className="space-y-4">
                 <div className="rounded-control border border-primary-line bg-primary-subtle p-3 text-xs text-primary">
-                  Periksa ringkasan konfigurasi di bawah sebelum mendaftarkan entitas perusahaan ke dalam sistem klaster.
+                  Periksa ringkasan konfigurasi di bawah sebelum mendaftarkan entitas badan usaha ke dalam sistem.
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1049,66 +895,36 @@ export function CompaniesPage() {
                     </div>
                   </div>
 
-                  {/* Kantor Primer & Geofence */}
+                  {/* Cakupan Wilayah Operasional */}
                   <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
-                    <h5 className="text-xs font-bold uppercase tracking-wide text-ink-3">
-                      Titik Kantor Primer
-                    </h5>
-                    <div>
-                      <p className="font-bold text-sm text-ink">{form.locationName}</p>
-                      <p className="text-xs text-ink-2 mt-0.5">{form.locationAddress}</p>
-                      <p className="text-xs text-ink-3">
-                        {form.locationCity}, {form.locationProvince} {form.locationPostalCode}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-xs font-bold uppercase tracking-wide text-ink-3">
+                        Cakupan Kota Operasional ({form.operationalAreas.length} Kota Terdaftar)
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => setCreateStep(2)}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Ubah Kota
+                      </button>
                     </div>
-                    <div className="text-xs text-ink-2 pt-1 border-t border-line/60 space-y-0.5">
-                      <p>
-                        Tipe Geofence:{' '}
-                        <span className="font-bold text-primary">
-                          {form.locationCoordinatesType === 'polygon'
-                            ? `Perimeter Poligon (${form.locationPolygon.length} titik sudut)`
-                            : `Titik Radius (${form.locationRadius} meter)`}
-                        </span>
-                      </p>
-                      <p>
-                        Koordinat Pusat: <span className="font-mono text-ink">{Number(form.locationLatitude).toFixed(6)}, {Number(form.locationLongitude).toFixed(6)}</span>
-                      </p>
-                      <p>
-                        Zona Waktu: <span className="font-semibold text-ink">{timezoneLabel(form.locationTimezone)}</span>
-                      </p>
-                    </div>
+                    {form.operationalAreas.length === 0 ? (
+                      <p className="text-xs text-warning">Belum ada wilayah operasional yang dipilih.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {form.operationalAreas.map((area, idx) => (
+                          <span
+                            key={`${area.province}-${area.city}-${idx}`}
+                            className="rounded bg-surface-2 px-2 py-0.5 text-xs text-ink border border-line"
+                          >
+                            <span className="font-semibold text-primary">{area.province}</span>
+                            <span className="text-ink-3"> — {area.city}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                {/* Cakupan Wilayah Operasional */}
-                <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h5 className="text-xs font-bold uppercase tracking-wide text-ink-3">
-                      Cakupan Wilayah Operasional ({form.operationalAreas.length} Kota Terdaftar)
-                    </h5>
-                    <button
-                      type="button"
-                      onClick={() => setCreateStep(2)}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Ubah Wilayah
-                    </button>
-                  </div>
-                  {form.operationalAreas.length === 0 ? (
-                    <p className="text-xs text-warning">Belum ada wilayah operasional yang dipilih.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {form.operationalAreas.map((area, idx) => (
-                        <span
-                          key={`${area.province}-${area.city}-${idx}`}
-                          className="rounded bg-surface-2 px-2 py-0.5 text-xs text-ink border border-line"
-                        >
-                          <span className="font-semibold text-primary">{area.province}</span>
-                          <span className="text-ink-3"> — {area.city}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 {/* Notifikasi Kepatuhan HR Wajib */}
@@ -1133,7 +949,7 @@ export function CompaniesPage() {
               </Button>
             )}
 
-            {createStep < 4 ? (
+            {createStep < 3 ? (
               <Button type="button" tone="primary" onClick={handleNextStep}>
                 Lanjutkan Langkah {createStep + 1}
                 <HiOutlineArrowRight className="h-4 w-4 ml-1" />
@@ -1345,73 +1161,9 @@ export function CompaniesPage() {
                   />
                 </div>
 
-                <div>
-                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1 text-xs">
-                    <span className="font-semibold text-ink">
-                      Peta Interaktif Presisi Geofence (Gaya Google Maps)
-                    </span>
-                    <span className="text-[11px] text-ink-3">
-                      Klik peta untuk otomatis mengisi alamat cabang
-                    </span>
-                  </div>
-                  <LeafletMapPicker
-                    latitude={Number(branch.latitude)}
-                    longitude={Number(branch.longitude)}
-                    radiusMeters={Number(branch.radius)}
-                    polygon={branch.polygon}
-                    mode={branch.coordinatesType}
-                    cityName={branch.city}
-                    provinceName={branch.province}
-                    onChange={({ latitude, longitude, radiusMeters, coordinatesType, polygonCoordinates }) => {
-                      patchBranch('latitude', latitude)
-                      patchBranch('longitude', longitude)
-                      patchBranch('radius', radiusMeters)
-                      patchBranch('coordinatesType', coordinatesType)
-                      patchBranch('polygon', polygonCoordinates)
-                    }}
-                    onAddressSelect={(resolved) => {
-                      if (resolved.fullAddress) {
-                        patchBranch('address', resolved.fullAddress)
-                      }
-                      if (resolved.city) {
-                        patchBranch('city', resolved.city)
-                      }
-                      if (resolved.province) {
-                        patchBranch('province', resolved.province)
-                      }
-                      if (resolved.postalCode) {
-                        patchBranch('postalCode', resolved.postalCode)
-                      }
-                    }}
-                    height={280}
-                  />
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <TextField
-                    label="Lintang"
-                    value={String(branch.latitude)}
-                    onChange={(e) => patchBranch('latitude', e.target.value)}
-                    required
-                    mono
-                  />
-                  <TextField
-                    label="Bujur"
-                    value={String(branch.longitude)}
-                    onChange={(e) => patchBranch('longitude', e.target.value)}
-                    required
-                    mono
-                  />
-                  <TextField
-                    label="Radius (meter)"
-                    type="number"
-                    value={branch.radius}
-                    onChange={(e) => patchBranch('radius', Number(e.target.value))}
-                    min={10}
-                    max={5000}
-                  />
+                <div className="grid gap-3 sm:grid-cols-2">
                   <SelectField
-                    label="Zona waktu"
+                    label="Zona waktu operasional"
                     value={branch.timezone}
                     onChange={(e) => patchBranch('timezone', e.target.value)}
                   >
@@ -1441,7 +1193,7 @@ export function CompaniesPage() {
                     Batal
                   </Button>
                   <Button type="submit" size="sm" tone="primary" loading={isSavingBranch}>
-                    {isSavingBranch ? 'Menyimpan titik...' : 'Simpan Titik Cabang'}
+                    {isSavingBranch ? 'Menyimpan...' : 'Simpan Lokasi Kantor'}
                   </Button>
                 </div>
               </FormSection>
@@ -1452,10 +1204,10 @@ export function CompaniesPage() {
             <table className="w-full min-w-[680px] border-collapse text-left text-[13px]">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3">
-                  <th className="py-2.5 pr-4 font-semibold">Nama titik</th>
+                  <th className="py-2.5 pr-4 font-semibold">Nama unit kantor</th>
+                  <th className="py-2.5 pr-4 font-semibold">Kota / Wilayah</th>
                   <th className="py-2.5 pr-4 font-semibold">Alamat</th>
-                  <th className="py-2.5 pr-4 font-semibold">Koordinat</th>
-                  <th className="py-2.5 pr-4 font-semibold">Radius</th>
+                  <th className="py-2.5 pr-4 font-semibold">Zona waktu</th>
                   <th className="py-2.5 pr-4 font-semibold">Status</th>
                   <th className="py-2.5 text-right font-semibold">Aksi</th>
                 </tr>
@@ -1477,17 +1229,16 @@ export function CompaniesPage() {
                             <span className="font-semibold text-ink">{loc.name}</span>
                             {loc.isPrimary ? <Badge tone="accent">Primer</Badge> : null}
                           </div>
-                          <div className="mt-1 text-xs text-ink-3">{timezoneLabel(loc.timezone)}</div>
                         </td>
                         <td className="py-3 pr-4 align-top text-ink-2">
-                          <div className="max-w-[220px]">{loc.address}</div>
-                          <div className="text-xs text-ink-3">{loc.city}</div>
+                          <span className="font-medium text-ink">{loc.city}</span>
+                          {loc.province ? <span className="text-xs text-ink-3"> ({loc.province})</span> : null}
                         </td>
-                        <td className="py-3 pr-4 align-top font-mono text-xs tabular text-ink-2">
-                          {coordinateText(loc)}
+                        <td className="py-3 pr-4 align-top text-ink-2">
+                          <div className="max-w-[240px] truncate">{loc.address}</div>
                         </td>
-                        <td className="py-3 pr-4 align-top tabular text-ink-2">
-                          {loc.radiusMeters} m
+                        <td className="py-3 pr-4 align-top text-xs text-ink-3">
+                          {timezoneLabel(loc.timezone)}
                         </td>
                         <td className="py-3 pr-4 align-top">
                           <StatusFromValue value={loc.status} />
@@ -1506,8 +1257,8 @@ export function CompaniesPage() {
                               tone="quiet"
                               className="text-error hover:bg-error-subtle hover:text-error"
                               onClick={() => setDeleteLocationItem(loc)}
-                              aria-label={`Hapus titik lokasi ${loc.name}`}
-                              title="Hapus titik lokasi"
+                              aria-label={`Hapus lokasi ${loc.name}`}
+                              title="Hapus lokasi"
                             >
                               <HiOutlineTrash className="h-4 w-4" />
                             </Button>

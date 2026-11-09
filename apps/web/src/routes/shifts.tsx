@@ -1,9 +1,12 @@
 import * as React from 'react'
 import { Link, createRoute } from '@tanstack/react-router'
 import {
+  HiOutlineArrowLeft,
   HiOutlineArrowRight,
+  HiOutlineCheck,
   HiOutlineClock,
   HiOutlineLocationMarker,
+  HiOutlineMap,
   HiOutlinePencil,
   HiOutlinePlus,
   HiOutlineTrash,
@@ -13,6 +16,7 @@ import { authenticatedRoute } from './_authenticated'
 import { api } from '@/lib/api'
 import Dialog from '@/components/ui/Dialog'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { LeafletMapPicker } from '@/components/shared/LeafletMapPicker'
 import {
   Badge,
   Button,
@@ -28,6 +32,7 @@ import {
   SelectField,
   StatusFromValue,
   TableSkeleton,
+  TextAreaField,
   TextField,
 } from '@/components/base'
 import { errorText } from '@/utils/apiError'
@@ -49,16 +54,49 @@ const SHIFT_STATUSES = [
   { value: 'inactive', label: 'Nonaktif' },
 ]
 
-const INITIAL_FORM = {
+const TIMEZONES = [
+  { value: 'Asia/Jakarta', label: 'WIB (Jakarta)' },
+  { value: 'Asia/Makassar', label: 'WITA (Makassar)' },
+  { value: 'Asia/Jayapura', label: 'WIT (Jayapura)' },
+]
+
+export interface AttendancePointDraft {
+  id?: string
+  name: string
+  address: string
+  city: string
+  province: string
+  latitude: number
+  longitude: number
+  radiusMeters: number
+  coordinatesType: 'point' | 'polygon'
+  polygonCoordinates: [number, number][]
+  timezone: string
+  locationId?: string
+}
+
+export interface ShiftFormState {
+  name: string
+  code: string
+  description: string
+  startTime: string
+  endTime: string
+  workLocationId: string
+  attendanceLocations: AttendancePointDraft[]
+  status: string
+  assignedEmployeeIds: string[]
+}
+
+const INITIAL_FORM: ShiftFormState = {
   name: '',
   code: '',
   description: '',
   startTime: '08:00',
   endTime: '17:00',
   workLocationId: '',
-  attendanceLocationIds: [] as string[],
+  attendanceLocations: [],
   status: 'active',
-  assignedEmployeeIds: [] as string[],
+  assignedEmployeeIds: [],
 }
 
 function displayTime(value: string) {
@@ -69,8 +107,45 @@ function isOvernight(startTime: string, endTime: string) {
   return endTime <= startTime
 }
 
+function calculateDuration(start: string, end: string): string {
+  const [sH, sM] = start.split(':').map(Number)
+  const [eH, eM] = end.split(':').map(Number)
+  if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return '—'
+  let diffMinutes = (eH * 60 + eM) - (sH * 60 + sM)
+  if (diffMinutes <= 0) {
+    diffMinutes += 24 * 60
+  }
+  const hours = Math.floor(diffMinutes / 60)
+  const mins = diffMinutes % 60
+  return mins > 0 ? `${hours} jam ${mins} menit` : `${hours} jam`
+}
+
+function createInitialPoint(baseLocation?: CompanyLocation, index = 1): AttendancePointDraft {
+  const lat =
+    baseLocation?.latitude && Number(baseLocation.latitude) !== 0
+      ? Number(baseLocation.latitude)
+      : -6.2088
+  const lng =
+    baseLocation?.longitude && Number(baseLocation.longitude) !== 0
+      ? Number(baseLocation.longitude)
+      : 106.8456
+  return {
+    name: baseLocation?.name ? `${baseLocation.name} (Titik ${index})` : `Titik Presensi ${index}`,
+    address: baseLocation?.address || 'Jl. Jenderal Sudirman, Senayan',
+    city: baseLocation?.city || 'Jakarta Selatan',
+    province: baseLocation?.province || 'DKI Jakarta',
+    latitude: lat,
+    longitude: lng,
+    radiusMeters: 50,
+    coordinatesType: 'point',
+    polygonCoordinates: [],
+    timezone: baseLocation?.timezone || 'Asia/Jakarta',
+    locationId: baseLocation?.id,
+  }
+}
+
 function locationLine(location: ShiftLocation | CompanyLocation) {
-  return `${location.name} · ${location.city} · radius ${location.radiusMeters} m`
+  return `${location.name} · ${location.city}`
 }
 
 export function ShiftsPage() {
@@ -82,12 +157,18 @@ export function ShiftsPage() {
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null)
 
+  // Multi-step Wizard Create State (1: Jadwal & Info, 2: Peta & Titik Presensi, 3: Konfirmasi)
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
-  const [createForm, setCreateForm] = React.useState(INITIAL_FORM)
+  const [createStep, setCreateStep] = React.useState(1)
+  const [createActivePointIndex, setCreateActivePointIndex] = React.useState(0)
+  const [createForm, setCreateForm] = React.useState<ShiftFormState>(INITIAL_FORM)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
+  // Multi-step Wizard Edit State
   const [editItem, setEditItem] = React.useState<Shift | null>(null)
-  const [editForm, setEditForm] = React.useState(INITIAL_FORM)
+  const [editStep, setEditStep] = React.useState(1)
+  const [editActivePointIndex, setEditActivePointIndex] = React.useState(0)
+  const [editForm, setEditForm] = React.useState<ShiftFormState>(INITIAL_FORM)
 
   const [deleteItem, setDeleteItem] = React.useState<Shift | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
@@ -99,7 +180,7 @@ export function ShiftsPage() {
   const primaryLocation = locations.find((location) => location.isPrimary) ?? locations[0]
   const activeEmployees = employees.filter((employee) => employee.status === 'active')
 
-  // Mengelompokkan lokasi kantor berdasarkan kota untuk mengantisipasi > 1 lokasi di 1 kota
+  // Mengelompokkan lokasi kantor berdasarkan kota untuk kemudahan referensi
   const locationsByCity = React.useMemo(() => {
     const map = new Map<string, CompanyLocation[]>()
     for (const loc of locations) {
@@ -176,25 +257,60 @@ export function ShiftsPage() {
     }
   }, [selectedCompanyId, fetchShiftData])
 
+  // Buka Dialog Tambah Shift
   const openCreate = () => {
     setErrorMsg(null)
     setSuccessMsg(null)
+    setCreateStep(1)
+    setCreateActivePointIndex(0)
 
+    const baseLoc = primaryLocation || locations[0]
     setCreateForm({
-      ...INITIAL_FORM,
-      workLocationId: primaryLocation?.id ?? '',
-      attendanceLocationIds: primaryLocation ? [primaryLocation.id] : [],
+      name: '',
+      code: '',
+      description: '',
+      startTime: '08:00',
+      endTime: '17:00',
+      workLocationId: baseLoc?.id || '',
+      attendanceLocations: [createInitialPoint(baseLoc, 1)],
+      status: 'active',
+      assignedEmployeeIds: [],
     })
     setIsCreateOpen(true)
   }
 
-  const toggleCreateAttendance = (locationId: string, checked: boolean) => {
-    setCreateForm((current) => ({
-      ...current,
-      attendanceLocationIds: checked
-        ? [...new Set([...current.attendanceLocationIds, locationId])]
-        : current.attendanceLocationIds.filter((id) => id !== locationId),
+  // Operasi Titik Presensi pada Formulir Buat
+  const handleAddCreatePoint = () => {
+    const baseLoc = locations.find((l) => l.id === createForm.workLocationId) || primaryLocation || locations[0]
+    const nextIdx = createForm.attendanceLocations.length + 1
+    const newPoint = createInitialPoint(baseLoc, nextIdx)
+    setCreateForm((prev) => ({
+      ...prev,
+      attendanceLocations: [...prev.attendanceLocations, newPoint],
     }))
+    setCreateActivePointIndex(createForm.attendanceLocations.length)
+  }
+
+  const handleRemoveCreatePoint = (idxToRemove: number) => {
+    if (createForm.attendanceLocations.length <= 1) {
+      setErrorMsg('Minimal harus ada 1 titik lokasi absensi.')
+      return
+    }
+    setCreateForm((prev) => ({
+      ...prev,
+      attendanceLocations: prev.attendanceLocations.filter((_, idx) => idx !== idxToRemove),
+    }))
+    setCreateActivePointIndex((prev) => Math.max(0, Math.min(prev, createForm.attendanceLocations.length - 2)))
+  }
+
+  const handleUpdateCreatePoint = (patch: Partial<AttendancePointDraft>) => {
+    setCreateForm((prev) => {
+      const updated = [...prev.attendanceLocations]
+      if (updated[createActivePointIndex]) {
+        updated[createActivePointIndex] = { ...updated[createActivePointIndex], ...patch }
+      }
+      return { ...prev, attendanceLocations: updated }
+    })
   }
 
   const toggleCreateEmployee = (employeeId: string, checked: boolean) => {
@@ -206,26 +322,57 @@ export function ShiftsPage() {
     }))
   }
 
-  const handleCreateSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
+  // Navigasi Langkah Formulir Buat
+  const handleNextCreateStep = () => {
+    setErrorMsg(null)
+    if (createStep === 1) {
+      if (!createForm.name.trim() || createForm.name.trim().length < 2) {
+        setErrorMsg('Nama shift wajib diisi minimal 2 karakter.')
+        return
+      }
+      if (!createForm.code.trim()) {
+        setErrorMsg('Kode shift wajib diisi.')
+        return
+      }
+      if (!createForm.workLocationId) {
+        setErrorMsg('Pilih kantor acuan operasional.')
+        return
+      }
+      if (createForm.startTime === createForm.endTime) {
+        setErrorMsg('Jam mulai dan jam selesai tidak boleh sama.')
+        return
+      }
+      setCreateStep(2)
+      return
+    }
 
-    if (!createForm.name.trim()) {
-      setErrorMsg('Nama shift wajib diisi.')
-      return
-    }
-    if (!createForm.code.trim()) {
-      setErrorMsg('Kode shift wajib diisi.')
-      return
-    }
-    if (!createForm.workLocationId) {
-      setErrorMsg('Pilih lokasi kerja utama.')
-      return
-    }
-    if (createForm.attendanceLocationIds.length === 0) {
-      setErrorMsg('Pilih minimal satu lokasi absensi.')
+    if (createStep === 2) {
+      if (createForm.attendanceLocations.length === 0) {
+        setErrorMsg('Tandai minimal satu titik lokasi absensi pada peta.')
+        return
+      }
+      for (let i = 0; i < createForm.attendanceLocations.length; i++) {
+        const pt = createForm.attendanceLocations[i]
+        if (!pt.name.trim() || pt.name.trim().length < 2) {
+          setErrorMsg(`Titik lokasi #${i + 1} memerlukan nama minimal 2 karakter.`)
+          setCreateActivePointIndex(i)
+          return
+        }
+        if (!pt.address.trim()) {
+          setErrorMsg(`Titik lokasi #${i + 1} memerlukan alamat fisik. Klik pada peta untuk mengisi otomatis.`)
+          setCreateActivePointIndex(i)
+          return
+        }
+      }
+      setCreateStep(3)
       return
     }
 
+    // Step 3 -> Eksekusi Simpan
+    handleCreateSubmit()
+  }
+
+  const handleCreateSubmit = async () => {
     setIsSubmitting(true)
     setErrorMsg(null)
 
@@ -238,7 +385,22 @@ export function ShiftsPage() {
         startTime: createForm.startTime,
         endTime: createForm.endTime,
         workLocationId: createForm.workLocationId,
-        attendanceLocationIds: createForm.attendanceLocationIds,
+        attendanceLocations: createForm.attendanceLocations.map((loc) => ({
+          name: loc.name.trim(),
+          address: loc.address.trim(),
+          city: loc.city.trim(),
+          province: loc.province?.trim() || undefined,
+          latitude: Number(loc.latitude),
+          longitude: Number(loc.longitude),
+          radiusMeters: Number(loc.radiusMeters),
+          coordinatesType: loc.coordinatesType,
+          polygonCoordinates:
+            loc.polygonCoordinates && loc.polygonCoordinates.length > 0
+              ? loc.polygonCoordinates
+              : undefined,
+          timezone: loc.timezone,
+          locationId: loc.locationId || undefined,
+        })),
         status: createForm.status,
         assignedEmployeeIds:
           createForm.assignedEmployeeIds.length > 0
@@ -251,7 +413,9 @@ export function ShiftsPage() {
         return
       }
 
-      setSuccessMsg('Master shift berhasil dibuat.')
+      setSuccessMsg(
+        `Master shift '${createForm.name}' berhasil dibuat dengan ${createForm.attendanceLocations.length} titik geofence presensi.`
+      )
       setIsCreateOpen(false)
       fetchShiftData(selectedCompanyId)
     } catch {
@@ -261,10 +425,32 @@ export function ShiftsPage() {
     }
   }
 
+  // Buka Dialog Ubah Shift
   const openEdit = (shift: Shift) => {
     setErrorMsg(null)
     setSuccessMsg(null)
     setEditItem(shift)
+    setEditStep(1)
+    setEditActivePointIndex(0)
+
+    const baseLoc =
+      locations.find((l) => l.id === shift.workLocationId) || primaryLocation || locations[0]
+
+    const mappedPoints: AttendancePointDraft[] = (shift.attendanceLocations || []).map((loc, idx) => ({
+      id: loc.id,
+      name: loc.name || `Titik Presensi ${idx + 1}`,
+      address: loc.address || baseLoc?.address || 'Lokasi Presensi',
+      city: loc.city || baseLoc?.city || 'Jakarta',
+      province: loc.province || baseLoc?.province || '',
+      latitude: Number(loc.latitude) || -6.2088,
+      longitude: Number(loc.longitude) || 106.8456,
+      radiusMeters: Number(loc.radiusMeters) || 50,
+      coordinatesType: (loc.coordinatesType as 'point' | 'polygon') || 'point',
+      polygonCoordinates: loc.polygonCoordinates || [],
+      timezone: loc.timezone || 'Asia/Jakarta',
+      locationId: loc.id,
+    }))
+
     setEditForm({
       name: shift.name,
       code: shift.code,
@@ -272,19 +458,46 @@ export function ShiftsPage() {
       startTime: displayTime(shift.startTime),
       endTime: displayTime(shift.endTime),
       workLocationId: shift.workLocationId,
-      attendanceLocationIds: shift.attendanceLocations.map((location) => location.id),
+      attendanceLocations:
+        mappedPoints.length > 0 ? mappedPoints : [createInitialPoint(baseLoc, 1)],
       status: shift.status,
       assignedEmployeeIds: shift.assignedEmployees?.map((emp) => emp.id) ?? [],
     })
   }
 
-  const toggleEditAttendance = (locationId: string, checked: boolean) => {
-    setEditForm((current) => ({
-      ...current,
-      attendanceLocationIds: checked
-        ? [...new Set([...current.attendanceLocationIds, locationId])]
-        : current.attendanceLocationIds.filter((id) => id !== locationId),
+  // Operasi Titik Presensi pada Formulir Ubah
+  const handleAddEditPoint = () => {
+    const baseLoc =
+      locations.find((l) => l.id === editForm.workLocationId) || primaryLocation || locations[0]
+    const nextIdx = editForm.attendanceLocations.length + 1
+    const newPoint = createInitialPoint(baseLoc, nextIdx)
+    setEditForm((prev) => ({
+      ...prev,
+      attendanceLocations: [...prev.attendanceLocations, newPoint],
     }))
+    setEditActivePointIndex(editForm.attendanceLocations.length)
+  }
+
+  const handleRemoveEditPoint = (idxToRemove: number) => {
+    if (editForm.attendanceLocations.length <= 1) {
+      setErrorMsg('Minimal harus ada 1 titik lokasi absensi.')
+      return
+    }
+    setEditForm((prev) => ({
+      ...prev,
+      attendanceLocations: prev.attendanceLocations.filter((_, idx) => idx !== idxToRemove),
+    }))
+    setEditActivePointIndex((prev) => Math.max(0, Math.min(prev, editForm.attendanceLocations.length - 2)))
+  }
+
+  const handleUpdateEditPoint = (patch: Partial<AttendancePointDraft>) => {
+    setEditForm((prev) => {
+      const updated = [...prev.attendanceLocations]
+      if (updated[editActivePointIndex]) {
+        updated[editActivePointIndex] = { ...updated[editActivePointIndex], ...patch }
+      }
+      return { ...prev, attendanceLocations: updated }
+    })
   }
 
   const toggleEditEmployee = (employeeId: string, checked: boolean) => {
@@ -296,27 +509,58 @@ export function ShiftsPage() {
     }))
   }
 
-  const handleEditSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
+  // Navigasi Langkah Formulir Ubah
+  const handleNextEditStep = () => {
+    setErrorMsg(null)
+    if (editStep === 1) {
+      if (!editForm.name.trim() || editForm.name.trim().length < 2) {
+        setErrorMsg('Nama shift wajib diisi minimal 2 karakter.')
+        return
+      }
+      if (!editForm.code.trim()) {
+        setErrorMsg('Kode shift wajib diisi.')
+        return
+      }
+      if (!editForm.workLocationId) {
+        setErrorMsg('Pilih kantor acuan operasional.')
+        return
+      }
+      if (editForm.startTime === editForm.endTime) {
+        setErrorMsg('Jam mulai dan jam selesai tidak boleh sama.')
+        return
+      }
+      setEditStep(2)
+      return
+    }
+
+    if (editStep === 2) {
+      if (editForm.attendanceLocations.length === 0) {
+        setErrorMsg('Tandai minimal satu titik lokasi absensi pada peta.')
+        return
+      }
+      for (let i = 0; i < editForm.attendanceLocations.length; i++) {
+        const pt = editForm.attendanceLocations[i]
+        if (!pt.name.trim() || pt.name.trim().length < 2) {
+          setErrorMsg(`Titik lokasi #${i + 1} memerlukan nama minimal 2 karakter.`)
+          setEditActivePointIndex(i)
+          return
+        }
+        if (!pt.address.trim()) {
+          setErrorMsg(`Titik lokasi #${i + 1} memerlukan alamat fisik. Klik pada peta untuk mengisi otomatis.`)
+          setEditActivePointIndex(i)
+          return
+        }
+      }
+      setEditStep(3)
+      return
+    }
+
+    // Step 3 -> Eksekusi Simpan Perubahan
+    handleEditSubmit()
+  }
+
+  const handleEditSubmit = async () => {
     if (!editItem) return
-
-    if (!editForm.name.trim()) {
-      setErrorMsg('Nama shift wajib diisi.')
-      return
-    }
-    if (!editForm.code.trim()) {
-      setErrorMsg('Kode shift wajib diisi.')
-      return
-    }
-    if (!editForm.workLocationId) {
-      setErrorMsg('Pilih lokasi kerja utama.')
-      return
-    }
-    if (editForm.attendanceLocationIds.length === 0) {
-      setErrorMsg('Pilih minimal satu lokasi absensi.')
-      return
-    }
-
     setIsSubmitting(true)
     setErrorMsg(null)
 
@@ -329,7 +573,22 @@ export function ShiftsPage() {
         startTime: editForm.startTime,
         endTime: editForm.endTime,
         workLocationId: editForm.workLocationId,
-        attendanceLocationIds: editForm.attendanceLocationIds,
+        attendanceLocations: editForm.attendanceLocations.map((loc) => ({
+          name: loc.name.trim(),
+          address: loc.address.trim(),
+          city: loc.city.trim(),
+          province: loc.province?.trim() || undefined,
+          latitude: Number(loc.latitude),
+          longitude: Number(loc.longitude),
+          radiusMeters: Number(loc.radiusMeters),
+          coordinatesType: loc.coordinatesType,
+          polygonCoordinates:
+            loc.polygonCoordinates && loc.polygonCoordinates.length > 0
+              ? loc.polygonCoordinates
+              : undefined,
+          timezone: loc.timezone,
+          locationId: loc.locationId || undefined,
+        })),
         status: editForm.status,
         assignedEmployeeIds: editForm.assignedEmployeeIds,
       })
@@ -339,7 +598,9 @@ export function ShiftsPage() {
         return
       }
 
-      setSuccessMsg('Master shift berhasil diperbarui.')
+      setSuccessMsg(
+        `Master shift '${editForm.name}' berhasil diperbarui (${editForm.attendanceLocations.length} titik geofence presensi).`
+      )
       setEditItem(null)
       fetchShiftData(selectedCompanyId)
     } catch {
@@ -545,9 +806,9 @@ export function ShiftsPage() {
                           <div className="flex items-start gap-2">
                             <HiOutlineLocationMarker className="mt-0.5 h-4 w-4 shrink-0 text-ink-3" />
                             <div>
-                              <p className="font-medium text-ink">{shift.workLocation.name}</p>
+                              <p className="font-medium text-ink">{shift.workLocation?.name || 'Kantor Operasional'}</p>
                               <p className="text-xs text-ink-3">
-                                {shift.workLocation.city} · radius {shift.workLocation.radiusMeters} m
+                                {shift.workLocation?.city || 'Kantor Acuan'}
                               </p>
                             </div>
                           </div>
@@ -634,466 +895,1040 @@ export function ShiftsPage() {
         </>
       )}
 
-      {/* Dialog Buat Shift */}
+      {/* Dialog Buat Shift — Multi-Step Wizard (3 Langkah) */}
       <Dialog
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onRequestClose={() => setIsCreateOpen(false)}
-        width={780}
+        width={880}
       >
         <DialogHeading
-          title="Buat Master Shift"
-          description="Tentukan nama shift, kode identifikasi, jam kerja operasional, dan titik absensi geofence yang diizinkan."
+          title="Buat Master Shift & Titik Geofence Absensi"
+          description={`Langkah ${createStep} dari 3 · ${
+            createStep === 1
+              ? 'Informasi Jadwal & Kantor Acuan'
+              : createStep === 2
+                ? 'Peta & Penandaan Titik Absensi Geofence'
+                : 'Rekapitulasi & Konfirmasi Shift'
+          }`}
         />
-        <form onSubmit={handleCreateSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogBody className="px-4 py-5 sm:px-5">
+
+        {/* Stepper Header Navigation */}
+        <div className="border-b border-line bg-surface-2/60 px-4 py-2.5 sm:px-6">
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { num: 1, label: 'Jadwal & Info' },
+              { num: 2, label: 'Peta Presensi' },
+              { num: 3, label: 'Konfirmasi' },
+            ].map((s) => {
+              const isPassed = createStep > s.num
+              const isCurrent = createStep === s.num
+              return (
+                <button
+                  key={s.num}
+                  type="button"
+                  onClick={() => {
+                    if (s.num < createStep) setCreateStep(s.num)
+                  }}
+                  className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors ${
+                    isCurrent
+                      ? 'bg-surface font-bold text-primary shadow-sm border border-line'
+                      : isPassed
+                        ? 'text-ink-2 hover:bg-surface-2/80 cursor-pointer font-medium'
+                        : 'text-ink-3/60 cursor-default'
+                  }`}
+                >
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                      isCurrent
+                        ? 'bg-primary text-primary-on'
+                        : isPassed
+                          ? 'bg-success text-white'
+                          : 'bg-line-strong/60 text-ink-3'
+                    }`}
+                  >
+                    {isPassed ? '✓' : s.num}
+                  </span>
+                  <span className="truncate">{s.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col">
+          <DialogBody className="px-4 py-5 sm:px-6 max-h-[75vh] overflow-y-auto">
             {errorMsg ? (
-              <Notice tone="danger" title="Permintaan gagal" className="mb-5">
+              <Notice tone="danger" title="Perhatian" onDismiss={() => setErrorMsg(null)} className="mb-4">
                 {errorMsg}
               </Notice>
             ) : null}
 
-            <div className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <TextField
-                  label="Nama shift"
-                  value={createForm.name}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                  placeholder="Misal: Shift Reguler Pagi, Shift Malam"
-                  required
-                />
-                <TextField
-                  label="Kode shift"
-                  value={createForm.code}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
-                  }
-                  placeholder="Misal: SH-PAGI, REG-01, MALAM"
-                  required
-                />
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <TextField
-                  label="Jam mulai"
-                  type="time"
-                  value={createForm.startTime}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, startTime: event.target.value }))
-                  }
-                  required
-                />
-                <TextField
-                  label="Jam selesai"
-                  type="time"
-                  value={createForm.endTime}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, endTime: event.target.value }))
-                  }
-                  required
-                  hint="Jika jam selesai lebih awal, shift otomatis dihitung melewati tengah malam."
-                />
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <SelectField
-                  label="Lokasi kerja utama"
-                  value={createForm.workLocationId}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, workLocationId: event.target.value }))
-                  }
-                  required
-                  hint="Titik kantor tempat shift ini berpusat."
-                >
-                  <option value="" disabled>
-                    Pilih lokasi kerja
-                  </option>
-                  {locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {locationLine(location)}
-                    </option>
-                  ))}
-                </SelectField>
-
-                <SelectField
-                  label="Status shift"
-                  value={createForm.status}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, status: event.target.value }))
-                  }
-                >
-                  {SHIFT_STATUSES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-
-              <TextField
-                label="Keterangan / Deskripsi (opsional)"
-                value={createForm.description}
-                onChange={(event) =>
-                  setCreateForm((current) => ({ ...current, description: event.target.value }))
-                }
-                placeholder="Catatan operasional shift, toleransi presensi, atau penugasan khusus"
-              />
-
-              <div className="space-y-3">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-ink-2">
-                      Lokasi absensi berizin (Geofence Geolocation)
-                      <span className="ml-1 text-error" aria-hidden="true">
-                        *
-                      </span>
-                    </p>
-                    <span className="text-[11px] font-medium text-ink-3">
-                      {createForm.attendanceLocationIds.length} titik terpilih
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-ink-3">
-                    Lokasi dikelompokkan per kota untuk mengantisipasi beberapa lokasi kantor/gudang dalam satu kota yang sama. Centang titik yang diizinkan untuk shift ini.
-                  </p>
+            {/* LANGKAH 1: DETAIL JADWAL SHIFT */}
+            {createStep === 1 && (
+              <div className="space-y-4">
+                <div className="rounded-control border border-line/80 bg-surface-2/40 p-3 text-xs text-ink-2">
+                  Tentukan identitas shift dan jam kerja operasional. Shift ini dapat langsung dibuat sebelum karyawan didaftarkan.
                 </div>
 
-                {locations.length === 0 ? (
-                  <p className="rounded-control border border-dashed border-line px-3 py-3 text-xs text-ink-3">
-                    Belum ada lokasi kantor aktif. Atur lokasi perusahaan terlebih dahulu.
-                  </p>
-                ) : (
-                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                    {Array.from(locationsByCity.entries()).map(([cityName, cityLocations]) => (
-                      <div key={cityName} className="rounded-panel border border-line bg-surface-2 p-3 space-y-2">
-                        <div className="flex items-center justify-between border-b border-line pb-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <HiOutlineLocationMarker className="h-4 w-4 text-primary shrink-0" />
-                            <span className="text-xs font-semibold text-ink">{cityName}</span>
-                            {cityLocations[0]?.province ? (
-                              <span className="text-[11px] text-ink-3">({cityLocations[0].province})</span>
-                            ) : null}
-                          </div>
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3">
-                            {cityLocations.length} titik lokasi
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="Nama master shift"
+                    value={createForm.name}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({ ...current, name: event.target.value }))
+                    }
+                    placeholder="Misal: Shift Pagi Operasional, Shift Malam Gudang"
+                    required
+                  />
+                  <TextField
+                    label="Kode shift"
+                    value={createForm.code}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
+                    }
+                    placeholder="PAGI, SIANG, MALAM, REG"
+                    required
+                    mono
+                  />
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="Jam mulai kerja"
+                    type="time"
+                    value={createForm.startTime}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({ ...current, startTime: event.target.value }))
+                    }
+                    required
+                  />
+                  <TextField
+                    label="Jam selesai kerja"
+                    type="time"
+                    value={createForm.endTime}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({ ...current, endTime: event.target.value }))
+                    }
+                    required
+                  />
+                </div>
+
+                {/* Banner Durasi & Deteksi Overnight */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line bg-surface-2 px-3 py-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-ink-2">
+                    <HiOutlineClock className="h-4 w-4 text-primary" />
+                    <span>Durasi shift: <strong className="text-ink">{calculateDuration(createForm.startTime, createForm.endTime)}</strong></span>
+                  </div>
+                  {isOvernight(createForm.startTime, createForm.endTime) ? (
+                    <span className="font-semibold text-warning text-[11px]">
+                      • Shift Lintas Hari (Melewati tengah malam)
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SelectField
+                    label="Kantor acuan operasional"
+                    value={createForm.workLocationId}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({ ...current, workLocationId: event.target.value }))
+                    }
+                    required
+                    hint="Unit kantor wilayah tempat shift ini berafiliasi."
+                  >
+                    <option value="" disabled>
+                      Pilih unit kantor
+                    </option>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {locationLine(location)}
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  <SelectField
+                    label="Status shift"
+                    value={createForm.status}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({ ...current, status: event.target.value }))
+                    }
+                  >
+                    {SHIFT_STATUSES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                </div>
+
+                <TextField
+                  label="Keterangan / Catatan operasional (opsional)"
+                  value={createForm.description}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                  placeholder="Catatan penugasan, instruksi serah-terima tugas, atau toleransi presensi"
+                />
+
+                {activeEmployees.length > 0 ? (
+                  <div className="space-y-2 border-t border-line/60 pt-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-ink">
+                        Tugaskan ke karyawan aktif (opsional)
+                      </p>
+                      <span className="text-[11px] text-ink-3">
+                        {createForm.assignedEmployeeIds.length} karyawan dipilih
+                      </span>
+                    </div>
+                    <div className="grid max-h-40 gap-2 overflow-y-auto rounded-control border border-line bg-surface p-2.5 sm:grid-cols-2">
+                      {activeEmployees.map((employee) => (
+                        <CheckboxField
+                          key={employee.id}
+                          label={employee.name}
+                          checked={createForm.assignedEmployeeIds.includes(employee.id)}
+                          onChange={(event) =>
+                            toggleCreateEmployee(employee.id, event.target.checked)
+                          }
+                          hint={`${employee.position || 'Staf'} ${employee.department ? `· ${employee.department.name}` : ''}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* LANGKAH 2: PETA & TITIK PRESENSI GEOFENCE */}
+            {createStep === 2 && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line/80 bg-surface-2/40 p-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-xs text-ink">
+                        Titik Presensi Geofence ({createForm.attendanceLocations.length} Titik Terdaftar)
+                      </span>
+                      <Badge tone="accent">Peta Interaktif</Badge>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-ink-3">
+                      Tandai posisi pointer pada peta. Alamat fisik dan koordinat GPS akan otomatis tersinkronisasi. Minimal 1 titik dan bisa lebih dari 1 lokasi.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    tone="primary"
+                    onClick={handleAddCreatePoint}
+                    icon={<HiOutlinePlus className="h-4 w-4" />}
+                  >
+                    Tambah Titik Presensi
+                  </Button>
+                </div>
+
+                {/* Tab Bar Pemilih Titik */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-line">
+                  {createForm.attendanceLocations.map((loc, idx) => {
+                    const isSelected = createActivePointIndex === idx
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setCreateActivePointIndex(idx)}
+                        className={`shrink-0 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-primary text-primary-on shadow-xs font-semibold'
+                            : 'bg-surface-2 text-ink-2 hover:bg-surface border border-line'
+                        }`}
+                      >
+                        <HiOutlineLocationMarker className="h-3.5 w-3.5 shrink-0" />
+                        <span className="max-w-[150px] truncate">{loc.name || `Titik #${idx + 1}`}</span>
+                        <span className={`text-[10px] px-1 rounded ${isSelected ? 'bg-white/25 text-white' : 'bg-surface text-ink-3'}`}>
+                          {loc.radiusMeters}m
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Editor Titik Aktif */}
+                {createForm.attendanceLocations[createActivePointIndex] && (
+                  <div className="grid gap-4 lg:grid-cols-12">
+                    {/* Kolom Peta (7 kolom) */}
+                    <div className="space-y-2 lg:col-span-7">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-ink">
+                          Peta Titik #{createActivePointIndex + 1}: {createForm.attendanceLocations[createActivePointIndex].name}
+                        </span>
+                        <span className="text-[11px] text-ink-3">
+                          Klik peta untuk memindahkan pin & isi alamat
+                        </span>
+                      </div>
+                      <LeafletMapPicker
+                        latitude={createForm.attendanceLocations[createActivePointIndex].latitude}
+                        longitude={createForm.attendanceLocations[createActivePointIndex].longitude}
+                        radiusMeters={createForm.attendanceLocations[createActivePointIndex].radiusMeters}
+                        polygon={createForm.attendanceLocations[createActivePointIndex].polygonCoordinates}
+                        mode={createForm.attendanceLocations[createActivePointIndex].coordinatesType}
+                        cityName={createForm.attendanceLocations[createActivePointIndex].city}
+                        provinceName={createForm.attendanceLocations[createActivePointIndex].province}
+                        onChange={({ latitude, longitude, radiusMeters, coordinatesType, polygonCoordinates }) => {
+                          handleUpdateCreatePoint({
+                            latitude,
+                            longitude,
+                            radiusMeters,
+                            coordinatesType,
+                            polygonCoordinates,
+                          })
+                        }}
+                        onAddressSelect={(resolved) => {
+                          handleUpdateCreatePoint({
+                            address: resolved.fullAddress || createForm.attendanceLocations[createActivePointIndex].address,
+                            city: resolved.city || createForm.attendanceLocations[createActivePointIndex].city,
+                            province: resolved.province || createForm.attendanceLocations[createActivePointIndex].province,
+                          })
+                        }}
+                        height={340}
+                      />
+                    </div>
+
+                    {/* Kolom Form Atribut Titik (5 kolom) */}
+                    <div className="space-y-3 rounded-control border border-line bg-surface p-3.5 lg:col-span-5">
+                      <div className="flex items-center justify-between border-b border-line pb-2">
+                        <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                          Konfigurasi Titik #{createActivePointIndex + 1}
+                        </h5>
+                        {createForm.attendanceLocations.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCreatePoint(createActivePointIndex)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-error hover:underline"
+                            title="Hapus titik lokasi ini"
+                          >
+                            <HiOutlineTrash className="h-3.5 w-3.5" />
+                            Hapus Titik
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-ink-3 italic">
+                            Minimal 1 titik wajib
+                          </span>
+                        )}
+                      </div>
+
+                      <TextField
+                        label="Nama titik presensi"
+                        value={createForm.attendanceLocations[createActivePointIndex].name}
+                        onChange={(e) => handleUpdateCreatePoint({ name: e.target.value })}
+                        placeholder="Pintu Gerbang Utama / Lobby Depan"
+                        required
+                      />
+
+                      <TextAreaField
+                        label="Alamat lengkap (otomatis terisi saat peta diklik)"
+                        value={createForm.attendanceLocations[createActivePointIndex].address}
+                        onChange={(e) => handleUpdateCreatePoint({ address: e.target.value })}
+                        placeholder="Gedung, jalan, nomor (otomatis dari peta)"
+                        rows={2}
+                        required
+                      />
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <TextField
+                          label="Kota / Wilayah"
+                          value={createForm.attendanceLocations[createActivePointIndex].city}
+                          onChange={(e) => handleUpdateCreatePoint({ city: e.target.value })}
+                          placeholder="Jakarta Selatan"
+                          required
+                        />
+                        <TextField
+                          label="Provinsi"
+                          value={createForm.attendanceLocations[createActivePointIndex].province || ''}
+                          onChange={(e) => handleUpdateCreatePoint({ province: e.target.value })}
+                          placeholder="DKI Jakarta"
+                        />
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <TextField
+                          label="Radius presensi (meter)"
+                          type="number"
+                          value={createForm.attendanceLocations[createActivePointIndex].radiusMeters}
+                          onChange={(e) =>
+                            handleUpdateCreatePoint({ radiusMeters: Number(e.target.value) || 50 })
+                          }
+                          min={10}
+                          max={5000}
+                          required
+                          hint="Toleransi lingkaran"
+                        />
+                        <SelectField
+                          label="Zona waktu"
+                          value={createForm.attendanceLocations[createActivePointIndex].timezone}
+                          onChange={(e) => handleUpdateCreatePoint({ timezone: e.target.value })}
+                        >
+                          {TIMEZONES.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </SelectField>
+                      </div>
+
+                      <div className="rounded border border-line bg-surface-2 px-2.5 py-1.5 text-[11px] text-ink-3">
+                        Koordinat GPS:{' '}
+                        <span className="font-mono text-ink font-semibold">
+                          {createForm.attendanceLocations[createActivePointIndex].latitude.toFixed(6)},{' '}
+                          {createForm.attendanceLocations[createActivePointIndex].longitude.toFixed(6)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* LANGKAH 3: REKAPITULASI & KONFIRMASI */}
+            {createStep === 3 && (
+              <div className="space-y-4">
+                <div className="rounded-control border border-primary-line bg-primary-subtle p-3 text-xs text-primary">
+                  Periksa ringkasan konfigurasi master shift di bawah ini sebelum disimpan ke dalam klaster.
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                      Informasi & Jadwal Shift
+                    </h5>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold rounded bg-surface-2 px-1.5 py-0.5 border border-line text-ink">
+                        {createForm.code}
+                      </span>
+                      <span className="font-bold text-sm text-ink">{createForm.name}</span>
+                    </div>
+                    <div className="text-xs text-ink-2 space-y-1 pt-1 border-t border-line/60">
+                      <p className="flex items-center gap-1.5">
+                        <HiOutlineClock className="h-4 w-4 text-primary shrink-0" />
+                        <span>
+                          Jam Kerja: <strong>{createForm.startTime} — {createForm.endTime}</strong> ({calculateDuration(createForm.startTime, createForm.endTime)})
+                        </span>
+                      </p>
+                      {isOvernight(createForm.startTime, createForm.endTime) ? (
+                        <p className="text-warning font-semibold text-[11px]">
+                          • Shift Lintas Hari (Melewati tengah malam)
+                        </p>
+                      ) : null}
+                      <p>
+                        Status: <span className="font-semibold text-ink">{createForm.status === 'active' ? 'Aktif' : 'Nonaktif'}</span>
+                      </p>
+                      {createForm.description ? (
+                        <p className="text-ink-3 italic">{createForm.description}</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                      Unit Kantor & Karyawan
+                    </h5>
+                    <p className="text-xs text-ink-2">
+                      Kantor Acuan:{' '}
+                      <strong className="text-ink">
+                        {locations.find((l) => l.id === createForm.workLocationId)?.name || 'Kantor Operasional'}
+                      </strong>
+                    </p>
+                    <p className="text-xs text-ink-2">
+                      Karyawan Ditugaskan: <strong className="text-ink">{createForm.assignedEmployeeIds.length} orang</strong>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ringkasan Titik Geofence Presensi */}
+                <div className="rounded-control border border-line bg-surface p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                      Daftar Titik Geofence Presensi ({createForm.attendanceLocations.length} Titik Terdaftar)
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => setCreateStep(2)}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Ubah di Peta
+                    </button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {createForm.attendanceLocations.map((loc, idx) => (
+                      <div key={idx} className="rounded border border-line bg-surface-2 p-2.5 text-xs space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-semibold text-ink truncate">{loc.name}</span>
+                          <span className="shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-surface border border-line text-primary">
+                            Radius {loc.radiusMeters}m
                           </span>
                         </div>
-
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {cityLocations.map((location) => {
-                            const isChecked = createForm.attendanceLocationIds.includes(location.id)
-                            const isPolygon = location.coordinatesType === 'polygon'
-                            const polygonPoints = location.polygonCoordinates?.length ?? 0
-
-                            return (
-                              <label
-                                key={location.id}
-                                className={`flex items-start gap-2.5 rounded-panel border p-2.5 cursor-pointer transition-colors ${
-                                  isChecked
-                                    ? 'border-primary bg-primary-subtle/15'
-                                    : 'border-line hover:border-line-hover bg-surface'
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={(e) => toggleCreateAttendance(location.id, e.target.checked)}
-                                  className="mt-0.5 h-4 w-4 rounded border-line text-primary focus:ring-primary shrink-0"
-                                />
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <p className="truncate text-xs font-semibold text-ink">{location.name}</p>
-                                    <span className="shrink-0 text-[10px] font-semibold uppercase px-1 py-0.2 rounded bg-surface-2 border border-line text-ink-2">
-                                      {isPolygon ? `Polygon (${polygonPoints} t)` : `Point (${location.radiusMeters}m)`}
-                                    </span>
-                                  </div>
-                                  <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-3">{location.address}</p>
-                                  <div className="mt-1 flex items-center gap-1.5 text-[10px] text-ink-3">
-                                    <span className="font-mono">{Number(location.latitude).toFixed(4)}, {Number(location.longitude).toFixed(4)}</span>
-                                    <span>·</span>
-                                    <span>{location.timezone || 'WIB'}</span>
-                                  </div>
-                                </div>
-                              </label>
-                            )
-                          })}
+                        <p className="text-[11px] text-ink-3 truncate">{loc.address}</p>
+                        <div className="flex items-center justify-between text-[10px] text-ink-3 pt-0.5">
+                          <span className="font-mono">
+                            {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
+                          </span>
+                          <span>
+                            {loc.city} · {loc.timezone}
+                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-
-              {activeEmployees.length > 0 ? (
-                <div className="space-y-2.5 border-t border-line pt-4">
-                  <div>
-                    <p className="text-xs font-semibold text-ink-2">
-                      Tetapkan ke karyawan aktif saat ini (opsional)
-                    </p>
-                    <p className="mt-1 text-[11px] leading-snug text-ink-3">
-                      Anda dapat langsung menugaskan karyawan ke shift ini sekarang, atau melakukannya nanti di halaman pendaftaran karyawan.
-                    </p>
-                  </div>
-
-                  <div className="grid max-h-48 gap-2 overflow-y-auto rounded-panel border border-line p-3 sm:grid-cols-2">
-                    {activeEmployees.map((employee) => (
-                      <CheckboxField
-                        key={employee.id}
-                        label={employee.name}
-                        checked={createForm.assignedEmployeeIds.includes(employee.id)}
-                        onChange={(event) =>
-                          toggleCreateEmployee(employee.id, event.target.checked)
-                        }
-                        hint={`${employee.position || 'Staf'} ${employee.department ? `· ${employee.department.name}` : ''}`}
-                      />
-                    ))}
-                  </div>
                 </div>
-              ) : null}
-            </div>
+              </div>
+            )}
           </DialogBody>
 
-          <DialogFooter>
-            <Button type="button" onClick={() => setIsCreateOpen(false)}>
-              Batal
-            </Button>
-            <Button
-              type="submit"
-              tone="primary"
-              loading={isSubmitting}
-              disabled={createForm.attendanceLocationIds.length === 0}
-            >
-              {isSubmitting ? 'Menyimpan...' : 'Simpan Shift'}
-            </Button>
+          <DialogFooter className="justify-between px-4 py-3 sm:px-6">
+            {createStep > 1 ? (
+              <Button
+                type="button"
+                onClick={() => setCreateStep((s) => Math.max(s - 1, 1))}
+                icon={<HiOutlineArrowLeft className="h-4 w-4" />}
+              >
+                Sebelumnya
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => setIsCreateOpen(false)}>
+                Batal
+              </Button>
+            )}
+
+            {createStep < 3 ? (
+              <Button type="button" tone="primary" onClick={handleNextCreateStep}>
+                Lanjutkan Langkah {createStep + 1}
+                <HiOutlineArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                tone="primary"
+                loading={isSubmitting}
+                onClick={handleCreateSubmit}
+              >
+                {isSubmitting ? 'Menyimpan Shift...' : 'Daftarkan Master Shift'}
+              </Button>
+            )}
           </DialogFooter>
-        </form>
+        </div>
       </Dialog>
 
-      {/* Dialog Ubah Shift */}
+      {/* Dialog Ubah Shift — Multi-Step Wizard (3 Langkah) */}
       <Dialog
         isOpen={!!editItem}
         onClose={() => setEditItem(null)}
         onRequestClose={() => setEditItem(null)}
-        width={780}
+        width={880}
       >
         <DialogHeading
-          title={`Ubah Shift ${editItem?.name ?? ''}`}
-          description="Sesuaikan jam operasional, lokasi kantor, dan titik absensi geofence."
+          title={`Ubah Master Shift — ${editItem?.name ?? ''}`}
+          description={`Langkah ${editStep} dari 3 · ${
+            editStep === 1
+              ? 'Informasi Jadwal & Kantor Acuan'
+              : editStep === 2
+                ? 'Peta & Penandaan Titik Absensi Geofence'
+                : 'Rekapitulasi & Konfirmasi Perubahan'
+          }`}
         />
-        <form onSubmit={handleEditSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogBody className="px-4 py-5 sm:px-5">
+
+        {/* Stepper Header Navigation */}
+        <div className="border-b border-line bg-surface-2/60 px-4 py-2.5 sm:px-6">
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { num: 1, label: 'Jadwal & Info' },
+              { num: 2, label: 'Peta Presensi' },
+              { num: 3, label: 'Konfirmasi' },
+            ].map((s) => {
+              const isPassed = editStep > s.num
+              const isCurrent = editStep === s.num
+              return (
+                <button
+                  key={s.num}
+                  type="button"
+                  onClick={() => {
+                    if (s.num < editStep) setEditStep(s.num)
+                  }}
+                  className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors ${
+                    isCurrent
+                      ? 'bg-surface font-bold text-primary shadow-sm border border-line'
+                      : isPassed
+                        ? 'text-ink-2 hover:bg-surface-2/80 cursor-pointer font-medium'
+                        : 'text-ink-3/60 cursor-default'
+                  }`}
+                >
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                      isCurrent
+                        ? 'bg-primary text-primary-on'
+                        : isPassed
+                          ? 'bg-success text-white'
+                          : 'bg-line-strong/60 text-ink-3'
+                    }`}
+                  >
+                    {isPassed ? '✓' : s.num}
+                  </span>
+                  <span className="truncate">{s.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col">
+          <DialogBody className="px-4 py-5 sm:px-6 max-h-[75vh] overflow-y-auto">
             {errorMsg ? (
-              <Notice tone="danger" title="Permintaan gagal" className="mb-5">
+              <Notice tone="danger" title="Perhatian" onDismiss={() => setErrorMsg(null)} className="mb-4">
                 {errorMsg}
               </Notice>
             ) : null}
 
-            <div className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <TextField
-                  label="Nama shift"
-                  value={editForm.name}
-                  onChange={(event) =>
-                    setEditForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                  required
-                />
-                <TextField
-                  label="Kode shift"
-                  value={editForm.code}
-                  onChange={(event) =>
-                    setEditForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
-                  }
-                  required
-                />
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <TextField
-                  label="Jam mulai"
-                  type="time"
-                  value={editForm.startTime}
-                  onChange={(event) =>
-                    setEditForm((current) => ({ ...current, startTime: event.target.value }))
-                  }
-                  required
-                />
-                <TextField
-                  label="Jam selesai"
-                  type="time"
-                  value={editForm.endTime}
-                  onChange={(event) =>
-                    setEditForm((current) => ({ ...current, endTime: event.target.value }))
-                  }
-                  required
-                  hint="Jika jam selesai lebih awal, shift otomatis dihitung melewati tengah malam."
-                />
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <SelectField
-                  label="Lokasi kerja utama"
-                  value={editForm.workLocationId}
-                  onChange={(event) =>
-                    setEditForm((current) => ({ ...current, workLocationId: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="" disabled>
-                    Pilih lokasi kerja
-                  </option>
-                  {locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {locationLine(location)}
-                    </option>
-                  ))}
-                </SelectField>
-
-                <SelectField
-                  label="Status shift"
-                  value={editForm.status}
-                  onChange={(event) =>
-                    setEditForm((current) => ({ ...current, status: event.target.value }))
-                  }
-                >
-                  {SHIFT_STATUSES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-
-              <TextField
-                label="Keterangan / Deskripsi (opsional)"
-                value={editForm.description}
-                onChange={(event) =>
-                  setEditForm((current) => ({ ...current, description: event.target.value }))
-                }
-              />
-
-              <div className="space-y-3">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-ink-2">
-                      Lokasi absensi berizin (Geofence Geolocation)
-                      <span className="ml-1 text-error" aria-hidden="true">
-                        *
-                      </span>
-                    </p>
-                    <span className="text-[11px] font-medium text-ink-3">
-                      {editForm.attendanceLocationIds.length} titik terpilih
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-ink-3">
-                    Lokasi dikelompokkan per kota untuk mengantisipasi beberapa lokasi kantor/gudang dalam satu kota yang sama.
-                  </p>
+            {/* LANGKAH 1: DETAIL JADWAL SHIFT (Ubah) */}
+            {editStep === 1 && (
+              <div className="space-y-4">
+                <div className="rounded-control border border-line/80 bg-surface-2/40 p-3 text-xs text-ink-2">
+                  Sesuaikan nama shift, kode identifikasi, dan jam kerja operasional.
                 </div>
 
-                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                  {Array.from(locationsByCity.entries()).map(([cityName, cityLocations]) => (
-                    <div key={cityName} className="rounded-panel border border-line bg-surface-2 p-3 space-y-2">
-                      <div className="flex items-center justify-between border-b border-line pb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <HiOutlineLocationMarker className="h-4 w-4 text-primary shrink-0" />
-                          <span className="text-xs font-semibold text-ink">{cityName}</span>
-                          {cityLocations[0]?.province ? (
-                            <span className="text-[11px] text-ink-3">({cityLocations[0].province})</span>
-                          ) : null}
-                        </div>
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3">
-                          {cityLocations.length} titik lokasi
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="Nama master shift"
+                    value={editForm.name}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, name: event.target.value }))
+                    }
+                    required
+                  />
+                  <TextField
+                    label="Kode shift"
+                    value={editForm.code}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
+                    }
+                    required
+                    mono
+                  />
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="Jam mulai kerja"
+                    type="time"
+                    value={editForm.startTime}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, startTime: event.target.value }))
+                    }
+                    required
+                  />
+                  <TextField
+                    label="Jam selesai kerja"
+                    type="time"
+                    value={editForm.endTime}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, endTime: event.target.value }))
+                    }
+                    required
+                  />
+                </div>
+
+                {/* Banner Durasi & Deteksi Overnight */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line bg-surface-2 px-3 py-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-ink-2">
+                    <HiOutlineClock className="h-4 w-4 text-primary" />
+                    <span>Durasi shift: <strong className="text-ink">{calculateDuration(editForm.startTime, editForm.endTime)}</strong></span>
+                  </div>
+                  {isOvernight(editForm.startTime, editForm.endTime) ? (
+                    <span className="font-semibold text-warning text-[11px]">
+                      • Shift Lintas Hari (Melewati tengah malam)
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SelectField
+                    label="Kantor acuan operasional"
+                    value={editForm.workLocationId}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, workLocationId: event.target.value }))
+                    }
+                    required
+                  >
+                    <option value="" disabled>
+                      Pilih unit kantor
+                    </option>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {locationLine(location)}
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  <SelectField
+                    label="Status shift"
+                    value={editForm.status}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, status: event.target.value }))
+                    }
+                  >
+                    {SHIFT_STATUSES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                </div>
+
+                <TextField
+                  label="Keterangan / Catatan operasional (opsional)"
+                  value={editForm.description}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                />
+
+                {activeEmployees.length > 0 ? (
+                  <div className="space-y-2 border-t border-line/60 pt-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-ink">
+                        Karyawan yang ditugaskan pada shift ini
+                      </p>
+                      <span className="text-[11px] text-ink-3">
+                        {editForm.assignedEmployeeIds.length} karyawan dipilih
+                      </span>
+                    </div>
+                    <div className="grid max-h-40 gap-2 overflow-y-auto rounded-control border border-line bg-surface p-2.5 sm:grid-cols-2">
+                      {activeEmployees.map((employee) => (
+                        <CheckboxField
+                          key={employee.id}
+                          label={employee.name}
+                          checked={editForm.assignedEmployeeIds.includes(employee.id)}
+                          onChange={(event) =>
+                            toggleEditEmployee(employee.id, event.target.checked)
+                          }
+                          hint={`${employee.position || 'Staf'} ${employee.department ? `· ${employee.department.name}` : ''}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* LANGKAH 2: PETA & TITIK PRESENSI GEOFENCE (Ubah) */}
+            {editStep === 2 && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line/80 bg-surface-2/40 p-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-xs text-ink">
+                        Titik Presensi Geofence ({editForm.attendanceLocations.length} Titik Terdaftar)
+                      </span>
+                      <Badge tone="accent">Peta Interaktif</Badge>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-ink-3">
+                      Tandai posisi pointer pada peta. Alamat fisik dan koordinat GPS akan otomatis tersinkronisasi. Minimal 1 titik dan bisa lebih dari 1 lokasi.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    tone="primary"
+                    onClick={handleAddEditPoint}
+                    icon={<HiOutlinePlus className="h-4 w-4" />}
+                  >
+                    Tambah Titik Presensi
+                  </Button>
+                </div>
+
+                {/* Tab Bar Pemilih Titik */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-line">
+                  {editForm.attendanceLocations.map((loc, idx) => {
+                    const isSelected = editActivePointIndex === idx
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setEditActivePointIndex(idx)}
+                        className={`shrink-0 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-primary text-primary-on shadow-xs font-semibold'
+                            : 'bg-surface-2 text-ink-2 hover:bg-surface border border-line'
+                        }`}
+                      >
+                        <HiOutlineLocationMarker className="h-3.5 w-3.5 shrink-0" />
+                        <span className="max-w-[150px] truncate">{loc.name || `Titik #${idx + 1}`}</span>
+                        <span className={`text-[10px] px-1 rounded ${isSelected ? 'bg-white/25 text-white' : 'bg-surface text-ink-3'}`}>
+                          {loc.radiusMeters}m
                         </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Editor Titik Aktif */}
+                {editForm.attendanceLocations[editActivePointIndex] && (
+                  <div className="grid gap-4 lg:grid-cols-12">
+                    {/* Kolom Peta (7 kolom) */}
+                    <div className="space-y-2 lg:col-span-7">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-ink">
+                          Peta Titik #{editActivePointIndex + 1}: {editForm.attendanceLocations[editActivePointIndex].name}
+                        </span>
+                        <span className="text-[11px] text-ink-3">
+                          Klik peta untuk memindahkan pin & isi alamat
+                        </span>
+                      </div>
+                      <LeafletMapPicker
+                        latitude={editForm.attendanceLocations[editActivePointIndex].latitude}
+                        longitude={editForm.attendanceLocations[editActivePointIndex].longitude}
+                        radiusMeters={editForm.attendanceLocations[editActivePointIndex].radiusMeters}
+                        polygon={editForm.attendanceLocations[editActivePointIndex].polygonCoordinates}
+                        mode={editForm.attendanceLocations[editActivePointIndex].coordinatesType}
+                        cityName={editForm.attendanceLocations[editActivePointIndex].city}
+                        provinceName={editForm.attendanceLocations[editActivePointIndex].province}
+                        onChange={({ latitude, longitude, radiusMeters, coordinatesType, polygonCoordinates }) => {
+                          handleUpdateEditPoint({
+                            latitude,
+                            longitude,
+                            radiusMeters,
+                            coordinatesType,
+                            polygonCoordinates,
+                          })
+                        }}
+                        onAddressSelect={(resolved) => {
+                          handleUpdateEditPoint({
+                            address: resolved.fullAddress || editForm.attendanceLocations[editActivePointIndex].address,
+                            city: resolved.city || editForm.attendanceLocations[editActivePointIndex].city,
+                            province: resolved.province || editForm.attendanceLocations[editActivePointIndex].province,
+                          })
+                        }}
+                        height={340}
+                      />
+                    </div>
+
+                    {/* Kolom Form Atribut Titik (5 kolom) */}
+                    <div className="space-y-3 rounded-control border border-line bg-surface p-3.5 lg:col-span-5">
+                      <div className="flex items-center justify-between border-b border-line pb-2">
+                        <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                          Konfigurasi Titik #{editActivePointIndex + 1}
+                        </h5>
+                        {editForm.attendanceLocations.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditPoint(editActivePointIndex)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-error hover:underline"
+                            title="Hapus titik lokasi ini"
+                          >
+                            <HiOutlineTrash className="h-3.5 w-3.5" />
+                            Hapus Titik
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-ink-3 italic">
+                            Minimal 1 titik wajib
+                          </span>
+                        )}
+                      </div>
+
+                      <TextField
+                        label="Nama titik presensi"
+                        value={editForm.attendanceLocations[editActivePointIndex].name}
+                        onChange={(e) => handleUpdateEditPoint({ name: e.target.value })}
+                        placeholder="Pintu Gerbang Utama / Lobby Depan"
+                        required
+                      />
+
+                      <TextAreaField
+                        label="Alamat lengkap (otomatis terisi saat peta diklik)"
+                        value={editForm.attendanceLocations[editActivePointIndex].address}
+                        onChange={(e) => handleUpdateEditPoint({ address: e.target.value })}
+                        placeholder="Gedung, jalan, nomor (otomatis dari peta)"
+                        rows={2}
+                        required
+                      />
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <TextField
+                          label="Kota / Wilayah"
+                          value={editForm.attendanceLocations[editActivePointIndex].city}
+                          onChange={(e) => handleUpdateEditPoint({ city: e.target.value })}
+                          placeholder="Jakarta Selatan"
+                          required
+                        />
+                        <TextField
+                          label="Provinsi"
+                          value={editForm.attendanceLocations[editActivePointIndex].province || ''}
+                          onChange={(e) => handleUpdateEditPoint({ province: e.target.value })}
+                          placeholder="DKI Jakarta"
+                        />
                       </div>
 
                       <div className="grid gap-2 sm:grid-cols-2">
-                        {cityLocations.map((location) => {
-                          const isChecked = editForm.attendanceLocationIds.includes(location.id)
-                          const isPolygon = location.coordinatesType === 'polygon'
-                          const polygonPoints = location.polygonCoordinates?.length ?? 0
+                        <TextField
+                          label="Radius presensi (meter)"
+                          type="number"
+                          value={editForm.attendanceLocations[editActivePointIndex].radiusMeters}
+                          onChange={(e) =>
+                            handleUpdateEditPoint({ radiusMeters: Number(e.target.value) || 50 })
+                          }
+                          min={10}
+                          max={5000}
+                          required
+                          hint="Toleransi lingkaran"
+                        />
+                        <SelectField
+                          label="Zona waktu"
+                          value={editForm.attendanceLocations[editActivePointIndex].timezone}
+                          onChange={(e) => handleUpdateEditPoint({ timezone: e.target.value })}
+                        >
+                          {TIMEZONES.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </SelectField>
+                      </div>
 
-                          return (
-                            <label
-                              key={location.id}
-                              className={`flex items-start gap-2.5 rounded-panel border p-2.5 cursor-pointer transition-colors ${
-                                isChecked
-                                  ? 'border-primary bg-primary-subtle/15'
-                                  : 'border-line hover:border-line-hover bg-surface'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => toggleEditAttendance(location.id, e.target.checked)}
-                                className="mt-0.5 h-4 w-4 rounded border-line text-primary focus:ring-primary shrink-0"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between gap-1">
-                                  <p className="truncate text-xs font-semibold text-ink">{location.name}</p>
-                                  <span className="shrink-0 text-[10px] font-semibold uppercase px-1 py-0.2 rounded bg-surface-2 border border-line text-ink-2">
-                                    {isPolygon ? `Polygon (${polygonPoints} t)` : `Point (${location.radiusMeters}m)`}
-                                  </span>
-                                </div>
-                                <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-3">{location.address}</p>
-                                <div className="mt-1 flex items-center gap-1.5 text-[10px] text-ink-3">
-                                  <span className="font-mono">{Number(location.latitude).toFixed(4)}, {Number(location.longitude).toFixed(4)}</span>
-                                  <span>·</span>
-                                  <span>{location.timezone || 'WIB'}</span>
-                                </div>
-                              </div>
-                            </label>
-                          )
-                        })}
+                      <div className="rounded border border-line bg-surface-2 px-2.5 py-1.5 text-[11px] text-ink-3">
+                        Koordinat GPS:{' '}
+                        <span className="font-mono text-ink font-semibold">
+                          {editForm.attendanceLocations[editActivePointIndex].latitude.toFixed(6)},{' '}
+                          {editForm.attendanceLocations[editActivePointIndex].longitude.toFixed(6)}
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
+            )}
 
-              {activeEmployees.length > 0 ? (
-                <div className="space-y-2.5 border-t border-line pt-4">
-                  <div>
-                    <p className="text-xs font-semibold text-ink-2">
-                      Karyawan yang ditugaskan pada shift ini
-                    </p>
-                    <p className="mt-1 text-[11px] leading-snug text-ink-3">
-                      Centang karyawan yang mengikuti shift operasional ini.
-                    </p>
+            {/* LANGKAH 3: REKAPITULASI & KONFIRMASI (Ubah) */}
+            {editStep === 3 && (
+              <div className="space-y-4">
+                <div className="rounded-control border border-primary-line bg-primary-subtle p-3 text-xs text-primary">
+                  Periksa ringkasan perubahan shift di bawah ini sebelum disimpan.
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                      Informasi & Jadwal Shift
+                    </h5>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold rounded bg-surface-2 px-1.5 py-0.5 border border-line text-ink">
+                        {editForm.code}
+                      </span>
+                      <span className="font-bold text-sm text-ink">{editForm.name}</span>
+                    </div>
+                    <div className="text-xs text-ink-2 space-y-1 pt-1 border-t border-line/60">
+                      <p className="flex items-center gap-1.5">
+                        <HiOutlineClock className="h-4 w-4 text-primary shrink-0" />
+                        <span>
+                          Jam Kerja: <strong>{editForm.startTime} — {editForm.endTime}</strong> ({calculateDuration(editForm.startTime, editForm.endTime)})
+                        </span>
+                      </p>
+                      {isOvernight(editForm.startTime, editForm.endTime) ? (
+                        <p className="text-warning font-semibold text-[11px]">
+                          • Shift Lintas Hari (Melewati tengah malam)
+                        </p>
+                      ) : null}
+                      <p>
+                        Status: <span className="font-semibold text-ink">{editForm.status === 'active' ? 'Aktif' : 'Nonaktif'}</span>
+                      </p>
+                      {editForm.description ? (
+                        <p className="text-ink-3 italic">{editForm.description}</p>
+                      ) : null}
+                    </div>
                   </div>
 
-                  <div className="grid max-h-48 gap-2 overflow-y-auto rounded-panel border border-line p-3 sm:grid-cols-2">
-                    {activeEmployees.map((employee) => (
-                      <CheckboxField
-                        key={employee.id}
-                        label={employee.name}
-                        checked={editForm.assignedEmployeeIds.includes(employee.id)}
-                        onChange={(event) =>
-                          toggleEditEmployee(employee.id, event.target.checked)
-                        }
-                        hint={`${employee.position || 'Staf'} ${employee.department ? `· ${employee.department.name}` : ''}`}
-                      />
+                  <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                      Unit Kantor & Karyawan
+                    </h5>
+                    <p className="text-xs text-ink-2">
+                      Kantor Acuan:{' '}
+                      <strong className="text-ink">
+                        {locations.find((l) => l.id === editForm.workLocationId)?.name || 'Kantor Operasional'}
+                      </strong>
+                    </p>
+                    <p className="text-xs text-ink-2">
+                      Karyawan Ditugaskan: <strong className="text-ink">{editForm.assignedEmployeeIds.length} orang</strong>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ringkasan Titik Geofence Presensi */}
+                <div className="rounded-control border border-line bg-surface p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                      Daftar Titik Geofence Presensi ({editForm.attendanceLocations.length} Titik Terdaftar)
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => setEditStep(2)}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Ubah di Peta
+                    </button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {editForm.attendanceLocations.map((loc, idx) => (
+                      <div key={idx} className="rounded border border-line bg-surface-2 p-2.5 text-xs space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-semibold text-ink truncate">{loc.name}</span>
+                          <span className="shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-surface border border-line text-primary">
+                            Radius {loc.radiusMeters}m
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-ink-3 truncate">{loc.address}</p>
+                        <div className="flex items-center justify-between text-[10px] text-ink-3 pt-0.5">
+                          <span className="font-mono">
+                            {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
+                          </span>
+                          <span>
+                            {loc.city} · {loc.timezone}
+                          </span>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
-              ) : null}
-            </div>
+              </div>
+            )}
           </DialogBody>
 
-          <DialogFooter>
-            <Button type="button" onClick={() => setEditItem(null)}>
-              Batal
-            </Button>
-            <Button
-              type="submit"
-              tone="primary"
-              loading={isSubmitting}
-              disabled={editForm.attendanceLocationIds.length === 0}
-            >
-              {isSubmitting ? 'Memperbarui...' : 'Simpan Perubahan'}
-            </Button>
+          <DialogFooter className="justify-between px-4 py-3 sm:px-6">
+            {editStep > 1 ? (
+              <Button
+                type="button"
+                onClick={() => setEditStep((s) => Math.max(s - 1, 1))}
+                icon={<HiOutlineArrowLeft className="h-4 w-4" />}
+              >
+                Sebelumnya
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => setEditItem(null)}>
+                Batal
+              </Button>
+            )}
+
+            {editStep < 3 ? (
+              <Button type="button" tone="primary" onClick={handleNextEditStep}>
+                Lanjutkan Langkah {editStep + 1}
+                <HiOutlineArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                tone="primary"
+                loading={isSubmitting}
+                onClick={handleEditSubmit}
+              >
+                {isSubmitting ? 'Memperbarui...' : 'Simpan Perubahan Shift'}
+              </Button>
+            )}
           </DialogFooter>
-        </form>
+        </div>
       </Dialog>
 
       {/* Konfirmasi Hapus */}

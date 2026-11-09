@@ -234,11 +234,16 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
   - Kolom `shift_id` pada tabel `users` mengaitkan karyawan langsung ke master shift.
   - Saat mendaftarkan atau memperbarui karyawan di menu Karyawan, admin dapat memilih shift kerja aktif.
   - Layanan shift secara otomatis menghitung `assignedCount` dan mengembalikan daftar karyawan yang bertugas pada shift tersebut.
-• **Titik Penting Geolokasi Absensi (*Geofence Attendance*)**:
-  - Setiap shift wajib memiliki minimal satu titik lokasi absensi (`attendanceLocationIds`).
-  - Mendukung penugasan multi-lokasi (karyawan diizinkan absensi di beberapa kantor cabang yang valid).
-  - Setiap titik absensi mengikat skema geolokasi mandiri yang identik dengan lokasi operasional perusahaan (`name`, `address`, `city`, `province`, `latitude`, `longitude`, `radius_meters`, `coordinates_type`, `polygon_coordinates`, dan `timezone`).
-  - Mengantisipasi kondisi perusahaan memiliki lebih dari satu cabang fisik di dalam satu kota yang sama tanpa kerancuan.
+• **Geofence Dialihkan ke Shifting (Data Corp Terbatas Level Kota)**:
+  - Geofence presensi (peta, radius meter, poligon) sepenuhnya dihapus dari data korporasi/perusahaan (`companies.tsx`).
+  - Data korporasi disederhanakan hanya sebatas cakupan provinsi dan kota operasional (`OperationalAreaSelector`).
+  - Pendaftaran badan usaha kini menjadi 3 langkah ringkas (Profil → Kota Operasional → Konfirmasi).
+• **Wizard Multistep Shifting dengan Peta Interaktif & Pointer Lokasi**:
+  - Formulir pembuatan dan pengubahan master shift diimplementasikan dalam bentuk *Multi-Step Wizard* (3 Langkah):
+    - **Langkah 1**: Informasi jadwal, jam kerja operasional (dengan kalkulator durasi & deteksi *overnight*), kantor acuan operasional, status, dan penugasan karyawan opsional.
+    - **Langkah 2**: Peta presisi interaktif (*LeafletMapPicker*) dengan pin pointer lokasi untuk menandai absensi point. Alamat lengkap dan kota otomatis terisi dari klik peta (*reverse geocoding*).
+    - **Langkah 3**: Rekapitulasi lengkap jadwal kerja dan kartu titik-titik geofence yang ditandai sebelum disimpan.
+  - **Dukungan Multi-Titik Presensi**: Administrator dapat menambahkan lebih dari 1 lokasi presensi (`+ Tambah Titik Presensi`) dengan koordinat dan radius masing-masing, dan sistem mewajibkan minimal 1 lokasi aktif (tombol hapus terproteksi jika tersisa 1 titik).
 • **Algoritma Verifikasi Presensi Geofence**:
   - *Haversine Formula*: Menghitung deviasi jarak meter terhadap titik pusat kantor radius lingkaran.
   - *Ray Casting (Even-Odd)*: Memvalidasi apakah koordinat GPS pengguna berada di dalam batas perimeter poligon tapak kantor.
@@ -286,12 +291,16 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
 • `DELETE /api/shifting/shifts/:id`: Menghapus data shift dan me-reset penugasan `shift_id` pada karyawan terkait menjadi null.
 • `POST /api/shifting/shifts/:id/verify-attendance`: Endpoint verifikasi absensi geolokasi berbasis posisi GPS pengguna (`latitude`, `longitude`). Mengembalikan status `verified: true/false`, deviasi jarak meter (`distanceMeters`), serta data titik lokasi yang cocok (`matchedLocation`).
 
-### 4. Integrasi Frontend (`apps/web/src/routes/shifts.tsx` & `employees.tsx`)
+### 4. Integrasi Frontend (`apps/web/src/routes/shifts.tsx` & `companies.tsx`)
+• **Halaman Badan Usaha / Perusahaan (`companies.tsx`)**:
+  - Pendaftaran badan usaha disederhanakan menjadi 3 langkah ringkas: Profil → Wilayah & Kota Operasional → Konfirmasi.
+  - Geofence presensi, peta Leaflet, dan pembatasan radius dihapus dari data perusahaan karena presensi absensi dikelola penuh oleh layanan shifting.
 • **Halaman Master Shift (`shifts.tsx`)**:
-  - Tombol "Buat Shift" aktif selama perusahaan memiliki lokasi kantor aktif (tidak terblokir oleh ketiadaan karyawan).
-  - Pengelompokan lokasi kantor per kota (`locationsByCity`) untuk mempermudah pemilihan saat perusahaan memiliki lebih dari satu cabang di kota yang sama.
-  - Kartu pemilih geofence menampilkan nama cabang, alamat, tipe geofence (`Point` radius atau `Polygon`), koordinat GPS, dan timezone.
-  - Tabel master shift menampilkan rincian titik geofence per baris shift beserta badge tipe koordinat.
+  - Modal pembuatan & pengubahan shift kini mengadopsi *Multi-Step Wizard* (3 Langkah).
+  - Terdapat peta interaktif dengan pin pointer lokasi untuk menandai absensi point secara visual.
+  - Alamat jalan, nomor, dan kota otomatis terisi berkat integrasi reverse geocoding Leaflet.
+  - Administrator dapat menambahkan lebih dari 1 lokasi presensi (`+ Tambah Titik Presensi`) dan wajib menyertakan minimal 1 lokasi aktif.
+  - Tab navigator antar-titik presensi memudahkan penyuntingan atribut titik secara individual (nama titik, alamat, radius toleransi meter, zona waktu).
 • **Halaman Karyawan (`employees.tsx`)**:
   - Formulir penambahan & pengubahan karyawan dilengkapi pemilih shift kerja (`SelectField` Shift kerja).
   - Tabel karyawan menampilkan kolom shift kerja aktif dengan nama shift, kode badge, dan jam kerja.

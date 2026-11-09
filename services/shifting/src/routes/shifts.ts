@@ -68,6 +68,20 @@ interface LocationGeoSnapshot {
   timezone: string
 }
 
+export interface ShiftAttendancePointInput {
+  name: string
+  address: string
+  city: string
+  province?: string
+  latitude: number | string
+  longitude: number | string
+  radiusMeters?: number
+  coordinatesType?: string
+  polygonCoordinates?: [number, number][] | null
+  timezone?: string
+  locationId?: string
+}
+
 interface ShiftInput {
   companyId: string
   name: string
@@ -76,7 +90,8 @@ interface ShiftInput {
   startTime: string
   endTime: string
   workLocationId: string
-  attendanceLocationIds: string[]
+  attendanceLocationIds?: string[]
+  attendanceLocations?: ShiftAttendancePointInput[]
   status?: string
   employeeId?: string
   position?: string
@@ -128,6 +143,7 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     .select({
       id: companyLocations.id,
       companyId: companyLocations.companyId,
+      city: companyLocations.city,
       status: companyLocations.status
     })
     .from(companyLocations)
@@ -146,40 +162,79 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     return { ok: false, status: 400, message: 'Lokasi kerja sedang nonaktif.' }
   }
 
-  const attendanceLocationIds = [...new Set(input.attendanceLocationIds.filter(Boolean))]
-  if (attendanceLocationIds.length < 1) {
-    return { ok: false, status: 400, message: 'Pilih minimal satu lokasi absensi.' }
-  }
+  let locations: LocationGeoSnapshot[] = []
+  let attendanceLocationIds: string[] = []
 
-  // Mengambil skema geolokasi lengkap dari company_locations untuk mengantisipasi
-  // adanya lebih dari satu lokasi fisik dalam satu kota yang sama.
-  const locations = await db
-    .select({
-      id: companyLocations.id,
-      companyId: companyLocations.companyId,
-      name: companyLocations.name,
-      address: companyLocations.address,
-      city: companyLocations.city,
-      province: companyLocations.province,
-      latitude: companyLocations.latitude,
-      longitude: companyLocations.longitude,
-      radiusMeters: companyLocations.radiusMeters,
-      coordinatesType: companyLocations.coordinatesType,
-      polygonCoordinates: companyLocations.polygonCoordinates,
-      timezone: companyLocations.timezone,
-      status: companyLocations.status
-    })
-    .from(companyLocations)
-    .where(inArray(companyLocations.id, attendanceLocationIds))
+  if (Array.isArray(input.attendanceLocations) && input.attendanceLocations.length > 0) {
+    for (let i = 0; i < input.attendanceLocations.length; i++) {
+      const p = input.attendanceLocations[i]
+      const locName = p.name?.trim()
+      if (!locName || locName.length < 2) {
+        return { ok: false, status: 400, message: `Nama titik lokasi #${i + 1} minimal 2 karakter.` }
+      }
+      const lat = Number(p.latitude)
+      const lng = Number(p.longitude)
+      if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        return { ok: false, status: 400, message: `Koordinat GPS titik #${i + 1} tidak valid.` }
+      }
+      const radius = Number(p.radiusMeters) || 50
+      const coordType = p.coordinatesType === 'polygon' ? 'polygon' : 'point'
+      const poly = Array.isArray(p.polygonCoordinates) ? p.polygonCoordinates : null
 
-  if (locations.length !== attendanceLocationIds.length) {
-    return { ok: false, status: 400, message: 'Salah satu lokasi absensi tidak ditemukan.' }
-  }
-  if (locations.some((location) => location.companyId !== companyId)) {
-    return { ok: false, status: 400, message: 'Semua lokasi absensi harus berada di perusahaan yang sama.' }
-  }
-  if (locations.some((location) => location.status !== 'active')) {
-    return { ok: false, status: 400, message: 'Semua lokasi absensi harus berstatus aktif.' }
+      locations.push({
+        id: p.locationId || workLocation.id,
+        companyId,
+        name: locName,
+        address: p.address?.trim() || 'Alamat Titik Presensi',
+        city: p.city?.trim() || workLocation.city || 'Kota Operasional',
+        province: p.province?.trim() || null,
+        latitude: lat,
+        longitude: lng,
+        radiusMeters: radius,
+        coordinatesType: coordType,
+        polygonCoordinates: poly,
+        timezone: p.timezone?.trim() || 'Asia/Jakarta'
+      })
+    }
+    attendanceLocationIds = locations.map((l) => l.id)
+  } else {
+    // Fallback ke attendanceLocationIds
+    const rawIds = [...new Set((input.attendanceLocationIds || []).filter(Boolean))]
+    if (rawIds.length < 1) {
+      return { ok: false, status: 400, message: 'Tandai minimal satu titik lokasi absensi pada peta.' }
+    }
+
+    const dbLocs = await db
+      .select({
+        id: companyLocations.id,
+        companyId: companyLocations.companyId,
+        name: companyLocations.name,
+        address: companyLocations.address,
+        city: companyLocations.city,
+        province: companyLocations.province,
+        latitude: companyLocations.latitude,
+        longitude: companyLocations.longitude,
+        radiusMeters: companyLocations.radiusMeters,
+        coordinatesType: companyLocations.coordinatesType,
+        polygonCoordinates: companyLocations.polygonCoordinates,
+        timezone: companyLocations.timezone,
+        status: companyLocations.status
+      })
+      .from(companyLocations)
+      .where(inArray(companyLocations.id, rawIds))
+
+    if (dbLocs.length !== rawIds.length) {
+      return { ok: false, status: 400, message: 'Salah satu lokasi absensi tidak ditemukan.' }
+    }
+    if (dbLocs.some((location) => location.companyId !== companyId)) {
+      return { ok: false, status: 400, message: 'Semua lokasi absensi harus berada di perusahaan yang sama.' }
+    }
+    if (dbLocs.some((location) => location.status !== 'active')) {
+      return { ok: false, status: 400, message: 'Semua lokasi absensi harus berstatus aktif.' }
+    }
+
+    locations = dbLocs
+    attendanceLocationIds = rawIds
   }
 
   let employeeId: string | null = null
@@ -416,6 +471,20 @@ async function getShiftDetail(id: string) {
   return detail
 }
 
+const attendancePointSchema = t.Object({
+  name: t.String({ minLength: 2, maxLength: 150 }),
+  address: t.String({ minLength: 2 }),
+  city: t.String({ minLength: 1, maxLength: 100 }),
+  province: t.Optional(t.String()),
+  latitude: t.Union([t.Number(), t.String()]),
+  longitude: t.Union([t.Number(), t.String()]),
+  radiusMeters: t.Optional(t.Number({ minimum: 10, maximum: 5000 })),
+  coordinatesType: t.Optional(t.String()),
+  polygonCoordinates: t.Optional(t.Any()),
+  timezone: t.Optional(t.String()),
+  locationId: t.Optional(t.String())
+})
+
 const shiftBodySchema = {
   body: t.Object({
     companyId: t.String(),
@@ -425,7 +494,8 @@ const shiftBodySchema = {
     startTime: t.String({ minLength: 5, maxLength: 8 }),
     endTime: t.String({ minLength: 5, maxLength: 8 }),
     workLocationId: t.String(),
-    attendanceLocationIds: t.Array(t.String(), { minItems: 1 }),
+    attendanceLocationIds: t.Optional(t.Array(t.String())),
+    attendanceLocations: t.Optional(t.Array(attendancePointSchema)),
     status: t.Optional(t.String()),
     employeeId: t.Optional(t.String()),
     position: t.Optional(t.String()),
