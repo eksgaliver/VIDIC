@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, varchar, numeric, integer, boolean, index, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, uuid, varchar, numeric, integer, boolean, index, jsonb, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
 // 1. Tabel Perusahaan (Companies)
@@ -75,13 +75,19 @@ export const users = pgTable('users', {
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  avatarUrl: text('avatar_url'),
+  position: varchar('position', { length: 150 }),
+  supervisorId: uuid('supervisor_id').references((): AnyPgColumn => users.id, { onDelete: 'set null' }),
+  status: varchar('status', { length: 20 }).default('active').notNull(),
   role: varchar('role', { length: 50 }).default('member').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 }, (table) => [
   index('idx_auth_users_email').on(table.email),
   index('idx_auth_users_company_id').on(table.companyId),
-  index('idx_auth_users_department_id').on(table.departmentId)
+  index('idx_auth_users_department_id').on(table.departmentId),
+  index('idx_auth_users_supervisor_id').on(table.supervisorId),
+  index('idx_auth_users_status').on(table.status)
 ])
 
 // 5. Tabel Wilayah & Kota Operasional Perusahaan (Company Operational Areas)

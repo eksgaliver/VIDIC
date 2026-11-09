@@ -61,3 +61,53 @@ export interface Company {
 }
 
 export type CompanyWithRelations = Company
+
+export interface Employee {
+  id: string
+  companyId: string | null
+  departmentId: string | null
+  supervisorId: string | null
+  name: string
+  email: string
+  position: string | null
+  avatarUrl?: string | null
+  status: string
+  role: string
+  department: Pick<Department, 'id' | 'name' | 'code'> | null
+  supervisor: { id: string; name: string; email: string } | null
+  createdAt?: string | Date
+  updatedAt?: string | Date
+}
+
+export interface ShiftLocation {
+  id: string
+  name: string
+  address: string
+  city: string
+  province?: string | null
+  latitude: string | number
+  longitude: string | number
+  radiusMeters: number
+  coordinatesType?: 'point' | 'polygon'
+  polygonCoordinates?: [number, number][] | null
+  timezone: string
+}
+
+export interface Shift {
+  id: string
+  companyId: string
+  employeeId: string
+  position: string
+  supervisorId: string | null
+  startTime: string
+  endTime: string
+  workLocationId: string
+  status: string
+  employee: { id: string; name: string; email: string }
+  department: Pick<Department, 'id' | 'name' | 'code'> | null
+  supervisor: { id: string; name: string; email: string } | null
+  workLocation: ShiftLocation
+  attendanceLocations: ShiftLocation[]
+  createdAt?: string | Date
+  updatedAt?: string | Date
+}

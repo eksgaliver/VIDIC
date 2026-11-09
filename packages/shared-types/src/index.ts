@@ -14,6 +14,7 @@ export const userDtoSchema = z.object({
   email: z.string().email(),
   name: z.string(),
   role: z.enum(['admin', 'member', 'guest']),
+  avatarUrl: z.string().nullable().optional(),
   createdAt: z.string().or(z.date())
 })
 

@@ -15,6 +15,20 @@
       "when": 1793940898740,
       "tag": "0001_tearful_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794208247088,
+      "tag": "0002_add_user_avatar",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794210964017,
+      "tag": "0003_smooth_marvel_boy",
+      "breakpoints": true
     }
   ]
 }

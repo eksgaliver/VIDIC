@@ -4,6 +4,7 @@ const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 const appName = process.env.APP_NAME || 'Srikaya Enterprise'
 const authPort = Number(process.env.AUTH_SERVICE_PORT || 3001)
+const shiftingPort = Number(process.env.SHIFTING_SERVICE_PORT || 3003)
 const storagePort = Number(process.env.STORAGE_SERVICE_PORT || 3002)
 const gatewayPort = Number(process.env.GATEWAY_PORT || 3000)
 const clientPort = Number(process.env.CLIENT_PORT || 5173)
@@ -31,6 +32,18 @@ const services: ServiceConfig[] = [
     }
   },
   {
+    name: 'SHIFTING',
+    port: shiftingPort,
+    runtime: 'bun',
+    cmd: ['bun', '--watch', 'src/index.ts'],
+    cwd: 'services/shifting',
+    env: {
+      SHIFTING_SERVICE_PORT: String(shiftingPort),
+      PORT: String(shiftingPort),
+      APP_NAME: appName
+    }
+  },
+  {
     name: 'STORAGE',
     port: storagePort,
     runtime: 'bun',
@@ -54,6 +67,8 @@ const services: ServiceConfig[] = [
       PORT: String(gatewayPort),
       AUTH_SERVICE_PORT: String(authPort),
       AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL || `http://localhost:${authPort}`,
+      SHIFTING_SERVICE_PORT: String(shiftingPort),
+      SHIFTING_SERVICE_URL: process.env.SHIFTING_SERVICE_URL || `http://localhost:${shiftingPort}`,
       STORAGE_SERVICE_PORT: String(storagePort),
       STORAGE_SERVICE_URL: process.env.STORAGE_SERVICE_URL || `http://localhost:${storagePort}`,
       APP_NAME: appName
@@ -77,6 +92,7 @@ const services: ServiceConfig[] = [
 
 console.log('================================================================')
 console.log(`  ${appName.toUpperCase()} MICROSERVICES ORCHESTRATOR`)
+console.log(`  -  Shifting       : http://localhost:${shiftingPort} (Runtime: Bun)`)
 console.log(`  • Auth Service   : http://localhost:${authPort} (Runtime: Bun)`)
 console.log(`  • API Gateway    : http://localhost:${gatewayPort}/api (Runtime: Bun)`)
 console.log(`  • Client SPA     : http://localhost:${clientPort} (Runtime: Node.js)`)

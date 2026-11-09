@@ -18,7 +18,17 @@ c:/project/
 │
 ├── services/                                 # Klaster Mikroservis (Runtime: Bun)
 │   ├── gateway/                              # API Gateway & Reverse Proxy (Port 3000)
-│   │   ├── src/index.ts                      # Mount authApp & storageApp ke /api, ekspos /storage/*
+│   │   ├── src/index.ts                      # Mount authApp, shiftingApp, & storageApp ke /api
+│   │   └── package.json
+│   │
+│   ├── shifting/                             # Shifting Microservice (Port 3003)
+│   │   ├── src/
+│   │   │   ├── db/
+│   │   │   │   ├── schema.ts                 # Drizzle schema (shifts & shift_attendance_locations)
+│   │   │   │   └── index.ts                  # Koneksi DB terisolasi
+│   │   │   ├── routes/
+│   │   │   │   └── shifts.ts                 # Handler CRUD Shift Karyawan & Geofence Absensi
+│   │   │   └── index.ts                      # Inisialisasi shiftingApp
 │   │   └── package.json
 │   │
 │   ├── storage/                              # Storage Microservice (Port 3002)
@@ -213,14 +223,62 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
 
 ---
 
-## § 7. Panduan Perintah Operasional
+## § 7. Layanan Shifting & CRUD Shift Karyawan (`services/shifting`)
+
+### 1. Fitur & Tanggung Jawab
+• **Layanan Mikroservis Mandiri (*Autonomous Service*)**:
+  Berdiri sendiri pada port `3003` dengan runtime Bun dan framework ElysiaJS. Memiliki koneksi basis data terisolasi, skema Drizzle khusus, dan di-mount ke API Gateway pada prefix `/api/shifting`.
+• **Penugasan Melekat pada Karyawan**:
+  Setiap shift merepresentasikan penugasan operasional satu karyawan aktif (`employeeId`), dengan posisi penugasan, atasan langsung (`supervisorId`), jam mulai (`startTime`), jam selesai (`endTime`), dan lokasi kerja utama (`workLocationId`).
+• **Titik Penting Geolokasi Absensi (*Geofence Attendance*)**:
+  - Setiap shift wajib memiliki minimal satu titik lokasi absensi (`attendanceLocationIds`).
+  - Mendukung penugasan multi-lokasi (karyawan diizinkan absensi di beberapa kantor cabang yang valid).
+  - Setiap titik absensi mengikat koordinat geolokasi (`latitude`, `longitude`, `radiusMeters`, `coordinatesType`, `polygonCoordinates`, dan `timezone`).
+• **Pendeteksian Shift Lintas Hari (*Overnight Shift*)**:
+  Sistem secara otomatis mendeteksi dan memberi indikasi jika jam selesai lebih awal dari jam mulai (`endTime <= startTime`), menandakan shift melewati tengah malam.
+
+### 2. Skema Basis Data PostgreSQL (`srikaya_auth`)
+• **Tabel `shifts`**:
+  - `id` (UUID PK)
+  - `company_id` (FK `companies.id`, `ON DELETE CASCADE`)
+  - `employee_id` (FK `users.id`, `ON DELETE CASCADE`)
+  - `position` (VARCHAR 150)
+  - `supervisor_id` (FK `users.id`, `ON DELETE SET NULL`)
+  - `start_time` (TIME)
+  - `end_time` (TIME)
+  - `work_location_id` (FK `company_locations.id`, `ON DELETE RESTRICT`)
+  - `status` (VARCHAR 20, default `'active'`)
+  - `created_at`, `updated_at` (TIMESTAMPTZ)
+• **Tabel `shift_attendance_locations`**:
+  - `id` (UUID PK)
+  - `shift_id` (FK `shifts.id`, `ON DELETE CASCADE`)
+  - `location_id` (FK `company_locations.id`, `ON DELETE RESTRICT`)
+  - `created_at` (TIMESTAMPTZ)
+  - Indeks unik majemuk: `(shift_id, location_id)`
+
+### 3. Kontrak Endpoint CRUD Shift
+• `GET /api/shifting/shifts`: Mengambil daftar shift dengan filter opsional `?companyId=...`.
+• `GET /api/shifting/shifts/:id`: Mengambil rincian shift tunggal beserta relasi karyawan, atasan, departemen, lokasi kerja, dan titik geofence absensi.
+• `POST /api/shifting/shifts`: Membuat penugasan shift baru dengan validasi integritas jam (HH:mm) dan lokasi absensi.
+• `PUT /api/shifting/shifts/:id`: Memperbarui data shift dan memperbarui relasi lokasi absensi secara transaksional (`db.transaction`).
+• `DELETE /api/shifting/shifts/:id`: Menghapus data shift dan membersihkan relasi lokasi absensi secara otomatis.
+
+### 4. Integrasi Frontend (`apps/web/src/routes/shifts.tsx`)
+• Antarmuka tabel daftar shift interaktif dengan avatar inisial, lencana departemen, kartu jam kerja dengan ikon jam, lokasi kerja utama, dan daftar lencana titik geofence absensi.
+• Modal formulir tambah & ubah shift dengan validasi input, pemilih jam HTML5 time picker, pemilih atasan dalam satu perusahaan, dan daftar pilihan titik absensi berbasis kotak centang (*checkbox*).
+• Dialog konfirmasi penghapusan dengan peringatan dampak penghapusan titik absensi terkait.
+
+---
+
+## § 8. Panduan Perintah Operasional
 
 ```powershell
-# 1. Menjalankan seluruh ekosistem (AUTH, STORAGE, GATEWAY, CLIENT):
+# 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):
 bun run dev
 
 # 2. Menjalankan mikroservis spesifik secara mandiri:
 bun run --cwd services/auth src/index.ts       # Port 3001
+bun run --cwd services/shifting src/index.ts   # Port 3003
 bun run --cwd services/storage src/index.ts    # Port 3002
 bun run --cwd services/gateway src/index.ts    # Port 3000
 

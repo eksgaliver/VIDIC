@@ -3,13 +3,16 @@ import { jwt } from '@elysiajs/jwt'
 import { cors } from '@elysiajs/cors'
 import { db } from './db'
 import { users, companies, departments, companyLocations, companyOperationalAreas } from './db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { companyRoutes } from './routes/companies'
 import { departmentRoutes } from './routes/departments'
+import { employeeRoutes } from './routes/employees'
 import { uploadRoutes } from './routes/upload'
+import { handleAvatarUpload, deleteStoredAvatar } from './handlers/uploadHandler'
 
 export { companyRoutes } from './routes/companies'
 export { departmentRoutes } from './routes/departments'
+export { employeeRoutes } from './routes/employees'
 export { uploadRoutes } from './routes/upload'
 
 interface AuthUser {
@@ -17,6 +20,7 @@ interface AuthUser {
   name: string
   email: string
   passwordHash: string
+  avatarUrl: string | null
   role: 'admin' | 'member'
   createdAt: Date
   updatedAt: Date
@@ -28,6 +32,7 @@ const DEMO_USER: AuthUser = {
   name: process.env.APP_NAME ? `${process.env.APP_NAME} Operator` : 'Srikaya Operator',
   email: 'admin@srikaya.id',
   passwordHash: await Bun.password.hash('rahasia123', { algorithm: 'bcrypt', cost: 10 }),
+  avatarUrl: null,
   role: 'admin',
   createdAt: new Date(),
   updatedAt: new Date()
@@ -104,6 +109,49 @@ async function seedDefaultData() {
         { companyId: comp.id, province: 'Jawa Timur', city: 'Kota Surabaya', status: 'active' }
       ])
 
+      // Buat Pengguna & Karyawan Awal jika belum ada
+      const existingUser = await db.select().from(users).where(eq(users.email, DEMO_USER.email)).limit(1)
+      if (existingUser.length === 0) {
+        const [adminUser] = await db.insert(users).values({
+          id: DEMO_USER.id,
+          companyId: comp.id,
+          name: DEMO_USER.name,
+          email: DEMO_USER.email,
+          passwordHash: DEMO_USER.passwordHash,
+          position: 'Direktur Operasional',
+          role: 'admin',
+          status: 'active'
+        }).returning()
+
+        const [itDept] = await db.select().from(departments).where(and(eq(departments.companyId, comp.id), eq(departments.code, 'IT'))).limit(1)
+        const [hrDept] = await db.select().from(departments).where(and(eq(departments.companyId, comp.id), eq(departments.code, 'HR'))).limit(1)
+
+        await db.insert(users).values([
+          {
+            companyId: comp.id,
+            departmentId: itDept?.id,
+            name: 'Budi Santoso',
+            email: 'budi.santoso@srikaya.id',
+            passwordHash: DEMO_USER.passwordHash,
+            position: 'Staff Rekayasa Perangkat Lunak',
+            supervisorId: adminUser.id,
+            role: 'member',
+            status: 'active'
+          },
+          {
+            companyId: comp.id,
+            departmentId: hrDept?.id,
+            name: 'Siti Rahma',
+            email: 'siti.rahma@srikaya.id',
+            passwordHash: DEMO_USER.passwordHash,
+            position: 'Spesialis Sumber Daya Manusia',
+            supervisorId: adminUser.id,
+            role: 'member',
+            status: 'active'
+          }
+        ])
+      }
+
       console.log('[SEED] Inisialisasi selesai: PT Srikaya Digital Solusindo + Departemen Wajib HR + Wilayah Operasional siap digunakan.')
     } else {
       // Pastikan perusahaan yang sudah ada juga memiliki wilayah operasional default jika masih kosong
@@ -120,6 +168,55 @@ async function seedDefaultData() {
         ])
         console.log('[SEED] Menambahkan wilayah operasional default untuk perusahaan yang ada.')
       }
+
+      const [existingAdmin] = await db.select().from(users).where(eq(users.email, DEMO_USER.email)).limit(1)
+      let adminId = existingAdmin?.id
+
+      if (!existingAdmin) {
+        const [adminUser] = await db.insert(users).values({
+          id: DEMO_USER.id,
+          companyId: comp.id,
+          name: DEMO_USER.name,
+          email: DEMO_USER.email,
+          passwordHash: DEMO_USER.passwordHash,
+          position: 'Direktur Operasional',
+          role: 'admin',
+          status: 'active'
+        }).returning()
+        adminId = adminUser.id
+      }
+
+      const existingEmployees = await db.select().from(users).where(eq(users.email, 'budi.santoso@srikaya.id')).limit(1)
+      if (existingEmployees.length === 0) {
+        const [itDept] = await db.select().from(departments).where(and(eq(departments.companyId, comp.id), eq(departments.code, 'IT'))).limit(1)
+        const [hrDept] = await db.select().from(departments).where(and(eq(departments.companyId, comp.id), eq(departments.code, 'HR'))).limit(1)
+
+        await db.insert(users).values([
+          {
+            companyId: comp.id,
+            departmentId: itDept?.id,
+            name: 'Budi Santoso',
+            email: 'budi.santoso@srikaya.id',
+            passwordHash: DEMO_USER.passwordHash,
+            position: 'Staff Rekayasa Perangkat Lunak',
+            supervisorId: adminId,
+            role: 'member',
+            status: 'active'
+          },
+          {
+            companyId: comp.id,
+            departmentId: hrDept?.id,
+            name: 'Siti Rahma',
+            email: 'siti.rahma@srikaya.id',
+            passwordHash: DEMO_USER.passwordHash,
+            position: 'Spesialis Sumber Daya Manusia',
+            supervisorId: adminId,
+            role: 'member',
+            status: 'active'
+          }
+        ])
+        console.log('[SEED] Menambahkan karyawan aktif default untuk perusahaan yang ada.')
+      }
     }
   } catch (err) {
     // Database connection or table might be synchronizing
@@ -128,6 +225,34 @@ async function seedDefaultData() {
 
 // Jalankan seed saat servis dimuat
 seedDefaultData()
+
+// Ambil pengguna aktif dari payload JWT. Akun demo hanya dipakai jika basis data tidak tersedia.
+async function resolveSessionUser(payload: unknown): Promise<AuthUser | null> {
+  if (!payload || typeof payload !== 'object') return null
+
+  const id = String((payload as { sub?: unknown }).sub ?? '')
+  if (!id) return null
+
+  try {
+    const [row] = await db.select().from(users).where(eq(users.id, id)).limit(1)
+    if (row) return { ...row, role: row.role as AuthUser['role'] }
+  } catch {
+    // Basis data tidak tersedia: hanya akun demo yang boleh melanjutkan sesi
+  }
+
+  return id === DEMO_USER.id ? DEMO_USER : null
+}
+
+function toPublicUser(user: AuthUser) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatarUrl: user.avatarUrl ?? null,
+    createdAt: user.createdAt
+  }
+}
 
 export const authService = new Elysia({ prefix: '/auth' })
   .use(cors())
@@ -195,6 +320,7 @@ export const authService = new Elysia({ prefix: '/auth' })
         name: foundUser.name,
         email: foundUser.email,
         role: foundUser.role,
+        avatarUrl: foundUser.avatarUrl ?? null,
         createdAt: foundUser.createdAt
       },
       message: 'Autentikasi berhasil'
@@ -213,21 +339,200 @@ export const authService = new Elysia({ prefix: '/auth' })
       return { success: false, message: 'Token otorisasi tidak ditemukan' }
     }
 
-    const token = authHeader.slice(7)
-    const payload = await jwt.verify(token)
+    const payload = await jwt.verify(authHeader.slice(7))
+    const current = await resolveSessionUser(payload)
 
-    if (!payload) {
+    if (!current) {
       set.status = 401
-      return { success: false, message: 'Token kadaluarsa atau tidak sah' }
+      return { success: false, message: 'Sesi tidak lagi valid. Silakan masuk kembali.' }
     }
 
     return {
       success: true,
-      user: {
-        id: String(payload.sub),
-        email: String(payload.email),
-        role: String(payload.role)
+      user: toPublicUser(current)
+    }
+  })
+  // Endpoint Perbarui Profil Akun
+  .put('/profile', async ({ headers, body, jwt, set }) => {
+    const authHeader = headers['authorization']
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401
+      return { success: false, message: 'Token otorisasi tidak ditemukan' }
+    }
+
+    const payload = await jwt.verify(authHeader.slice(7))
+    const current = await resolveSessionUser(payload)
+
+    if (!current) {
+      set.status = 401
+      return { success: false, message: 'Sesi tidak lagi valid. Silakan masuk kembali.' }
+    }
+
+    const name = body.name.trim()
+    const email = body.email.trim().toLowerCase()
+
+    if (name.length < 2) {
+      set.status = 400
+      return { success: false, message: 'Nama minimal 2 karakter' }
+    }
+
+    const isDemoAccount = current.id === DEMO_USER.id
+
+    let emailOwner: { id: string } | undefined
+    try {
+      const [owner] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1)
+      emailOwner = owner
+    } catch (err) {
+      if (!isDemoAccount) throw err
+    }
+
+    if (emailOwner && emailOwner.id !== current.id) {
+      set.status = 400
+      return { success: false, message: 'Alamat surel sudah dipakai akun lain' }
+    }
+
+    if (isDemoAccount) {
+      DEMO_USER.name = name
+      DEMO_USER.email = email
+      DEMO_USER.updatedAt = new Date()
+
+      return {
+        success: true,
+        user: toPublicUser(DEMO_USER),
+        message: 'Profil akun demo diperbarui untuk sesi berjalan'
       }
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({ name, email, updatedAt: new Date() })
+      .where(eq(users.id, current.id))
+      .returning()
+
+    return {
+      success: true,
+      user: toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
+      message: 'Profil berhasil diperbarui'
+    }
+  }, {
+    body: t.Object({
+      name: t.String({ minLength: 2, maxLength: 255 }),
+      email: t.String({ format: 'email' })
+    })
+  })
+  // Unggah atau ganti foto profil
+  .post('/avatar', async ({ headers, body, jwt, set }) => {
+    const authHeader = headers['authorization']
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401
+      return { success: false, message: 'Token otorisasi tidak ditemukan' }
+    }
+
+    const payload = await jwt.verify(authHeader.slice(7))
+    const current = await resolveSessionUser(payload)
+
+    if (!current) {
+      set.status = 401
+      return { success: false, message: 'Sesi tidak lagi valid. Silakan masuk kembali.' }
+    }
+
+    const file = (body as { file?: File }).file
+    if (!file) {
+      set.status = 400
+      return { success: false, message: 'Berkas foto profil wajib disertakan' }
+    }
+
+    try {
+      const upload = await handleAvatarUpload(file)
+      const previousAvatar = current.avatarUrl
+
+      if (current.id === DEMO_USER.id) {
+        DEMO_USER.avatarUrl = upload.url
+        DEMO_USER.updatedAt = new Date()
+
+        await deleteStoredAvatar(previousAvatar)
+
+        return {
+          success: true,
+          user: toPublicUser(DEMO_USER),
+          upload,
+          message: 'Foto profil berhasil diperbarui'
+        }
+      }
+
+      const [updated] = await db
+        .update(users)
+        .set({ avatarUrl: upload.url, updatedAt: new Date() })
+        .where(eq(users.id, current.id))
+        .returning()
+
+      await deleteStoredAvatar(previousAvatar)
+
+      return {
+        success: true,
+        user: toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
+        upload,
+        message: 'Foto profil berhasil diperbarui'
+      }
+    } catch (err: unknown) {
+      set.status = 400
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Gagal memproses foto profil'
+      }
+    }
+  }, {
+    body: t.Object({
+      file: t.File()
+    })
+  })
+  // Hapus foto profil
+  .delete('/avatar', async ({ headers, jwt, set }) => {
+    const authHeader = headers['authorization']
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      set.status = 401
+      return { success: false, message: 'Token otorisasi tidak ditemukan' }
+    }
+
+    const payload = await jwt.verify(authHeader.slice(7))
+    const current = await resolveSessionUser(payload)
+
+    if (!current) {
+      set.status = 401
+      return { success: false, message: 'Sesi tidak lagi valid. Silakan masuk kembali.' }
+    }
+
+    const previousAvatar = current.avatarUrl
+
+    if (current.id === DEMO_USER.id) {
+      DEMO_USER.avatarUrl = null
+      DEMO_USER.updatedAt = new Date()
+
+      await deleteStoredAvatar(previousAvatar)
+
+      return {
+        success: true,
+        user: toPublicUser(DEMO_USER),
+        message: 'Foto profil berhasil dihapus'
+      }
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({ avatarUrl: null, updatedAt: new Date() })
+      .where(eq(users.id, current.id))
+      .returning()
+
+    await deleteStoredAvatar(previousAvatar)
+
+    return {
+      success: true,
+      user: toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
+      message: 'Foto profil berhasil dihapus'
     }
   })
 
@@ -236,6 +541,7 @@ export const authApp = new Elysia()
   .use(authService)
   .use(companyRoutes)
   .use(departmentRoutes)
+  .use(employeeRoutes)
   .use(uploadRoutes)
 
 // Jalankan server jika dieksekusi langsung

@@ -1,10 +1,12 @@
 import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
 import { authApp } from 'auth-service'
+import { shiftingApp } from 'shifting-service'
 import { storageApp } from 'storage-service'
 import { resolve } from 'node:path'
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3001'
+const SHIFTING_SERVICE_URL = process.env.SHIFTING_SERVICE_URL || 'http://localhost:3003'
 const STORAGE_SERVICE_URL = process.env.STORAGE_SERVICE_URL || 'http://localhost:3002'
 const STORAGE_DIR = resolve(import.meta.dir, '../../../storage')
 
@@ -36,11 +38,13 @@ export const gateway = new Elysia()
         gatewayPort: Number(process.env.GATEWAY_PORT || process.env.PORT || 3000),
         services: {
           auth: AUTH_SERVICE_URL,
+          shifting: SHIFTING_SERVICE_URL,
           storage: STORAGE_SERVICE_URL
         },
         timestamp: new Date().toISOString()
       }))
       .use(authApp)
+      .use(shiftingApp)
       .use(storageApp)
   )
 

@@ -3,7 +3,7 @@ import { createRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { HiOutlineLockClosed, HiOutlineMail, HiOutlineMoon, HiOutlineSun } from 'react-icons/hi'
 import { rootRoute } from './__root'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/stores/auth'
+import { getLastLoginEmail, useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { Notice, Button } from '@/components/base'
 import { errorText } from '@/utils/apiError'
@@ -30,7 +30,7 @@ export function LoginPage() {
   const { setAuth } = useAuthStore()
   const appName = import.meta.env.VITE_APP_NAME || 'Srikaya Enterprise'
 
-  const [email, setEmail] = React.useState('admin@srikaya.id')
+  const [email, setEmail] = React.useState(() => getLastLoginEmail() || 'admin@srikaya.id')
   const [password, setPassword] = React.useState('rahasia123')
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const [isLoading, setIsLoading] = React.useState(false)
@@ -55,6 +55,7 @@ export function LoginPage() {
           email: data.user.email,
           name: data.user.name,
           role: data.user.role as 'admin' | 'member' | 'guest',
+          avatarUrl: data.user.avatarUrl ?? null,
           createdAt: data.user.createdAt
         })
         navigate({ to: DASHBOARD_PATH })
@@ -162,7 +163,7 @@ export function LoginPage() {
 
             <div className="mt-6 rounded-control border border-line bg-surface px-3.5 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">
-                Akun bawaan pengembangan
+                Kredensial awal layanan auth
               </p>
               <dl className="mt-2 space-y-1 text-[12px]">
                 <div className="flex justify-between gap-3">
@@ -174,6 +175,9 @@ export function LoginPage() {
                   <dd className="font-mono text-ink">rahasia123</dd>
                 </div>
               </dl>
+              <p className="mt-2 text-[11px] leading-snug text-ink-3">
+                Berlaku setelah layanan auth dimulai ulang, selama profil belum diubah.
+              </p>
             </div>
           </div>
         </div>

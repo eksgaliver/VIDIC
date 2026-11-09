@@ -9,6 +9,7 @@
     "dev": "bun run scripts/dev.ts",
     "backend:gateway": "bun run --cwd services/gateway src/index.ts",
     "backend:auth": "bun run --cwd services/auth src/index.ts",
+    "backend:shifting": "bun run --cwd services/shifting src/index.ts",
     "backend:storage": "bun run --cwd services/storage src/index.ts",
     "client:dev": "npm --prefix apps/web run dev",
     "client:build": "npm --prefix apps/web run build"

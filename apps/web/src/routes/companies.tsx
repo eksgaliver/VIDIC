@@ -584,81 +584,81 @@ export function CompaniesPage() {
                           <StatusFromValue value={company.status} />
                         </div>
 
-                      <p className="text-[13px] text-ink-2 2xl:text-sm">
-                        {company.industry || 'Layanan umum'} · {locationCount(company)} titik lokasi ·{' '}
-                        {departmentCount(company)} departemen
-                        {operationalAreaCount(company) > 0 ? ` · ${operationalAreaCount(company)} kota operasional` : ''}
-                      </p>
+                        <p className="text-[13px] text-ink-2 2xl:text-sm">
+                          {company.industry || 'Layanan umum'} · {locationCount(company)} titik lokasi ·{' '}
+                          {departmentCount(company)} departemen
+                          {operationalAreaCount(company) > 0 ? ` · ${operationalAreaCount(company)} kota operasional` : ''}
+                        </p>
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-ink-2 2xl:text-sm">
-                        <span className="inline-flex min-w-0 items-center gap-1.5">
-                          <HiOutlineMail className="h-4 w-4 shrink-0 text-ink-3" />
-                          <span className="truncate font-mono text-[12px] 2xl:text-[13px]">{company.email}</span>
-                        </span>
-                        {company.phone ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <HiOutlinePhone className="h-4 w-4 shrink-0 text-ink-3" />
-                            <span className="tabular">{company.phone}</span>
-                          </span>
-                        ) : null}
-                        {company.website ? (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-ink-2 2xl:text-sm">
                           <span className="inline-flex min-w-0 items-center gap-1.5">
-                            <HiOutlineGlobeAlt className="h-4 w-4 shrink-0 text-ink-3" />
-                            <a
-                              href={company.website}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="max-w-[220px] truncate text-primary hover:underline 2xl:max-w-[320px]"
-                            >
-                              {company.website.replace(/^https?:\/\//, '')}
-                            </a>
+                            <HiOutlineMail className="h-4 w-4 shrink-0 text-ink-3" />
+                            <span className="truncate font-mono text-[12px] 2xl:text-[13px]">{company.email}</span>
                           </span>
-                        ) : null}
-                      </div>
-
-                      {/* Cakupan Wilayah & Kota Operasional Perusahaan */}
-                      {company.operationalAreas && company.operationalAreas.length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-ink-2">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-3">
-                            <HiOutlineMap className="h-3.5 w-3.5 text-primary" />
-                            Cakupan Operasional:
-                          </span>
-                          {groupOperationalAreas(company.operationalAreas).map(([prov, cities]) => (
-                            <span
-                              key={prov}
-                              className="inline-flex items-center gap-1 rounded bg-surface-2 px-2 py-0.5 text-[11px] text-ink border border-line"
-                              title={`${prov}: ${cities.join(', ')}`}
-                            >
-                              <span className="font-semibold text-primary">{prov}</span>
-                              <span className="text-ink-3">({cities.length} kota)</span>
+                          {company.phone ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <HiOutlinePhone className="h-4 w-4 shrink-0 text-ink-3" />
+                              <span className="tabular">{company.phone}</span>
                             </span>
-                          ))}
+                          ) : null}
+                          {company.website ? (
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <HiOutlineGlobeAlt className="h-4 w-4 shrink-0 text-ink-3" />
+                              <a
+                                href={company.website}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="max-w-[220px] truncate text-primary hover:underline 2xl:max-w-[320px]"
+                              >
+                                {company.website.replace(/^https?:\/\//, '')}
+                              </a>
+                            </span>
+                          ) : null}
                         </div>
-                      ) : null}
 
-                      {home ? (
-                        <p className="flex items-start gap-1.5 text-[13px] text-ink-2 2xl:text-sm">
-                          <HiOutlineLocationMarker className="mt-px h-4 w-4 shrink-0 text-primary" />
-                          <span className="min-w-0">
-                            <span className="font-semibold text-ink">{home.name}</span>
-                            <span className="text-ink-3">
-                              {' '}
-                              — {home.city} ·{' '}
-                              {home.coordinatesType === 'polygon'
-                                ? 'geofence poligon'
-                                : `radius ${home.radiusMeters} m`}{' '}
-                              · {timezoneLabel(home.timezone)}
+                        {/* Cakupan Wilayah & Kota Operasional Perusahaan */}
+                        {company.operationalAreas && company.operationalAreas.length > 0 ? (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-ink-2">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-3">
+                              <HiOutlineMap className="h-3.5 w-3.5 text-primary" />
+                              Cakupan Operasional:
                             </span>
-                          </span>
-                        </p>
-                      ) : (
-                        <p className="flex items-center gap-1.5 text-[13px] text-warning 2xl:text-sm">
-                          <HiOutlineLocationMarker className="h-4 w-4 shrink-0" />
-                          Lokasi primer belum dikonfigurasi.
-                        </p>
-                      )}
+                            {groupOperationalAreas(company.operationalAreas).map(([prov, cities]) => (
+                              <span
+                                key={prov}
+                                className="inline-flex items-center gap-1 rounded bg-surface-2 px-2 py-0.5 text-[11px] text-ink border border-line"
+                                title={`${prov}: ${cities.join(', ')}`}
+                              >
+                                <span className="font-semibold text-primary">{prov}</span>
+                                <span className="text-ink-3">({cities.length} kota)</span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {home ? (
+                          <p className="flex items-start gap-1.5 text-[13px] text-ink-2 2xl:text-sm">
+                            <HiOutlineLocationMarker className="mt-px h-4 w-4 shrink-0 text-primary" />
+                            <span className="min-w-0">
+                              <span className="font-semibold text-ink">{home.name}</span>
+                              <span className="text-ink-3">
+                                {' '}
+                                — {home.city} ·{' '}
+                                {home.coordinatesType === 'polygon'
+                                  ? 'geofence poligon'
+                                  : `radius ${home.radiusMeters} m`}{' '}
+                                · {timezoneLabel(home.timezone)}
+                              </span>
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="flex items-center gap-1.5 text-[13px] text-warning 2xl:text-sm">
+                            <HiOutlineLocationMarker className="h-4 w-4 shrink-0" />
+                            Lokasi primer belum dikonfigurasi.
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
                     <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-line/60 sm:border-0 sm:pt-0 sm:shrink-0 sm:justify-end">
                       <Button
@@ -744,15 +744,14 @@ export function CompaniesPage() {
       >
         <DialogHeading
           title="Pendaftaran Badan Usaha & Wilayah Operasional"
-          description={`Langkah ${createStep} dari 4 · ${
-            createStep === 1
+          description={`Langkah ${createStep} dari 4 · ${createStep === 1
               ? 'Profil & Identitas Badan Usaha'
               : createStep === 2
-              ? 'Cakupan Wilayah & Kota Operasional Indonesia'
-              : createStep === 3
-              ? 'Titik Geofence & Peta Kantor Primer'
-              : 'Rekapitulasi & Konfirmasi Pendaftaran'
-          }`}
+                ? 'Cakupan Wilayah & Kota Operasional Indonesia'
+                : createStep === 3
+                  ? 'Titik Geofence & Peta Kantor Primer'
+                  : 'Rekapitulasi & Konfirmasi Pendaftaran'
+            }`}
         />
 
         {/* Stepper Header Navigation */}
@@ -773,22 +772,20 @@ export function CompaniesPage() {
                   onClick={() => {
                     if (s.num < createStep) setCreateStep(s.num)
                   }}
-                  className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors ${
-                    isCurrent
+                  className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors ${isCurrent
                       ? 'bg-surface font-bold text-primary shadow-sm border border-line'
                       : isPassed
-                      ? 'text-ink-2 hover:bg-surface-2/80 cursor-pointer font-medium'
-                      : 'text-ink-3/60 cursor-default'
-                  }`}
+                        ? 'text-ink-2 hover:bg-surface-2/80 cursor-pointer font-medium'
+                        : 'text-ink-3/60 cursor-default'
+                    }`}
                 >
                   <span
-                    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
-                      isCurrent
+                    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${isCurrent
                         ? 'bg-primary text-primary-on'
                         : isPassed
-                        ? 'bg-success text-white'
-                        : 'bg-line-strong/60 text-ink-3'
-                    }`}
+                          ? 'bg-success text-white'
+                          : 'bg-line-strong/60 text-ink-3'
+                      }`}
                   >
                     {isPassed ? '✓' : s.num}
                   </span>

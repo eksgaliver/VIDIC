@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, unlink } from 'node:fs/promises'
 import sharp from 'sharp'
 
 // Direktori Penyimpanan Berkas Bersama di Server Bun
@@ -8,6 +8,7 @@ export const ROOT_STORAGE_DIR = process.env.STORAGE_DIR
   : resolve(import.meta.dir, '../../../../storage')
 
 export const LOGOS_STORAGE_DIR = resolve(ROOT_STORAGE_DIR, 'logos')
+export const AVATARS_STORAGE_DIR = resolve(ROOT_STORAGE_DIR, 'avatars')
 
 // Batasan dan Validasi Jenis Berkas
 const ALLOWED_MIME_TYPES = new Set([
@@ -35,59 +36,62 @@ export interface ProcessedUploadResult {
   mimeType: string
 }
 
-/**
- * Handler Pemrosesan dan Kompresi Berkas Unggahan Gambar ke WebP (Presisi HD)
- */
-export async function handleLogoUpload(file: File): Promise<ProcessedUploadResult> {
+function validateImageFile(file: File) {
   if (!file || typeof file.arrayBuffer !== 'function') {
     throw new Error('Berkas tidak ditemukan atau format unggahan tidak valid.')
   }
 
-  // 1. Validasi Ukuran Berkas
   if (file.size > MAX_FILE_SIZE_BYTES) {
     throw new Error(`Ukuran berkas melebihi batas maksimum 10 MB (Ukuran: ${(file.size / 1024 / 1024).toFixed(2)} MB).`)
   }
 
-  // 2. Validasi Tipe MIME
   if (!ALLOWED_MIME_TYPES.has(file.type)) {
     throw new Error(`Format berkas '${file.type}' tidak didukung. Harap unggah berkas PNG, JPG, JPEG, WEBP, GIF, atau SVG.`)
   }
+}
 
-  // Pastikan direktori penyimpanan tersedia
-  await mkdir(LOGOS_STORAGE_DIR, { recursive: true })
+interface ResizeOptions {
+  width: number
+  height: number
+  fit: 'inside' | 'cover'
+  withoutEnlargement?: boolean
+}
 
-  // 3. Baca Buffer Berkas
-  const rawArrayBuffer = await file.arrayBuffer()
-  const inputBuffer = Buffer.from(rawArrayBuffer)
+async function processImageToWebp(
+  file: File,
+  targetDir: string,
+  filenamePrefix: string,
+  resize: ResizeOptions,
+  urlFolder: string
+): Promise<ProcessedUploadResult> {
+  validateImageFile(file)
 
-  // 4. Kompresi & Konversi ke Format WebP Presisi Tinggi (HD Lossless/Smart Subsample)
-  // Menjaga ketajaman HD logo hingga 1200px tanpa distorsi atau pembesaran paksa
+  await mkdir(targetDir, { recursive: true })
+
+  const inputBuffer = Buffer.from(await file.arrayBuffer())
+
   const imagePipeline = sharp(inputBuffer)
     .rotate() // Koreksi orientasi EXIF otomatis
     .resize({
-      width: 1200,
-      height: 1200,
-      fit: 'inside',
-      withoutEnlargement: true,
+      width: resize.width,
+      height: resize.height,
+      fit: resize.fit,
+      position: 'centre',
+      withoutEnlargement: resize.withoutEnlargement ?? true,
     })
     .webp({
-      quality: 85,          // Keseimbangan optimal: ketajaman visual HD dengan ukuran minimal
-      effort: 6,            // Komputasi CPU maksimal untuk rasio kompresi tinggi
-      smartSubsample: true, // Mempertahankan ketajaman garis dan kontras warna logo/teks
+      quality: 85,
+      effort: 6,
+      smartSubsample: true,
     })
 
-  const [webpBuffer, metadata] = await Promise.all([
-    imagePipeline.toBuffer(),
-    imagePipeline.metadata(),
-  ])
+  const { data: webpBuffer, info } = await imagePipeline.toBuffer({ resolveWithObject: true })
 
-  // 5. Pembuatan Nama Berkas Unik
   const timestamp = Date.now()
   const randomSuffix = crypto.randomUUID().slice(0, 8)
-  const filename = `logo-${timestamp}-${randomSuffix}.webp`
-  const targetFilePath = resolve(LOGOS_STORAGE_DIR, filename)
+  const filename = `${filenamePrefix}-${timestamp}-${randomSuffix}.webp`
+  const targetFilePath = resolve(targetDir, filename)
 
-  // 6. Simpan ke Sistem Berkas Menggunakan Bun.write
   await Bun.write(targetFilePath, webpBuffer)
 
   const originalSize = file.size
@@ -98,15 +102,54 @@ export async function handleLogoUpload(file: File): Promise<ProcessedUploadResul
 
   return {
     filename,
-    url: `/api/storage/logos/${filename}`,
+    url: `/api/storage/${urlFolder}/${filename}`,
     originalName: file.name,
     originalSize,
     compressedSize,
     compressionRatio,
-    width: metadata.width || 0,
-    height: metadata.height || 0,
+    width: info.width || 0,
+    height: info.height || 0,
     format: 'webp',
     mimeType: 'image/webp',
   }
 }
 
+/**
+ * Handler Pemrosesan dan Kompresi Berkas Unggahan Logo ke WebP (Presisi HD)
+ */
+export async function handleLogoUpload(file: File): Promise<ProcessedUploadResult> {
+  return processImageToWebp(
+    file,
+    LOGOS_STORAGE_DIR,
+    'logo',
+    { width: 1200, height: 1200, fit: 'inside' },
+    'logos'
+  )
+}
+
+/**
+ * Handler Foto Profil: potong persegi 1:1, lalu kompres ke WebP.
+ */
+export async function handleAvatarUpload(file: File): Promise<ProcessedUploadResult> {
+  return processImageToWebp(
+    file,
+    AVATARS_STORAGE_DIR,
+    'avatar',
+    { width: 512, height: 512, fit: 'cover', withoutEnlargement: false },
+    'avatars'
+  )
+}
+
+/**
+ * Hapus berkas avatar lama tanpa menyentuh berkas di luar folder avatar.
+ */
+export async function deleteStoredAvatar(url?: string | null) {
+  if (!url) return
+
+  const match = url.match(/^\/api\/storage\/avatars\/([A-Za-z0-9_.-]+)$/)
+  if (!match) return
+
+  await unlink(resolve(AVATARS_STORAGE_DIR, match[1])).catch(() => {
+    // Berkas sudah tidak ada: tidak perlu menghentikan pembaruan profil
+  })
+}
