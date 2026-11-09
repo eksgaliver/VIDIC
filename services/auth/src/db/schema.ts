@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, varchar, numeric, integer, boolean, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, uuid, varchar, numeric, integer, boolean, index, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
 // 1. Tabel Perusahaan (Companies)
@@ -34,6 +34,8 @@ export const companyLocations = pgTable('company_locations', {
   latitude: numeric('latitude', { precision: 10, scale: 7 }).notNull(),
   longitude: numeric('longitude', { precision: 10, scale: 7 }).notNull(),
   radiusMeters: integer('radius_meters').default(100).notNull(),
+  coordinatesType: varchar('coordinates_type', { length: 20 }).default('point').notNull(),
+  polygonCoordinates: jsonb('polygon_coordinates').$type<[number, number][]>(),
   timezone: varchar('timezone', { length: 50 }).default('Asia/Jakarta').notNull(),
   isPrimary: boolean('is_primary').default(false).notNull(),
   status: varchar('status', { length: 20 }).default('active').notNull(),
@@ -82,11 +84,36 @@ export const users = pgTable('users', {
   index('idx_auth_users_department_id').on(table.departmentId)
 ])
 
+// 5. Tabel Wilayah & Kota Operasional Perusahaan (Company Operational Areas)
+export const companyOperationalAreas = pgTable('company_operational_areas', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  province: varchar('province', { length: 100 }).notNull(),
+  city: varchar('city', { length: 100 }).notNull(),
+  status: varchar('status', { length: 20 }).default('active').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_comp_op_areas_company_id').on(table.companyId),
+  index('idx_comp_op_areas_province').on(table.province),
+  index('idx_comp_op_areas_city').on(table.city)
+])
+
 // Relasi untuk Drizzle Relational Queries API (db.query)
 export const companiesRelations = relations(companies, ({ many }) => ({
   locations: many(companyLocations),
   departments: many(departments),
-  employees: many(users)
+  employees: many(users),
+  operationalAreas: many(companyOperationalAreas)
+}))
+
+export const companyOperationalAreasRelations = relations(companyOperationalAreas, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyOperationalAreas.companyId],
+    references: [companies.id]
+  })
 }))
 
 export const companyLocationsRelations = relations(companyLocations, ({ one }) => ({
@@ -124,3 +151,6 @@ export type Department = typeof departments.$inferSelect
 export type NewDepartment = typeof departments.$inferInsert
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
+export type CompanyOperationalArea = typeof companyOperationalAreas.$inferSelect
+export type NewCompanyOperationalArea = typeof companyOperationalAreas.$inferInsert
+

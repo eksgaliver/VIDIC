@@ -10,6 +10,7 @@
     "elysia": "^1.2.25",
     "@elysiajs/cors": "^1.2.0",
     "auth-service": "workspace:*",
+    "storage-service": "workspace:*",
     "shared-types": "workspace:*"
   },
   "devDependencies": {

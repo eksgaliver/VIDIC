@@ -55,12 +55,13 @@ const Dialog = (props: DialogProps) => {
 
     if (width !== undefined) {
         contentStyle.content.width = width
+        contentStyle.content.maxWidth = '100%'
 
         if (
             typeof currentSize.width !== 'undefined' &&
             currentSize.width <= width
         ) {
-            contentStyle.content.width = 'auto'
+            contentStyle.content.width = '100%'
         }
     }
 

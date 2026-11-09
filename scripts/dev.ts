@@ -4,6 +4,7 @@ const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 const appName = process.env.APP_NAME || 'Srikaya Enterprise'
 const authPort = Number(process.env.AUTH_SERVICE_PORT || 3001)
+const storagePort = Number(process.env.STORAGE_SERVICE_PORT || 3002)
 const gatewayPort = Number(process.env.GATEWAY_PORT || 3000)
 const clientPort = Number(process.env.CLIENT_PORT || 5173)
 
@@ -30,11 +31,22 @@ const services: ServiceConfig[] = [
     }
   },
   {
+    name: 'STORAGE',
+    port: storagePort,
+    runtime: 'bun',
+    cmd: ['bun', '--watch', 'src/index.ts'],
+    cwd: 'services/storage',
+    env: {
+      STORAGE_SERVICE_PORT: String(storagePort),
+      PORT: String(storagePort),
+      APP_NAME: appName
+    }
+  },
+  {
     name: 'GATEWAY',
     port: gatewayPort,
     runtime: 'bun',
-    // Dijalankan dari folder services agar services/auth (yang di-mount gateway)
-    // ikut terpantau --watch, bukan hanya services/gateway.
+    // Dijalankan dari folder services agar mikroservis yang di-mount gateway ikut terpantau --watch
     cmd: ['bun', '--watch', 'gateway/src/index.ts'],
     cwd: 'services',
     env: {
@@ -42,6 +54,8 @@ const services: ServiceConfig[] = [
       PORT: String(gatewayPort),
       AUTH_SERVICE_PORT: String(authPort),
       AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL || `http://localhost:${authPort}`,
+      STORAGE_SERVICE_PORT: String(storagePort),
+      STORAGE_SERVICE_URL: process.env.STORAGE_SERVICE_URL || `http://localhost:${storagePort}`,
       APP_NAME: appName
     }
   },

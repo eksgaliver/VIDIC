@@ -33,17 +33,17 @@ export function PanelHeader({
   return (
     <header
       className={cn(
-        'flex flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5',
+        'flex flex-col gap-3 border-b border-line px-3.5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 2xl:px-7 2xl:py-4',
         className
       )}
     >
       <div className="min-w-0">
-        <h2 className="text-[15px] font-bold tracking-tight text-ink">{title}</h2>
-        {description ? <p className="mt-1 text-[13px] text-ink-2">{description}</p> : null}
+        <h2 className="text-[15px] font-bold tracking-tight text-ink 2xl:text-base">{title}</h2>
+        {description ? <p className="mt-1 text-[13px] text-ink-2 2xl:text-sm">{description}</p> : null}
       </div>
       {actions || meta ? (
         <div className="flex shrink-0 items-center gap-3">
-          {meta ? <span className="text-xs tabular text-ink-3">{meta}</span> : null}
+          {meta ? <span className="text-xs tabular text-ink-3 2xl:text-[13px]">{meta}</span> : null}
           {actions}
         </div>
       ) : null}
@@ -59,10 +59,10 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div className="max-w-2xl">
-        <h1 className="text-xl font-bold tracking-tightest text-ink sm:text-2xl">{title}</h1>
-        {description ? <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">{description}</p> : null}
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between 2xl:mb-8">
+      <div className="max-w-2xl 2xl:max-w-4xl">
+        <h1 className="text-xl font-bold tracking-tightest text-ink sm:text-2xl 2xl:text-3xl">{title}</h1>
+        {description ? <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2 2xl:text-sm">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
     </div>
@@ -101,14 +101,14 @@ export function DialogHeading({ title, description, actions, className }: Dialog
   return (
     <div
       className={cn(
-        'flex shrink-0 flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5',
+        'flex shrink-0 flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5 2xl:px-7 2xl:py-5',
         className
       )}
     >
       <div className="min-w-0 pr-10">
-        <h2 className="text-[15px] font-bold tracking-tight text-ink">{title}</h2>
+        <h2 className="text-[15px] font-bold tracking-tight text-ink 2xl:text-base">{title}</h2>
         {description ? (
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{description}</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-ink-2 2xl:text-sm">{description}</p>
         ) : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
@@ -135,7 +135,7 @@ export function DialogFooter({ children, className }: DialogFooterProps) {
   return (
     <div
       className={cn(
-        'flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line bg-surface-2 px-4 py-3.5 sm:px-5',
+        'flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line bg-surface-2 px-4 py-3.5 sm:px-5 2xl:px-7 2xl:py-4',
         className
       )}
     >

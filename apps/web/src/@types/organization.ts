@@ -11,8 +11,20 @@ export interface CompanyLocation {
   latitude: string | number
   longitude: string | number
   radiusMeters: number
+  coordinatesType?: 'point' | 'polygon'
+  polygonCoordinates?: [number, number][] | null
   timezone: string
   isPrimary: boolean
+  status: string
+  createdAt?: string | Date
+  updatedAt?: string | Date
+}
+
+export interface CompanyOperationalArea {
+  id: string
+  companyId: string
+  province: string
+  city: string
   status: string
   createdAt?: string | Date
   updatedAt?: string | Date
@@ -43,6 +55,7 @@ export interface Company {
   status: string
   locations?: CompanyLocation[]
   departments?: Department[]
+  operationalAreas?: CompanyOperationalArea[]
   createdAt?: string | Date
   updatedAt?: string | Date
 }

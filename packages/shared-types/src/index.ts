@@ -29,3 +29,7 @@ export const authResponseSchema = z.object({
 
 export type AuthResponse = z.infer<typeof authResponseSchema>
 
+// 4. Data Wilayah Indonesia (38 Provinsi & Kota/Kabupaten)
+export * from './indonesia-regions'
+
+

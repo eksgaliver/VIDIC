@@ -1,4 +1,4 @@
-import type { Company, CompanyLocation } from '@/@types/organization'
+import type { Company, CompanyLocation, CompanyOperationalArea } from '@/@types/organization'
 
 const TIMEZONE_LABEL: Record<string, string> = {
   'Asia/Jakarta': 'WIB',
@@ -24,8 +24,32 @@ export function departmentCount(company: Company): number {
   return (company.departments ?? []).length
 }
 
+export function operationalAreaCount(company: Company): number {
+  return (company.operationalAreas ?? []).length
+}
+
+export function groupOperationalAreas(areas?: CompanyOperationalArea[]): [string, string[]][] {
+  if (!areas || areas.length === 0) return []
+  const map = new Map<string, string[]>()
+  for (const item of areas) {
+    if (!map.has(item.province)) {
+      map.set(item.province, [])
+    }
+    map.get(item.province)!.push(item.city)
+  }
+  return Array.from(map.entries())
+}
+
+export function operationalProvinceCount(company: Company): number {
+  return groupOperationalAreas(company.operationalAreas).length
+}
+
 export function totalLocations(companies: Company[]): number {
   return companies.reduce((sum, item) => sum + locationCount(item), 0)
+}
+
+export function totalOperationalAreas(companies: Company[]): number {
+  return companies.reduce((sum, item) => sum + operationalAreaCount(item), 0)
 }
 
 export function totalDepartments(companies: Company[]): number {

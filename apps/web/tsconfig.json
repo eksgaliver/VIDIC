@@ -19,6 +19,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
+      "elysia": ["./node_modules/elysia"],
+      "elysia/*": ["./node_modules/elysia/*"],
       "gateway": ["../../services/gateway/src/index.ts"],
       "shared-types": ["../../packages/shared-types/src/index.ts"]
     }

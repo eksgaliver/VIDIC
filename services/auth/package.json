@@ -7,13 +7,14 @@
     "start": "bun src/index.ts"
   },
   "dependencies": {
-    "elysia": "^1.2.25",
-    "@elysiajs/jwt": "^1.2.0",
     "@elysiajs/cors": "^1.2.0",
+    "@elysiajs/jwt": "^1.2.0",
     "drizzle-orm": "^0.40.0",
     "drizzle-zod": "^0.7.0",
+    "elysia": "^1.2.25",
     "postgres": "^3.4.5",
     "shared-types": "workspace:*",
+    "sharp": "^0.35.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -22,4 +23,3 @@
     "typescript": "^5.8.2"
   }
 }
-

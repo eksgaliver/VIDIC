@@ -70,29 +70,29 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-dvh bg-app">
-      <div className="flex flex-1 flex-col px-5 py-6 sm:px-10 lg:px-14">
+      <div className="flex flex-1 flex-col px-4 py-5 sm:px-10 lg:px-14 2xl:px-20 fhd:px-28">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img
               src="/img/logo/logo-light-streamline.png"
               alt=""
-              className="h-8 w-auto dark:hidden"
+              className="h-8 w-auto 2xl:h-9 dark:hidden"
             />
             <img
               src="/img/logo/logo-dark-streamline.png"
               alt=""
-              className="hidden h-8 w-auto dark:block"
+              className="hidden h-8 w-auto 2xl:h-9 dark:block"
             />
-            <span className="text-[15px] font-bold tracking-tight text-ink">{appName}</span>
+            <span className="text-[15px] font-bold tracking-tight text-ink 2xl:text-base">{appName}</span>
           </div>
           <ThemeToggle />
         </div>
 
-        <div className="flex flex-1 items-center py-8">
-          <div className="mx-auto w-full max-w-[380px]">
-            <div className="mb-7">
-              <h1 className="text-2xl font-bold tracking-tightest text-ink">Masuk ke portal</h1>
-              <p className="mt-2 text-[13px] leading-relaxed text-ink-2">
+        <div className="flex flex-1 items-center justify-center py-8 2xl:py-12">
+          <div className="w-full max-w-[390px] 2xl:max-w-[430px]">
+            <div className="mb-7 2xl:mb-9">
+              <h1 className="text-2xl font-bold tracking-tightest text-ink 2xl:text-3xl">Masuk ke portal</h1>
+              <p className="mt-2 text-[13px] leading-relaxed text-ink-2 2xl:text-sm">
                 Sesi berlaku tujuh hari. Kredensial diverifikasi oleh layanan auth melalui gateway.
               </p>
             </div>

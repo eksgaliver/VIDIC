@@ -2,13 +2,15 @@ import { Elysia, t } from 'elysia'
 import { jwt } from '@elysiajs/jwt'
 import { cors } from '@elysiajs/cors'
 import { db } from './db'
-import { users, companies, departments, companyLocations } from './db/schema'
+import { users, companies, departments, companyLocations, companyOperationalAreas } from './db/schema'
 import { eq } from 'drizzle-orm'
 import { companyRoutes } from './routes/companies'
 import { departmentRoutes } from './routes/departments'
+import { uploadRoutes } from './routes/upload'
 
 export { companyRoutes } from './routes/companies'
 export { departmentRoutes } from './routes/departments'
+export { uploadRoutes } from './routes/upload'
 
 interface AuthUser {
   id: string
@@ -92,7 +94,32 @@ async function seedDefaultData() {
         status: 'active'
       })
 
-      console.log('[SEED] Inisialisasi selesai: PT Srikaya Digital Solusindo + Departemen Wajib HR siap digunakan.')
+      // Buat Wilayah & Kota Operasional Bawaan
+      await db.insert(companyOperationalAreas).values([
+        { companyId: comp.id, province: 'DKI Jakarta', city: 'Jakarta Selatan', status: 'active' },
+        { companyId: comp.id, province: 'DKI Jakarta', city: 'Jakarta Pusat', status: 'active' },
+        { companyId: comp.id, province: 'DKI Jakarta', city: 'Jakarta Barat', status: 'active' },
+        { companyId: comp.id, province: 'Jawa Barat', city: 'Kota Bandung', status: 'active' },
+        { companyId: comp.id, province: 'Jawa Barat', city: 'Kota Bekasi', status: 'active' },
+        { companyId: comp.id, province: 'Jawa Timur', city: 'Kota Surabaya', status: 'active' }
+      ])
+
+      console.log('[SEED] Inisialisasi selesai: PT Srikaya Digital Solusindo + Departemen Wajib HR + Wilayah Operasional siap digunakan.')
+    } else {
+      // Pastikan perusahaan yang sudah ada juga memiliki wilayah operasional default jika masih kosong
+      const [comp] = existing
+      const existingAreas = await db.select().from(companyOperationalAreas).where(eq(companyOperationalAreas.companyId, comp.id)).limit(1)
+      if (existingAreas.length === 0) {
+        await db.insert(companyOperationalAreas).values([
+          { companyId: comp.id, province: 'DKI Jakarta', city: 'Jakarta Selatan', status: 'active' },
+          { companyId: comp.id, province: 'DKI Jakarta', city: 'Jakarta Pusat', status: 'active' },
+          { companyId: comp.id, province: 'DKI Jakarta', city: 'Jakarta Barat', status: 'active' },
+          { companyId: comp.id, province: 'Jawa Barat', city: 'Kota Bandung', status: 'active' },
+          { companyId: comp.id, province: 'Jawa Barat', city: 'Kota Bekasi', status: 'active' },
+          { companyId: comp.id, province: 'Jawa Timur', city: 'Kota Surabaya', status: 'active' }
+        ])
+        console.log('[SEED] Menambahkan wilayah operasional default untuk perusahaan yang ada.')
+      }
     }
   } catch (err) {
     // Database connection or table might be synchronizing
@@ -209,6 +236,7 @@ export const authApp = new Elysia()
   .use(authService)
   .use(companyRoutes)
   .use(departmentRoutes)
+  .use(uploadRoutes)
 
 // Jalankan server jika dieksekusi langsung
 if (import.meta.main) {

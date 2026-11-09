@@ -6,3 +6,5 @@ bahan/
 .env.local
 .DS_Store
 *.log
+storage/*
+!storage/logos/.gitkeep

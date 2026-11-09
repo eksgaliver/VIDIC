@@ -266,7 +266,7 @@ export function DepartmentsPage() {
               label="Perusahaan"
               value={selectedCompanyId}
               onChange={(e) => setSelectedCompanyId(e.target.value)}
-              className="w-full sm:max-w-sm"
+              className="w-full sm:max-w-sm 2xl:max-w-md"
             >
               {companies.map((company) => (
                 <option key={company.id} value={company.id}>
@@ -276,10 +276,10 @@ export function DepartmentsPage() {
             </SelectField>
 
             {selectedCompany ? (
-              <p className="pb-2 text-[13px] text-ink-2">
-                <span className="font-mono text-xs font-bold text-ink">{selectedCompany.code}</span>{' '}
-                Â· {isLoading ? 'memuat' : `${departments.length} departemen`}
-                {mandatoryCount > 0 ? ` Â· ${mandatoryCount} wajib` : null}
+              <p className="pb-1 text-xs text-ink-2 sm:pb-2 sm:text-[13px] 2xl:text-sm">
+                <span className="font-mono font-bold text-ink">{selectedCompany.code}</span>{' '}
+                · {isLoading ? 'memuat' : `${departments.length} departemen`}
+                {mandatoryCount > 0 ? ` · ${mandatoryCount} wajib` : null}
               </p>
             ) : null}
           </div>
@@ -311,35 +311,35 @@ export function DepartmentsPage() {
                 }
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
+              <div className="overflow-x-auto rounded-b-panel">
+                <table className="w-full min-w-[680px] border-collapse text-left text-[13px] 2xl:text-sm">
                   <thead>
-                    <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3">
-                      <th className="px-4 py-2.5 font-semibold sm:px-5">Departemen</th>
-                      <th className="px-4 py-2.5 font-semibold">Deskripsi</th>
-                      <th className="px-4 py-2.5 font-semibold">Status</th>
-                      <th className="px-4 py-2.5 text-right font-semibold sm:px-5">Aksi</th>
+                    <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">
+                      <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Departemen</th>
+                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Deskripsi</th>
+                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Status</th>
+                      <th className="px-4 py-2.5 text-right font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
                     {departments.map((dept) => (
                       <tr key={dept.id} className="transition-colors hover:bg-surface-2">
-                        <td className="px-4 py-3.5 align-top sm:px-5">
+                        <td className="px-4 py-3.5 align-top sm:px-5 2xl:px-7 2xl:py-4">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wide text-ink">
+                            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wide text-ink 2xl:text-xs">
                               {dept.code}
                             </span>
                             <span className="font-semibold text-ink">{dept.name}</span>
                             {dept.isMandatory ? <Badge tone="accent">Wajib</Badge> : null}
                           </div>
                         </td>
-                        <td className="max-w-[320px] px-4 py-3.5 align-top text-ink-2">
-                          {dept.description || <span className="text-ink-3">â€”</span>}
+                        <td className="max-w-[320px] px-4 py-3.5 align-top text-ink-2 2xl:max-w-[540px] 2xl:py-4">
+                          {dept.description || <span className="text-ink-3">—</span>}
                         </td>
-                        <td className="px-4 py-3.5 align-top">
+                        <td className="px-4 py-3.5 align-top 2xl:py-4">
                           <StatusFromValue value={dept.status} />
                         </td>
-                        <td className="px-4 py-3.5 text-right align-top sm:px-5">
+                        <td className="px-4 py-3.5 text-right align-top sm:px-5 2xl:px-7 2xl:py-4">
                           <div className="inline-flex items-center gap-1">
                             <Button
                               size="iconSm"

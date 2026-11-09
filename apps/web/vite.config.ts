@@ -12,7 +12,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src')
+        '@': path.resolve(__dirname, './src'),
+        'shared-types': path.resolve(__dirname, '../../packages/shared-types/src/index.ts')
       }
     },
     server: {
