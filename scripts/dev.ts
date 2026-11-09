@@ -33,8 +33,10 @@ const services: ServiceConfig[] = [
     name: 'GATEWAY',
     port: gatewayPort,
     runtime: 'bun',
-    cmd: ['bun', '--watch', 'src/index.ts'],
-    cwd: 'services/gateway',
+    // Dijalankan dari folder services agar services/auth (yang di-mount gateway)
+    // ikut terpantau --watch, bukan hanya services/gateway.
+    cmd: ['bun', '--watch', 'gateway/src/index.ts'],
+    cwd: 'services',
     env: {
       GATEWAY_PORT: String(gatewayPort),
       PORT: String(gatewayPort),

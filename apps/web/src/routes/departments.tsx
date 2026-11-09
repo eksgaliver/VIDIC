@@ -1,98 +1,96 @@
 import * as React from 'react'
-import { createRoute } from '@tanstack/react-router'
+import { Link, createRoute } from '@tanstack/react-router'
+import { HiOutlineArrowRight, HiOutlinePlus, HiOutlinePencil, HiOutlineTrash } from 'react-icons/hi'
 import { authenticatedRoute } from './_authenticated'
 import { api } from '@/lib/api'
-import Alert from '@/components/ui/Alert'
 import Dialog from '@/components/ui/Dialog'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import {
-  HiOutlinePlus,
-  HiOutlinePencil,
-  HiOutlineTrash,
-  HiOutlineOfficeBuilding,
-  HiOutlineShieldCheck
-} from 'react-icons/hi'
-import { DEPARTMENTS_PATH } from '@/constants/route.constant'
+  Badge,
+  Button,
+  DialogBody,
+  DialogFooter,
+  DialogHeading,
+  EmptyState,
+  Notice,
+  PageHeader,
+  Panel,
+  PanelHeader,
+  SelectField,
+  StatusFromValue,
+  TableSkeleton,
+  TextAreaField,
+  TextField,
+} from '@/components/base'
+import { errorText } from '@/utils/apiError'
+import type { Company, Department } from '@/@types/organization'
+import { COMPANIES_PATH, DEPARTMENTS_PATH } from '@/constants/route.constant'
 
 export const departmentsRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: DEPARTMENTS_PATH,
-  component: DepartmentsPage
+  component: DepartmentsPage,
 })
 
-interface DepartmentItem {
-  id: string
-  companyId: string
-  code: string
-  name: string
-  description: string | null
-  isMandatory: boolean
-  status: string
-  createdAt: Date | string
-  updatedAt: Date | string
-}
+const DEPARTMENT_STATUSES = [
+  { value: 'active', label: 'Aktif' },
+  { value: 'inactive', label: 'Nonaktif' },
+]
 
-interface CompanyItem {
-  id: string
-  code: string
-  name: string
-  brandName?: string | null
-}
+const INITIAL_CREATE_FORM = { code: '', name: '', description: '' }
+const INITIAL_EDIT_FORM = { name: '', description: '', status: 'active' }
 
 export function DepartmentsPage() {
-  const [companies, setCompanies] = React.useState<CompanyItem[]>([])
-  const [selectedCompanyId, setSelectedCompanyId] = React.useState<string>('')
-  const [departments, setDepartments] = React.useState<DepartmentItem[]>([])
+  const [companies, setCompanies] = React.useState<Company[]>([])
+  const [selectedCompanyId, setSelectedCompanyId] = React.useState('')
+  const [departments, setDepartments] = React.useState<Department[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null)
 
-  // State Modal Tambah
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
-  const [createCode, setCreateCode] = React.useState('')
-  const [createName, setCreateName] = React.useState('')
-  const [createDesc, setCreateDesc] = React.useState('')
+  const [createForm, setCreateForm] = React.useState(INITIAL_CREATE_FORM)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
-  // State Modal Ubah
-  const [editItem, setEditItem] = React.useState<DepartmentItem | null>(null)
-  const [editName, setEditName] = React.useState('')
-  const [editDesc, setEditDesc] = React.useState('')
-  const [editStatus, setEditStatus] = React.useState('active')
+  const [editItem, setEditItem] = React.useState<Department | null>(null)
+  const [editForm, setEditForm] = React.useState(INITIAL_EDIT_FORM)
 
-  // State Dialog Hapus
-  const [deleteItem, setDeleteItem] = React.useState<DepartmentItem | null>(null)
+  const [deleteItem, setDeleteItem] = React.useState<Department | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
 
-  // 1. Muat daftar perusahaan
+  const selectedCompany = companies.find((item) => item.id === selectedCompanyId)
+
   const fetchCompanies = React.useCallback(async () => {
     try {
       const res = await api.companies.get()
-      if (res.data && Array.isArray(res.data)) {
-        const list = res.data as unknown as CompanyItem[]
+      if (res.error) {
+        setErrorMsg(errorText(res, 'Gagal memuat daftar perusahaan.'))
+        return
+      }
+      if (Array.isArray(res.data)) {
+        const list = res.data as unknown as Company[]
         setCompanies(list)
-        if (list.length > 0 && !selectedCompanyId) {
-          setSelectedCompanyId(list[0].id)
-        }
+        setSelectedCompanyId((current) => current || list[0]?.id || '')
       }
     } catch {
       setErrorMsg('Gagal memuat daftar perusahaan.')
     }
-  }, [selectedCompanyId])
+  }, [])
 
-  // 2. Muat daftar departemen per perusahaan
   const fetchDepartments = React.useCallback(async (companyId: string) => {
     if (!companyId) return
     setIsLoading(true)
     setErrorMsg(null)
     try {
-      const res = await api.departments.get({
-        query: { companyId }
-      })
-      if (res.data && Array.isArray(res.data)) {
-        setDepartments(res.data as unknown as DepartmentItem[])
+      const res = await api.departments.get({ query: { companyId } })
+      if (res.error) {
+        setDepartments([])
+        setErrorMsg(errorText(res, 'Gagal memuat data departemen.'))
+        return
       }
+      setDepartments(Array.isArray(res.data) ? (res.data as unknown as Department[]) : [])
     } catch {
+      setDepartments([])
       setErrorMsg('Gagal memuat data departemen.')
     } finally {
       setIsLoading(false)
@@ -109,7 +107,6 @@ export function DepartmentsPage() {
     }
   }, [selectedCompanyId, fetchDepartments])
 
-  // 3. Tambah Departemen
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedCompanyId) {
@@ -123,25 +120,19 @@ export function DepartmentsPage() {
     try {
       const res = await api.departments.post({
         companyId: selectedCompanyId,
-        code: createCode.trim().toUpperCase(),
-        name: createName.trim(),
-        description: createDesc.trim() || undefined
+        code: createForm.code.trim().toUpperCase(),
+        name: createForm.name.trim(),
+        description: createForm.description.trim() || undefined,
       })
 
       if (res.error) {
-        const msg =
-          typeof res.error.value === 'object' && res.error.value && 'message' in res.error.value
-            ? String((res.error.value as { message?: string }).message)
-            : 'Gagal menambahkan departemen.'
-        setErrorMsg(msg)
+        setErrorMsg(errorText(res, 'Gagal menambahkan departemen.'))
         return
       }
 
-      setSuccessMsg(`Departemen '${createCode.toUpperCase()}' berhasil ditambahkan.`)
+      setSuccessMsg(`Departemen '${createForm.code.toUpperCase()}' berhasil ditambahkan.`)
       setIsCreateOpen(false)
-      setCreateCode('')
-      setCreateName('')
-      setCreateDesc('')
+      setCreateForm(INITIAL_CREATE_FORM)
       fetchDepartments(selectedCompanyId)
     } catch {
       setErrorMsg('Terjadi kesalahan saat menghubungi gateway.')
@@ -150,7 +141,16 @@ export function DepartmentsPage() {
     }
   }
 
-  // 4. Ubah Departemen
+  const openEdit = (dept: Department) => {
+    setErrorMsg(null)
+    setEditItem(dept)
+    setEditForm({
+      name: dept.name,
+      description: dept.description || '',
+      status: dept.status,
+    })
+  }
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editItem) return
@@ -160,17 +160,13 @@ export function DepartmentsPage() {
 
     try {
       const res = await api.departments({ id: editItem.id }).put({
-        name: editName.trim(),
-        description: editDesc.trim() || undefined,
-        status: editStatus
+        name: editForm.name.trim(),
+        description: editForm.description.trim() || undefined,
+        status: editForm.status,
       })
 
       if (res.error) {
-        const msg =
-          typeof res.error.value === 'object' && res.error.value && 'message' in res.error.value
-            ? String((res.error.value as { message?: string }).message)
-            : 'Gagal memperbarui departemen.'
-        setErrorMsg(msg)
+        setErrorMsg(errorText(res, 'Gagal memperbarui departemen.'))
         return
       }
 
@@ -184,11 +180,12 @@ export function DepartmentsPage() {
     }
   }
 
-  // 5. Hapus Departemen
   const handleConfirmDelete = async () => {
     if (!deleteItem) return
     if (deleteItem.isMandatory) {
-      setErrorMsg(`Departemen ${deleteItem.code} merupakan departemen wajib dan tidak dapat dihapus.`)
+      setErrorMsg(
+        `Departemen ${deleteItem.code} merupakan departemen wajib dan tidak dapat dihapus.`
+      )
       setDeleteItem(null)
       return
     }
@@ -199,11 +196,7 @@ export function DepartmentsPage() {
     try {
       const res = await api.departments({ id: deleteItem.id }).delete()
       if (res.error) {
-        const msg =
-          typeof res.error.value === 'object' && res.error.value && 'message' in res.error.value
-            ? String((res.error.value as { message?: string }).message)
-            : 'Gagal menghapus departemen.'
-        setErrorMsg(msg)
+        setErrorMsg(errorText(res, 'Gagal menghapus departemen.'))
         return
       }
 
@@ -217,363 +210,305 @@ export function DepartmentsPage() {
     }
   }
 
-  const selectedCompany = companies.find((c) => c.id === selectedCompanyId)
+  const mandatoryCount = departments.filter((dept) => dept.isMandatory).length
 
   return (
     <div className="space-y-6">
-      {/* 1. Header Halaman */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white sm:text-3xl">
-            Struktur Departemen
-          </h1>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-            Manajemen unit kerja dan divisi operasional. Setiap perusahaan wajib memiliki departemen HR.
-          </p>
-        </div>
+      <PageHeader
+        title="Struktur Departemen"
+        description="Unit kerja tempat karyawan ditugaskan dan absensinya dicatat."
+        actions={
+          <Button
+            tone="primary"
+            disabled={!selectedCompanyId}
+            onClick={() => {
+              setErrorMsg(null)
+              setSuccessMsg(null)
+              setIsCreateOpen(true)
+            }}
+            icon={<HiOutlinePlus className="h-4 w-4" />}
+          >
+            Tambah Departemen
+          </Button>
+        }
+      />
 
-        <button
-          onClick={() => {
-            setErrorMsg(null)
-            setIsCreateOpen(true)
-          }}
-          disabled={!selectedCompanyId}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-primary-deep transition-colors cursor-pointer disabled:opacity-50"
-        >
-          <HiOutlinePlus className="h-4 w-4" />
-          <span>Tambah Departemen</span>
-        </button>
-      </div>
-
-      {/* 2. Banner Notifikasi & Umpan Balik */}
       {errorMsg && (
-        <Alert
-          type="danger"
-          showIcon
-          title="Permintaan Gagal"
-          closable
-          onClose={() => setErrorMsg(null)}
-        >
+        <Notice tone="danger" title="Permintaan gagal" onDismiss={() => setErrorMsg(null)}>
           {errorMsg}
-        </Alert>
+        </Notice>
       )}
 
       {successMsg && (
-        <Alert
-          type="success"
-          showIcon
-          title="Berhasil"
-          closable
-          onClose={() => setSuccessMsg(null)}
-        >
+        <Notice tone="success" title="Perubahan tersimpan" onDismiss={() => setSuccessMsg(null)}>
           {successMsg}
-        </Alert>
+        </Notice>
       )}
 
-      {/* 3. Pemilih Perusahaan & Info Departemen Wajib */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900 shadow-xs md:col-span-2">
-          <label
-            htmlFor="company-select"
-            className="block text-xs font-semibold uppercase tracking-wider text-neutral-500"
-          >
-            Pilih Perusahaan Aktif
-          </label>
-          <div className="relative mt-2">
-            <select
-              id="company-select"
+      {companies.length === 0 && !isLoading ? (
+        <Panel>
+          <EmptyState
+            title="Belum ada badan usaha"
+            description="Departemen selalu melekat pada satu perusahaan. Daftarkan perusahaan terlebih dahulu; departemen HR dibuat otomatis saat pendaftaran."
+            action={
+              <Link to={COMPANIES_PATH} className="inline-flex">
+                <Button tone="primary" icon={<HiOutlineArrowRight className="h-4 w-4" />}>
+                  Ke halaman perusahaan
+                </Button>
+              </Link>
+            }
+          />
+        </Panel>
+      ) : (
+        <>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <SelectField
+              label="Perusahaan"
               value={selectedCompanyId}
               onChange={(e) => setSelectedCompanyId(e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-3.5 pr-8 text-xs font-medium text-neutral-900 focus:border-primary focus:bg-white focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
+              className="w-full sm:max-w-sm"
             >
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.code})
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name} ({company.code})
                 </option>
               ))}
-            </select>
-          </div>
-          {selectedCompany && (
-            <div className="mt-3 flex items-center gap-3 text-xs text-neutral-500">
-              <span className="flex items-center gap-1 font-mono text-[11px]">
-                <HiOutlineOfficeBuilding className="h-4 w-4 text-primary" />
-                <span>Kode: {selectedCompany.code}</span>
-              </span>
-              <span>&middot;</span>
-              <span>Total Departemen Terdaftar: {departments.length}</span>
-            </div>
-          )}
-        </div>
+            </SelectField>
 
-        {/* Kartu Informasi Aturan Bisnis Departemen Wajib */}
-        <div className="rounded-2xl border border-primary/20 bg-primary-subtle/30 p-5 dark:border-primary/30 dark:bg-primary-subtle/10 flex flex-col justify-between">
-          <div className="flex items-center gap-2 text-xs font-semibold text-primary">
-            <HiOutlineShieldCheck className="h-4 w-4" />
-            <span>Kaidah Wajib Sistem</span>
+            {selectedCompany ? (
+              <p className="pb-2 text-[13px] text-ink-2">
+                <span className="font-mono text-xs font-bold text-ink">{selectedCompany.code}</span>{' '}
+                Â· {isLoading ? 'memuat' : `${departments.length} departemen`}
+                {mandatoryCount > 0 ? ` Â· ${mandatoryCount} wajib` : null}
+              </p>
+            ) : null}
           </div>
-          <p className="mt-2 text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
-            Departemen <strong>HR (Human Resources)</strong> wajib tersedia di setiap perusahaan untuk mengelola kehadiran dan data personalia. Departemen ini dilindungi dari tindakan penghapusan.
-          </p>
-          <div className="mt-3 text-[11px] font-mono text-neutral-400">
-            Status Validasi: Aktif
-          </div>
-        </div>
-      </div>
 
-      {/* 4. Tabel Daftar Departemen */}
-      <div className="rounded-2xl border border-neutral-200 bg-white shadow-xs dark:border-neutral-800 dark:bg-neutral-900 overflow-hidden">
-        <div className="border-b border-neutral-200 p-5 dark:border-neutral-800 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-neutral-900 dark:text-white">
-              Daftar Departemen Operasional
-            </h2>
-            <p className="text-xs text-neutral-500 mt-0.5">
-              Unit organisasi kerja untuk penempatan staf dan pelaporan absensi.
-            </p>
-          </div>
-          <span className="text-xs font-mono text-neutral-400">
-            {departments.length} Data
-          </span>
-        </div>
+          <Panel>
+            <PanelHeader
+              title="Daftar departemen"
+              description="Departemen HR dilindungi dari penghapusan karena menjadi acuan data kepegawaian."
+              meta={isLoading ? undefined : `${departments.length} unit kerja`}
+            />
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="border-b border-neutral-200 bg-neutral-50/75 text-neutral-500 dark:border-neutral-800 dark:bg-neutral-800/50">
-              <tr>
-                <th className="py-3 px-5 font-semibold">Kode</th>
-                <th className="py-3 px-5 font-semibold">Nama Departemen</th>
-                <th className="py-3 px-5 font-semibold">Deskripsi Operasional</th>
-                <th className="py-3 px-5 font-semibold">Klasifikasi</th>
-                <th className="py-3 px-5 font-semibold">Kondisi</th>
-                <th className="py-3 px-5 font-semibold text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-neutral-400">
-                    Memuat data departemen...
-                  </td>
-                </tr>
-              ) : departments.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-neutral-400">
-                    Belum ada departemen terdaftar untuk perusahaan ini.
-                  </td>
-                </tr>
-              ) : (
-                departments.map((dept) => (
-                  <tr
-                    key={dept.id}
-                    className="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/30 transition-colors"
+            {isLoading ? (
+              <TableSkeleton rows={5} columns={4} />
+            ) : departments.length === 0 ? (
+              <EmptyState
+                title="Belum ada departemen"
+                description={`Tambahkan unit kerja pertama untuk ${selectedCompany?.name ?? 'perusahaan ini'}.`}
+                action={
+                  <Button
+                    tone="primary"
+                    onClick={() => {
+                      setErrorMsg(null)
+                      setIsCreateOpen(true)
+                    }}
+                    icon={<HiOutlinePlus className="h-4 w-4" />}
                   >
-                    <td className="py-3.5 px-5 font-mono font-bold text-neutral-900 dark:text-white">
-                      {dept.code}
-                    </td>
-                    <td className="py-3.5 px-5 font-semibold text-neutral-900 dark:text-white">
-                      {dept.name}
-                    </td>
-                    <td className="py-3.5 px-5 text-neutral-500 max-w-xs truncate">
-                      {dept.description || '—'}
-                    </td>
-                    <td className="py-3.5 px-5">
-                      {dept.isMandatory ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
-                          <span>&#x2713;</span> Departemen Wajib
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-[11px] font-medium text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
-                          Opsional
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-5">
-                      <span className="inline-flex items-center gap-1 font-medium text-emerald-600">
-                        <span>&#x25CF;</span> Aktif
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-5 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            setEditItem(dept)
-                            setEditName(dept.name)
-                            setEditDesc(dept.description || '')
-                            setEditStatus(dept.status)
-                          }}
-                          className="rounded-lg p-1.5 text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                          title="Ubah Data"
-                        >
-                          <HiOutlinePencil className="h-4 w-4" />
-                        </button>
+                    Tambah Departemen
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3">
+                      <th className="px-4 py-2.5 font-semibold sm:px-5">Departemen</th>
+                      <th className="px-4 py-2.5 font-semibold">Deskripsi</th>
+                      <th className="px-4 py-2.5 font-semibold">Status</th>
+                      <th className="px-4 py-2.5 text-right font-semibold sm:px-5">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {departments.map((dept) => (
+                      <tr key={dept.id} className="transition-colors hover:bg-surface-2">
+                        <td className="px-4 py-3.5 align-top sm:px-5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wide text-ink">
+                              {dept.code}
+                            </span>
+                            <span className="font-semibold text-ink">{dept.name}</span>
+                            {dept.isMandatory ? <Badge tone="accent">Wajib</Badge> : null}
+                          </div>
+                        </td>
+                        <td className="max-w-[320px] px-4 py-3.5 align-top text-ink-2">
+                          {dept.description || <span className="text-ink-3">â€”</span>}
+                        </td>
+                        <td className="px-4 py-3.5 align-top">
+                          <StatusFromValue value={dept.status} />
+                        </td>
+                        <td className="px-4 py-3.5 text-right align-top sm:px-5">
+                          <div className="inline-flex items-center gap-1">
+                            <Button
+                              size="iconSm"
+                              tone="quiet"
+                              onClick={() => openEdit(dept)}
+                              aria-label={`Ubah departemen ${dept.name}`}
+                              title="Ubah departemen"
+                            >
+                              <HiOutlinePencil className="h-4 w-4" />
+                            </Button>
+                            {dept.isMandatory ? (
+                              <span
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-control text-ink-3"
+                                title="Departemen wajib tidak dapat dihapus"
+                              >
+                                <HiOutlineTrash className="h-4 w-4" />
+                              </span>
+                            ) : (
+                              <Button
+                                size="iconSm"
+                                tone="quiet"
+                                className="text-error hover:bg-error-subtle hover:text-error"
+                                onClick={() => {
+                                  setErrorMsg(null)
+                                  setSuccessMsg(null)
+                                  setDeleteItem(dept)
+                                }}
+                                aria-label={`Hapus departemen ${dept.name}`}
+                                title="Hapus departemen"
+                              >
+                                <HiOutlineTrash className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        </>
+      )}
 
-                        {dept.isMandatory ? (
-                          <span
-                            className="p-1.5 text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
-                            title="Departemen wajib tidak dapat dihapus"
-                          >
-                            <HiOutlineTrash className="h-4 w-4" />
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteItem(dept)}
-                            className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer transition-colors"
-                            title="Hapus Departemen"
-                          >
-                            <HiOutlineTrash className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 5. Modal Tambah Departemen */}
       <Dialog
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onRequestClose={() => setIsCreateOpen(false)}
         width={520}
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
-            <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-              Tambah Departemen Baru
-            </h3>
-          </div>
+        <DialogHeading
+          title="Tambah Departemen"
+          description={
+            selectedCompany
+              ? `Unit kerja baru akan terdaftar di ${selectedCompany.name}.`
+              : 'Pilih perusahaan sebelum menambahkan unit kerja.'
+          }
+        />
+        <form onSubmit={handleCreateSubmit} className="flex min-h-0 flex-1 flex-col">
+          <DialogBody className="px-4 py-5 sm:px-5">
+            {errorMsg ? (
+              <Notice tone="danger" title="Permintaan gagal" className="mb-5">
+                {errorMsg}
+              </Notice>
+            ) : null}
 
-          <form onSubmit={handleCreateSubmit} className="mt-4 space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
-                Kode Departemen
-              </label>
-              <input
-                type="text"
-                value={createCode}
-                onChange={(e) => setCreateCode(e.target.value.toUpperCase())}
-                placeholder="Contoh: MKT, FIN, PROD"
+            <div className="space-y-3">
+              <TextField
+                label="Kode departemen"
+                value={createForm.code}
+                onChange={(e) =>
+                  setCreateForm((c) => ({ ...c, code: e.target.value.toUpperCase() }))
+                }
+                placeholder="MKT"
                 required
                 maxLength={20}
-                className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-xs font-mono uppercase text-neutral-900 focus:border-primary focus:bg-white focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
+                mono
+                hint="Singkatan huruf kapital, 2â€“5 karakter."
               />
-              <span className="text-[11px] text-neutral-400 mt-1 block">
-                Gunakan singkatan huruf kapital 2-5 karakter.
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
-                Nama Departemen
-              </label>
-              <input
-                type="text"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                placeholder="Contoh: Pemasaran &amp; Komunikasi"
+              <TextField
+                label="Nama departemen"
+                value={createForm.name}
+                onChange={(e) => setCreateForm((c) => ({ ...c, name: e.target.value }))}
+                placeholder="Pemasaran & Komunikasi"
                 required
-                className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-xs text-neutral-900 focus:border-primary focus:bg-white focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
-                Deskripsi
-              </label>
-              <textarea
-                value={createDesc}
-                onChange={(e) => setCreateDesc(e.target.value)}
-                placeholder="Jelaskan ruang lingkup departemen ini..."
+              <TextAreaField
+                label="Deskripsi"
+                value={createForm.description}
+                onChange={(e) => setCreateForm((c) => ({ ...c, description: e.target.value }))}
+                placeholder="Ruang lingkup kerja departemen ini"
                 rows={3}
-                className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-xs text-neutral-900 focus:border-primary focus:bg-white focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
               />
             </div>
+          </DialogBody>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-primary-deep cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? 'Menyimpan...' : 'Simpan Departemen'}
-              </button>
-            </div>
-          </form>
-        </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setIsCreateOpen(false)}>
+              Batal
+            </Button>
+            <Button type="submit" tone="primary" loading={isSubmitting}>
+              {isSubmitting ? 'Menyimpan...' : 'Simpan Departemen'}
+            </Button>
+          </DialogFooter>
+        </form>
       </Dialog>
 
-      {/* 6. Modal Ubah Departemen */}
       <Dialog
         isOpen={!!editItem}
         onClose={() => setEditItem(null)}
         onRequestClose={() => setEditItem(null)}
         width={520}
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
-            <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-              Ubah Departemen: {editItem?.code}
-            </h3>
-          </div>
+        <DialogHeading
+          title={`Ubah Departemen ${editItem?.code ?? ''}`}
+          description={
+            editItem?.isMandatory
+              ? 'Departemen wajib: kode dan status penghapusan dikunci sistem.'
+              : 'Kode departemen tidak dapat diubah setelah dibuat.'
+          }
+        />
+        <form onSubmit={handleEditSubmit} className="flex min-h-0 flex-1 flex-col">
+          <DialogBody className="px-4 py-5 sm:px-5">
+            {errorMsg ? (
+              <Notice tone="danger" title="Permintaan gagal" className="mb-5">
+                {errorMsg}
+              </Notice>
+            ) : null}
 
-          <form onSubmit={handleEditSubmit} className="mt-4 space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
-                Nama Departemen
-              </label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
+            <div className="space-y-3">
+              <TextField
+                label="Nama departemen"
+                value={editForm.name}
+                onChange={(e) => setEditForm((c) => ({ ...c, name: e.target.value }))}
                 required
-                className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-xs text-neutral-900 focus:border-primary focus:bg-white focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
-                Deskripsi
-              </label>
-              <textarea
-                value={editDesc}
-                onChange={(e) => setEditDesc(e.target.value)}
+              <TextAreaField
+                label="Deskripsi"
+                value={editForm.description}
+                onChange={(e) => setEditForm((c) => ({ ...c, description: e.target.value }))}
                 rows={3}
-                className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-xs text-neutral-900 focus:border-primary focus:bg-white focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
               />
+              <SelectField
+                label="Status"
+                value={editForm.status}
+                onChange={(e) => setEditForm((c) => ({ ...c, status: e.target.value }))}
+                hint="Nonaktif menutup unit kerja dari penempatan karyawan baru."
+              >
+                {DEPARTMENT_STATUSES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </SelectField>
             </div>
+          </DialogBody>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-              <button
-                type="button"
-                onClick={() => setEditItem(null)}
-                className="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-primary-deep cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? 'Memperbarui...' : 'Simpan Perubahan'}
-              </button>
-            </div>
-          </form>
-        </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setEditItem(null)}>
+              Batal
+            </Button>
+            <Button type="submit" tone="primary" loading={isSubmitting}>
+              {isSubmitting ? 'Memperbarui...' : 'Simpan Perubahan'}
+            </Button>
+          </DialogFooter>
+        </form>
       </Dialog>
 
-      {/* 7. Dialog Konfirmasi Hapus */}
       <ConfirmDialog
         isOpen={!!deleteItem}
         type="danger"
@@ -584,8 +519,10 @@ export function DepartmentsPage() {
         onCancel={() => setDeleteItem(null)}
         onConfirm={handleConfirmDelete}
       >
-        <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
-          Apakah Anda yakin ingin menghapus departemen <strong>{deleteItem?.name} ({deleteItem?.code})</strong>? Data yang sudah dihapus tidak dapat dipulihkan kembali.
+        <p>
+          Hapus <strong className="font-semibold text-ink">{deleteItem?.name}</strong> (
+          {deleteItem?.code})? Karyawan yang tertaut pada departemen ini perlu dipindahkan lebih
+          dahulu.
         </p>
       </ConfirmDialog>
     </div>

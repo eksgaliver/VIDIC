@@ -1,7 +1,31 @@
-import { createRoute } from '@tanstack/react-router'
+import * as React from 'react'
+import { Link, createRoute } from '@tanstack/react-router'
+import { HiOutlineArrowRight } from 'react-icons/hi'
 import { authenticatedRoute } from './_authenticated'
+import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import { DASHBOARD_PATH } from '@/constants/route.constant'
+import type { Company } from '@/@types/organization'
+import {
+  Badge,
+  Button,
+  EmptyState,
+  ListSkeleton,
+  Notice,
+  PageHeader,
+  Panel,
+  PanelHeader,
+  StatusFromValue
+} from '@/components/base'
+import { errorText } from '@/utils/apiError'
+import {
+  departmentCount,
+  locationCount,
+  primaryLocation,
+  timezoneLabel,
+  totalDepartments,
+  totalLocations
+} from '@/utils/organization'
+import { COMPANIES_PATH, DASHBOARD_PATH, DEPARTMENTS_PATH } from '@/constants/route.constant'
 
 export const dashboardRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
@@ -9,25 +33,181 @@ export const dashboardRoute = createRoute({
   component: DashboardPage
 })
 
-export function DashboardPage() {
+function DashboardPage() {
   const { user } = useAuthStore()
-  const appName = import.meta.env.VITE_APP_NAME || 'Srikaya Enterprise'
+  const [companies, setCompanies] = React.useState<Company[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
+
+  const load = React.useCallback(async () => {
+    setIsLoading(true)
+    setErrorMsg(null)
+    try {
+      const res = await api.companies.get()
+      if (res.error) {
+        setErrorMsg(errorText(res, 'Data badan usaha tidak dapat dimuat dari gateway.'))
+        return
+      }
+      setCompanies(Array.isArray(res.data) ? (res.data as unknown as Company[]) : [])
+    } catch {
+      setErrorMsg('Gateway API tidak terjangkau. Pastikan layanan backend berjalan.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    load()
+  }, [load])
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-8 dark:border-neutral-800 dark:bg-neutral-900 shadow-sm">
-        <div className="max-w-2xl space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Portal Informasi
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white sm:text-3xl">
-            Selamat Datang, {user?.name || 'Operator'}
-          </h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Sistem informasi kehadiran karyawan dan manajemen operasional {appName} siap digunakan.
-          </p>
+      <PageHeader
+        title="Dasbor"
+        description={`${user?.name ?? 'Operator'} · peran ${user?.role ?? 'anggota'}. Ringkasan di bawah dihitung langsung dari data organisasi yang tersimpan.`}
+        actions={
+          <Button tone="neutral" onClick={load} disabled={isLoading}>
+            Muat ulang
+          </Button>
+        }
+      />
+
+      {errorMsg && (
+        <Notice tone="danger" title="Gagal memuat data" onDismiss={() => setErrorMsg(null)}>
+          {errorMsg}
+        </Notice>
+      )}
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <Panel>
+          <PanelHeader
+            title="Badan usaha"
+            description="Setiap entitas membawa titik geofence dan departemennya sendiri."
+            meta={isLoading ? undefined : `${companies.length} entitas`}
+          />
+          {isLoading ? (
+            <ListSkeleton rows={3} />
+          ) : companies.length === 0 ? (
+            <EmptyState
+              title="Belum ada badan usaha"
+              description="Daftarkan perusahaan pertama untuk membuka konfigurasi titik lokasi absensi dan departemen."
+              action={
+                <Link to={COMPANIES_PATH} className="inline-flex">
+                  <Button tone="primary" icon={<HiOutlineArrowRight className="h-4 w-4" />}>
+                    Ke halaman perusahaan
+                  </Button>
+                </Link>
+              }
+            />
+          ) : (
+            <ul className="divide-y divide-line">
+              {companies.map((company) => {
+                const location = primaryLocation(company)
+                return (
+                  <li key={company.id} className="px-4 py-4 transition-colors hover:bg-surface-2 sm:px-5">
+                    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink">
+                            {company.code}
+                          </span>
+                          <h3 className="truncate text-[15px] font-bold tracking-tight text-ink">
+                            {company.name}
+                          </h3>
+                        </div>
+                        <p className="mt-1.5 text-[13px] text-ink-2">
+                          {location
+                            ? `${location.name} · ${location.city} · ${timezoneLabel(location.timezone)}`
+                            : 'Titik lokasi belum dikonfigurasi'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <StatusFromValue value={company.status} />
+                        <dl className="hidden items-center gap-4 text-[13px] sm:flex">
+                          <div className="text-right">
+                            <dt className="text-[11px] uppercase tracking-wide text-ink-3">Lokasi</dt>
+                            <dd className="tabular font-semibold text-ink">{locationCount(company)}</dd>
+                          </div>
+                          <div className="text-right">
+                            <dt className="text-[11px] uppercase tracking-wide text-ink-3">Dept.</dt>
+                            <dd className="tabular font-semibold text-ink">{departmentCount(company)}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Panel>
+
+        <div className="space-y-5">
+          <Panel>
+            <PanelHeader title="Cakupan" />
+            <dl className="divide-y divide-line">
+              <SummaryRow label="Perusahaan" value={String(companies.length)} loading={isLoading} />
+              <SummaryRow
+                label="Titik geofence"
+                value={String(totalLocations(companies))}
+                loading={isLoading}
+              />
+              <SummaryRow
+                label="Departemen"
+                value={String(totalDepartments(companies))}
+                loading={isLoading}
+              />
+            </dl>
+            <div className="border-t border-line px-4 py-3.5 sm:px-5">
+              <Link
+                to={DEPARTMENTS_PATH}
+                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline"
+              >
+                Atur departemen
+                <HiOutlineArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </Panel>
+
+          <Panel>
+            <PanelHeader title="Sesi aktif" />
+            <div className="space-y-3 px-4 py-4 sm:px-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-on">
+                  {(user?.name ?? 'OP').slice(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-semibold text-ink">{user?.name}</div>
+                  <div className="truncate font-mono text-[11px] text-ink-3">{user?.email}</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge tone="accent">{user?.role === 'admin' ? 'Administrator' : 'Anggota'}</Badge>
+                <Badge>Token 7 hari</Badge>
+              </div>
+            </div>
+          </Panel>
         </div>
       </div>
+    </div>
+  )
+}
+
+function SummaryRow({
+  label,
+  value,
+  loading
+}: {
+  label: string
+  value: string
+  loading: boolean
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 px-4 py-3 sm:px-5">
+      <dt className="text-[13px] text-ink-2">{label}</dt>
+      <dd className="tabular text-[15px] font-bold text-ink">
+        {loading ? '—' : value}
+      </dd>
     </div>
   )
 }

@@ -1,11 +1,14 @@
 import * as React from 'react'
 import { createRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { HiOutlineLockClosed, HiOutlineMail, HiOutlineMoon, HiOutlineSun } from 'react-icons/hi'
 import { rootRoute } from './__root'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import { HiOutlineMail, HiOutlineLockClosed } from 'react-icons/hi'
-import Alert from '@/components/ui/Alert'
+import { useThemeStore } from '@/stores/theme'
+import { Notice, Button } from '@/components/base'
+import { errorText } from '@/utils/apiError'
 import { DASHBOARD_PATH, LOGIN_PATH } from '@/constants/route.constant'
+import { cn } from '@/lib/utils'
 
 export const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -19,9 +22,12 @@ export const loginRoute = createRoute({
   component: LoginPage
 })
 
+const inputClass =
+  'h-11 w-full rounded-control border border-line bg-surface pl-10 pr-3.5 text-[14px] text-ink transition-[border-color,background-color] duration-150 hover:border-line-strong focus:border-primary sm:h-10'
+
 export function LoginPage() {
   const navigate = useNavigate()
-  const { setAuth, isAuthenticated } = useAuthStore()
+  const { setAuth } = useAuthStore()
   const appName = import.meta.env.VITE_APP_NAME || 'Srikaya Enterprise'
 
   const [email, setEmail] = React.useState('admin@srikaya.id')
@@ -29,212 +35,195 @@ export function LoginPage() {
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const [isLoading, setIsLoading] = React.useState(false)
 
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      navigate({ to: '/dashboard' })
-    }
-  }, [isAuthenticated, navigate])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
     setIsLoading(true)
 
     try {
-      const response = await api.auth.login.post({
-        email,
-        password
-      })
+      const res = await api.auth.login.post({ email, password })
 
-      if (response.error) {
-        const message =
-          typeof response.error.value === 'object' && response.error.value && 'message' in response.error.value
-            ? String((response.error.value as { message?: string }).message)
-            : 'Surel atau kata sandi tidak cocok. Periksa kembali data Anda.'
-        setErrorMsg(message)
-        setIsLoading(false)
+      if (res.error) {
+        setErrorMsg(errorText(res, 'Surel atau kata sandi tidak cocok.'))
         return
       }
 
-      const resData = response.data
-      if (resData && 'token' in resData && resData.token && resData.user) {
-        setAuth(resData.token, {
-          id: resData.user.id,
-          email: resData.user.email,
-          name: resData.user.name,
-          role: resData.user.role as 'admin' | 'member' | 'guest',
-          createdAt: resData.user.createdAt
+      const data = res.data
+      if (data && 'token' in data && data.token && data.user) {
+        setAuth(data.token, {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          role: data.user.role as 'admin' | 'member' | 'guest',
+          createdAt: data.user.createdAt
         })
-        navigate({ to: '/dashboard' })
+        navigate({ to: DASHBOARD_PATH })
       } else {
-        const failMessage =
-          resData && 'message' in resData ? String(resData.message) : 'Server tidak memberikan respon valid.'
-        setErrorMsg(failMessage)
+        setErrorMsg(errorText({ error: { value: data } }, 'Server tidak mengirim balasan yang sah.'))
       }
     } catch {
-      setErrorMsg('Gagal terhubung ke gateway API. Pastikan layanan backend aktif.')
+      setErrorMsg('Gateway API tidak terjangkau. Jalankan layanan backend lebih dahulu.')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen bg-white dark:bg-neutral-900 font-sans">
-      {/* Kolom Kiri: Formulir Masuk */}
-      <div className="flex flex-1 flex-col justify-between p-6 sm:p-10 lg:p-14">
-        {/* Identitas Brand */}
-        <div className="flex items-center gap-3">
-          <img
-            src="/img/logo/logo-light-streamline.png"
-            alt={appName}
-            className="h-9 w-auto dark:hidden"
-          />
-          <img
-            src="/img/logo/logo-dark-streamline.png"
-            alt={appName}
-            className="hidden h-9 w-auto dark:block"
-          />
-          <span className="font-bold tracking-tight text-lg text-neutral-900 dark:text-white">
-            {appName}
-          </span>
-        </div>
-
-        {/* Konten Formulir */}
-        <div className="mx-auto w-full max-w-md py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              Masuk ke Akun
-            </h1>
-            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-              Masukkan surel dan kata sandi Anda untuk mengelola layanan.
-            </p>
+    <div className="flex min-h-dvh bg-app">
+      <div className="flex flex-1 flex-col px-5 py-6 sm:px-10 lg:px-14">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/img/logo/logo-light-streamline.png"
+              alt=""
+              className="h-8 w-auto dark:hidden"
+            />
+            <img
+              src="/img/logo/logo-dark-streamline.png"
+              alt=""
+              className="hidden h-8 w-auto dark:block"
+            />
+            <span className="text-[15px] font-bold tracking-tight text-ink">{appName}</span>
           </div>
+          <ThemeToggle />
+        </div>
 
-          {errorMsg && (
-            <Alert
-              type="danger"
-              showIcon
-              title="Permintaan Ditolak"
-              className="mb-6 shadow-sm"
-              closable
-              onClose={() => setErrorMsg(null)}
-            >
-              {errorMsg}
-            </Alert>
-          )}
+        <div className="flex flex-1 items-center py-8">
+          <div className="mx-auto w-full max-w-[380px]">
+            <div className="mb-7">
+              <h1 className="text-2xl font-bold tracking-tightest text-ink">Masuk ke portal</h1>
+              <p className="mt-2 text-[13px] leading-relaxed text-ink-2">
+                Sesi berlaku tujuh hari. Kredensial diverifikasi oleh layanan auth melalui gateway.
+              </p>
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300"
+            {errorMsg && (
+              <Notice
+                tone="danger"
+                title="Tidak bisa masuk"
+                onDismiss={() => setErrorMsg(null)}
+                className="mb-5"
               >
-                Alamat Surel
-              </label>
-              <div className="relative mt-2">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-neutral-400">
-                  <HiOutlineMail className="h-5 w-5" />
-                </div>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@srikaya.id"
-                  required
-                  autoComplete="email"
-                  className="w-full rounded-xl border border-neutral-300 bg-neutral-50/50 py-2.5 pl-11 pr-4 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:bg-neutral-900"
-                />
-              </div>
-            </div>
+                {errorMsg}
+              </Notice>
+            )}
 
-            <div>
-              <div className="flex items-center justify-between">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
                 <label
-                  htmlFor="password"
-                  className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300"
+                  htmlFor="login-email"
+                  className="mb-1.5 block text-[13px] font-semibold text-ink-2"
                 >
-                  Kata Sandi
+                  Alamat surel
                 </label>
-                <span className="text-xs text-neutral-400">Minimal 6 karakter</span>
-              </div>
-              <div className="relative mt-2">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-neutral-400">
-                  <HiOutlineLockClosed className="h-5 w-5" />
+                <div className="relative">
+                  <HiOutlineMail className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-3" />
+                  <input
+                    id="login-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nama@perusahaan.co.id"
+                    required
+                    autoComplete="email"
+                    className={cn(inputClass, 'font-mono text-[13px]')}
+                  />
                 </div>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                  required
-                  autoComplete="current-password"
-                  className="w-full rounded-xl border border-neutral-300 bg-neutral-50/50 py-2.5 pl-11 pr-4 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:bg-neutral-900"
-                />
               </div>
-            </div>
 
-            {/* Kotak Informasi Demo Kredensial */}
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3.5 text-xs text-neutral-600 dark:border-neutral-800 dark:bg-neutral-800/60 dark:text-neutral-300">
-              <div className="flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-white">
-                <span className="text-primary">&#x25CF;</span>
-                <span>Akun Bawaan Pengembang</span>
+              <div>
+                <div className="mb-1.5 flex items-baseline justify-between">
+                  <label
+                    htmlFor="login-password"
+                    className="block text-[13px] font-semibold text-ink-2"
+                  >
+                    Kata sandi
+                  </label>
+                  <span className="text-[11px] text-ink-3">minimal 6 karakter</span>
+                </div>
+                <div className="relative">
+                  <HiOutlineLockClosed className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-3" />
+                  <input
+                    id="login-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                    className={inputClass}
+                  />
+                </div>
               </div>
-              <div className="mt-1 text-[11px] space-y-0.5 text-neutral-500 dark:text-neutral-400">
-                <div>Surel: <span className="font-mono text-neutral-800 dark:text-neutral-200">admin@srikaya.id</span></div>
-                <div>Sandi: <span className="font-mono text-neutral-800 dark:text-neutral-200">rahasia123</span></div>
-              </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full rounded-xl bg-primary py-3 px-4 text-sm font-semibold text-white shadow-sm hover:bg-primary-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isLoading ? 'Memverifikasi Sesi...' : 'Masuk Sekarang \u2192'}
-            </button>
-          </form>
+              <Button type="submit" tone="primary" full loading={isLoading}>
+                {isLoading ? 'Memverifikasi' : 'Masuk'}
+              </Button>
+            </form>
+
+            <div className="mt-6 rounded-control border border-line bg-surface px-3.5 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+                Akun bawaan pengembangan
+              </p>
+              <dl className="mt-2 space-y-1 text-[12px]">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-2">Surel</dt>
+                  <dd className="font-mono text-ink">admin@srikaya.id</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-2">Kata sandi</dt>
+                  <dd className="font-mono text-ink">rahasia123</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
         </div>
 
-        {/* Keterangan Hak Cipta & Stack */}
-        <div className="text-xs text-neutral-400">
-          &copy; 2026 {appName} &middot; Layanan Terdistribusi Bun &amp; Node.js
-        </div>
+        <p className="text-[11px] text-ink-3">
+          &copy; 2026 {appName} &middot; Layanan berjalan di Bun, antarmuka di Node.js
+        </p>
       </div>
 
-      {/* Kolom Kanan: Visual Samping */}
-      <div className="hidden lg:flex flex-1 p-6 items-center justify-center bg-neutral-50 dark:bg-neutral-950">
-        <div className="relative h-full max-h-[94vh] w-full max-w-[640px] overflow-hidden rounded-3xl shadow-xl">
+      <div className="hidden w-[46%] max-w-[720px] shrink-0 border-l border-line p-6 lg:block">
+        <div className="relative h-full overflow-hidden rounded-panel">
           <img
             src="/img/others/auth-side-bg.png"
-            alt="Suasana Ruang Kerja"
+            alt=""
             className="h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent flex flex-col justify-end p-10 text-white">
-            <span className="text-xs font-semibold uppercase tracking-widest text-primary-mild">
-              Sistem Informasi Terpadu
-            </span>
-            <h2 className="mt-2 text-2xl font-bold leading-snug">
-              Kendali Klaster Mikroservis Lintas Runtime
+          <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/25 to-transparent p-10 text-white">
+            <h2 className="text-2xl font-bold leading-snug tracking-tight">
+              Portal operasional kehadiran
             </h2>
-            <p className="mt-2 text-xs text-neutral-300 leading-relaxed max-w-md">
-              Integrasi langsung antara backend Bun dan antarmuka client Node.js dengan keamanan tipe Eden Treaty.
+            <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-white/85">
+              Satu tempat untuk mengatur badan usaha, titik geofence absensi, dan struktur departemen.
             </p>
-            <div className="mt-6 flex items-center gap-4 text-xs font-mono text-neutral-200">
-              <div className="flex items-center gap-1.5">
-                <span className="text-emerald-400">&#x25CF;</span> Gateway Aktif
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-emerald-400">&#x25CF;</span> Basis Data Terhubung
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-emerald-400">&#x25CF;</span> Sesi Aman
-              </div>
-            </div>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+function ThemeToggle() {
+  const resolved = useThemeStore((state) => state.resolved)
+  const toggle = useThemeStore((state) => state.toggle)
+  const isDark = resolved === 'dark'
+
+  return (
+    <button
+      onClick={toggle}
+      className={cn(
+        'rounded-control border border-line bg-surface p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink button-press-feedback',
+        'lg:border-transparent lg:bg-transparent'
+      )}
+      title={isDark ? 'Gunakan tema terang' : 'Gunakan tema gelap'}
+      aria-label={isDark ? 'Gunakan tema terang' : 'Gunakan tema gelap'}
+    >
+      {isDark ? (
+        <HiOutlineSun className="h-[18px] w-[18px]" />
+      ) : (
+        <HiOutlineMoon className="h-[18px] w-[18px]" />
+      )}
+    </button>
   )
 }

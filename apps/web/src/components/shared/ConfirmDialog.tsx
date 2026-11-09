@@ -1,15 +1,9 @@
-import {
-    HiCheckCircle,
-    HiOutlineInformationCircle,
-    HiOutlineExclamation,
-    HiOutlineExclamationCircle,
-} from 'react-icons/hi'
-import Avatar from '@/components/ui/Avatar'
-import Button from '@/components/ui/Button'
-import Dialog from '@/components/ui/Dialog'
 import type { ReactNode } from 'react'
+import Dialog from '@/components/ui/Dialog'
+import { Button, DialogFooter } from '@/components/base'
+import type { ButtonProps } from '@/components/base'
+import { cn } from '@/lib/utils'
 import type { DialogProps } from '@/components/ui/Dialog'
-import type { ButtonProps } from '@/components/ui/Button'
 
 type StatusType = 'info' | 'success' | 'warning' | 'danger'
 
@@ -24,56 +18,28 @@ interface ConfirmDialogProps extends DialogProps {
     onConfirm?: () => void
 }
 
-const StatusIcon = ({ status }: { status: StatusType }) => {
-    switch (status) {
-        case 'info':
-            return (
-                <Avatar
-                    className="bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-100"
-                    shape="circle"
-                >
-                    <span className="text-2xl">
-                        <HiOutlineInformationCircle />
-                    </span>
-                </Avatar>
-            )
-        case 'success':
-            return (
-                <Avatar
-                    className="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-100"
-                    shape="circle"
-                >
-                    <span className="text-2xl">
-                        <HiCheckCircle />
-                    </span>
-                </Avatar>
-            )
-        case 'warning':
-            return (
-                <Avatar
-                    className="text-amber-600 bg-amber-100 dark:text-amber-100"
-                    shape="circle"
-                >
-                    <span className="text-2xl">
-                        <HiOutlineExclamationCircle />
-                    </span>
-                </Avatar>
-            )
-        case 'danger':
-            return (
-                <Avatar
-                    className="text-red-600 bg-red-100 dark:text-red-100"
-                    shape="circle"
-                >
-                    <span className="text-2xl">
-                        <HiOutlineExclamation />
-                    </span>
-                </Avatar>
-            )
+const TONE = {
+    info: { ring: 'border-primary-line bg-primary-subtle text-primary', path: 'M12 8h.01M11 12h1v4h1' },
+    success: { ring: 'border-success-line bg-success-subtle text-success', path: 'M8.5 12.5l2.5 2.5 5-5.5' },
+    warning: { ring: 'border-warning-line bg-warning-subtle text-warning', path: 'M12 8v5m0 3h.01' },
+    danger: { ring: 'border-error-line bg-error-subtle text-error', path: 'M12 8v5m0 3h.01' },
+} as const
 
-        default:
-            return null
-    }
+function StatusIcon({ status }: { status: StatusType }) {
+    const tone = TONE[status]
+    return (
+        <span
+            className={cn(
+                'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border',
+                tone.ring
+            )}
+            aria-hidden="true"
+        >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d={tone.path} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        </span>
+    )
 }
 
 const ConfirmDialog = (props: ConfirmDialogProps) => {
@@ -83,51 +49,35 @@ const ConfirmDialog = (props: ConfirmDialogProps) => {
         children,
         onCancel,
         onConfirm,
-        cancelText = 'Cancel',
-        confirmText = 'Confirm',
+        cancelText = 'Batal',
+        confirmText = 'Konfirmasi',
         confirmButtonProps,
         cancelButtonProps,
         ...rest
     } = props
 
-    const handleCancel = () => {
-        onCancel?.()
-    }
-
-    const handleConfirm = () => {
-        onConfirm?.()
-    }
-
     return (
-        <Dialog contentClassName="pb-0 px-0" {...rest}>
-            <div className="px-6 pb-6 pt-2 flex">
-                <div>
-                    <StatusIcon status={type} />
-                </div>
-                <div className="ml-4 rtl:mr-4">
-                    <h5 className="mb-2">{title}</h5>
-                    {children}
+        <Dialog {...rest}>
+            <div className="flex min-h-0 flex-1 gap-4 px-4 py-5 sm:px-5">
+                <StatusIcon status={type} />
+                <div className="min-w-0">
+                    <h2 className="text-[15px] font-bold tracking-tight text-ink">{title}</h2>
+                    <div className="mt-1.5 text-[13px] leading-relaxed text-ink-2">{children}</div>
                 </div>
             </div>
-            <div className="px-6 py-3 bg-gray-100 dark:bg-gray-700 rounded-bl-2xl rounded-br-2xl">
-                <div className="flex justify-end items-center gap-2">
-                    <Button
-                        size="sm"
-                        onClick={handleCancel}
-                        {...cancelButtonProps}
-                    >
-                        {cancelText}
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="solid"
-                        onClick={handleConfirm}
-                        {...confirmButtonProps}
-                    >
-                        {confirmText}
-                    </Button>
-                </div>
-            </div>
+            <DialogFooter>
+                <Button size="sm" onClick={onCancel} {...cancelButtonProps}>
+                    {cancelText}
+                </Button>
+                <Button
+                    size="sm"
+                    tone={type === 'danger' ? 'destructive' : 'primary'}
+                    onClick={onConfirm}
+                    {...confirmButtonProps}
+                >
+                    {confirmText}
+                </Button>
+            </DialogFooter>
         </Dialog>
     )
 }

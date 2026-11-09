@@ -1,89 +1,212 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ==============================================================
+   Token design system.
+   Terang dan gelap didefinisikan di satu tempat; komponen hanya
+   membaca var, tidak pernah hardcoded hex.
+   ============================================================ */
 @layer theme {
   :root {
-    --neutral: #ffffff;
-    --primary: #2a85ff;
-    --primary-deep: #0069f6;
-    --primary-mild: #4996ff;
-    --primary-subtle: #2a85ff1a;
-    --error: #ff6a55;
-    --error-subtle: #ff6a551a;
-    --success: #10b981;
-    --success-subtle: #05eb7624;
-    --info: #2a85ff;
-    --info-subtle: #2a85ff1a;
-    --warning: #f59e0b;
-    --warning-subtle: #ffd40045;
+    color-scheme: light;
 
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
+    /* Muka & garis */
+    --app: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f1f3f6;
+    --surface-3: #e8ebf0;
+    --line: #e2e5ea;
+    --line-strong: #cfd5de;
+
+    /* Tinta */
+    --ink: #111620;
+    --ink-2: #525c6b;
+    --ink-3: #6b7482;
+
+    /* Aksen: biru ditajamkan supaya lolos kontras 4.5:1 di atas putih */
+    --primary: #1668e5;
+    --primary-deep: #0f56c2;
+    --primary-mild: #5ea2ff;
+    --primary-subtle: #eaf1fd;
+    --primary-line: #c4dbf8;
+    /* Tinta di atas bidang berwarna: putih di tema terang, nyaris hitam di tema gelap */
+    --on-primary: #ffffff;
+    --on-error: #ffffff;
+
+    --error: #c2271f;
+    --error-subtle: #fceceb;
+    --error-line: #f3c9c6;
+    --success: #0d7a4f;
+    --success-subtle: #e6f5ed;
+    --success-line: #c3e6d3;
+    --warning: #8f5a04;
+    --warning-subtle: #fbf2e0;
+    --warning-line: #ecdcb6;
+    --info: var(--primary);
+    --info-subtle: var(--primary-subtle);
+
+    /* Kontras & fokus */
+    --ring: #1668e5;
+    --focus-ring: 0 0 0 3px rgba(22, 104, 229, 0.22);
+    --selection-bg: #cfe1fb;
+
+    /* Bayangan: satu skala, offset + blur lembut */
+    --shadow-sm: 0 1px 2px rgba(17, 22, 32, 0.05);
+    --shadow-md: 0 1px 2px rgba(17, 22, 32, 0.04), 0 6px 16px -6px rgba(17, 22, 32, 0.12);
+    --shadow-lg: 0 2px 4px rgba(17, 22, 32, 0.05), 0 24px 48px -20px rgba(17, 22, 32, 0.28);
+
+    --radius: 14px;
+    --radius-control: 10px;
+
+    /* Jembatan ke komponen lama (shadcn-style, triplet HSL) */
+    --background: 220 33% 97%;
+    --foreground: 222 30% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 217 100% 58%;
-    --radius: 0.75rem;
+    --card-foreground: 222 30% 10%;
+    --muted: 216 20% 95%;
+    --muted-foreground: 218 13% 40%;
+    --accent: 216 20% 95%;
+    --accent-foreground: 222 30% 10%;
+    --border: 216 15% 90%;
+    --input: 216 15% 90%;
+    --ring-hsl: 217 82% 49%;
+
+    /* Gerak */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --dur-fast: 120ms;
+    --dur: 200ms;
   }
 
   .dark {
-    --neutral: #171717;
-    --primary: #2a85ff;
-    --primary-deep: #0069f6;
-    --primary-mild: #4996ff;
-    --primary-subtle: #2a85ff1a;
-    --error: #ff6a55;
-    --error-subtle: #ff6a551a;
-    --success: #10b981;
-    --success-subtle: #05eb7624;
-    --info: #2a85ff;
-    --info-subtle: #2a85ff1a;
-    --warning: #f59e0b;
-    --warning-subtle: #ffd40045;
+    color-scheme: dark;
 
-    --background: 0 0% 9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 98%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 217 100% 58%;
+    --app: #0b0d11;
+    --surface: #12151a;
+    --surface-2: #171b22;
+    --surface-3: #1e232b;
+    --line: #242a33;
+    --line-strong: #38414f;
+
+    --ink: #e9edf3;
+    --ink-2: #a8b2c0;
+    --ink-3: #7d8795;
+
+    --primary: #5ea2ff;
+    --primary-deep: #7fb4ff;
+    --primary-mild: #a7ccff;
+    --primary-subtle: #14243a;
+    --primary-line: #25415f;
+    --on-primary: #08111f;
+    --on-error: #2a0f0e;
+
+    --error: #ff8f86;
+    --error-subtle: #2a1517;
+    --error-line: #55292a;
+    --success: #55d39a;
+    --success-subtle: #10231a;
+    --success-line: #1f4433;
+    --warning: #e2b263;
+    --warning-subtle: #241c0f;
+    --warning-line: #4a3a1c;
+
+    --ring: #5ea2ff;
+    --focus-ring: 0 0 0 3px rgba(94, 162, 255, 0.28);
+    --selection-bg: #1d3f68;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.45), 0 28px 56px -24px rgba(0, 0, 0, 0.8);
+
+    --background: 222 26% 6%;
+    --foreground: 220 30% 95%;
+    --card: 222 20% 12%;
+    --card-foreground: 220 30% 95%;
+    --muted: 220 16% 16%;
+    --muted-foreground: 218 14% 62%;
+    --accent: 220 16% 16%;
+    --accent-foreground: 220 30% 95%;
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring-hsl: 217 100% 68%;
   }
 }
 
 @layer base {
+  html {
+    /* Cegah kedip saat berganti tema: hanya warna yang bertransisi */
+    transition: background-color var(--dur) var(--ease-out);
+  }
+
   body {
-    @apply text-neutral-600 dark:text-neutral-300 text-sm bg-neutral-100 dark:bg-neutral-950 font-sans antialiased;
+    @apply bg-app font-sans text-sm text-ink antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
+    text-rendering: optimizeLegibility;
   }
 
   h1, .h1 {
-    @apply text-3xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight;
+    @apply text-2xl font-bold tracking-[-0.02em] text-ink;
+    text-wrap: balance;
   }
   h2, .h2 {
-    @apply text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight;
+    @apply text-lg font-bold tracking-[-0.015em] text-ink;
+    text-wrap: balance;
   }
   h3, .h3 {
-    @apply text-xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight;
+    @apply text-base font-semibold tracking-[-0.01em] text-ink;
   }
   h4, .h4 {
-    @apply text-lg font-bold text-neutral-900 dark:text-neutral-100;
+    @apply text-sm font-semibold text-ink;
+  }
+
+  /* Permukaan bawaan browser ikut di-theme dari palet */
+  ::selection {
+    background-color: var(--selection-bg);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  input, textarea, select {
+    font-family: inherit;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ink-3);
+    opacity: 1;
+  }
+
+  /* Angka pada data sejajar, kolom tidak bergeser */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--ink-3);
   }
 }
 
 @layer components {
-  .heading-text {
-    @apply text-neutral-900 dark:text-neutral-100;
+  /* Baris data: angka rata kanan, tidak melompat */
+  .data-cell {
+    @apply tabular text-[13px] leading-5;
   }
 
   /* Dialog & Modal */
@@ -96,10 +219,10 @@
     justify-content: center;
     overflow-y: auto;
     padding: 1rem;
-    background-color: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    transition: opacity 0.15s ease-in-out;
+    background-color: rgba(10, 13, 18, 0.55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    animation: overlay-in var(--dur) var(--ease-out);
   }
 
   .dialog-overlay-after-open {
@@ -108,6 +231,7 @@
 
   .dialog-overlay-before-close {
     opacity: 0;
+    transition: opacity var(--dur-fast) linear;
   }
 
   .dialog {
@@ -115,29 +239,27 @@
     position: relative;
     margin: auto;
     max-width: 100%;
-    max-height: 90vh;
     display: flex;
     flex-direction: column;
   }
 
-  .dialog:focus {
-    outline: none;
-  }
-
   .dialog-content {
     position: relative;
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    border-radius: 1rem;
-    background-color: #ffffff;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background-color: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--line);
+    max-height: calc(100vh - 2rem);
     overflow: hidden;
+    animation: dialog-in 240ms var(--ease-out);
   }
 
-  .dark .dialog-content {
-    background-color: #171717;
-    border-color: #262626;
-    color: #f5f5f5;
+  .dialog-content:focus {
+    outline: none;
   }
 
   /* Close Button */
@@ -145,35 +267,110 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 9999px;
+    border-radius: 8px;
     padding: 0.375rem;
-    color: #6b7280;
-    background-color: #f3f4f6;
-    transition: all 0.15s ease-in-out;
+    color: var(--ink-2);
+    background-color: transparent;
+    transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
     cursor: pointer;
     font-size: 1.125rem;
   }
 
   .close-button:hover {
-    background-color: #e5e7eb;
-    color: #111827;
+    background-color: var(--surface-2);
+    color: var(--ink);
   }
 
-  .dark .close-button {
-    background-color: #262626;
-    color: #9ca3af;
-  }
-
-  .dark .close-button:hover {
-    background-color: #404040;
-    color: #f9fafb;
-  }
-
+  /* Umpan balik tekan pada semua kontrol kursor */
   .button-press-feedback {
-    transition: transform 0.1s ease-in-out;
+    transition: transform var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
   }
 
-  .button-press-feedback:active {
-    transform: scale(0.96);
+  .button-press-feedback:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .surface-raised {
+    background-color: var(--surface);
+    border-color: var(--line);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Satu momen masuk halaman: konten naik dari default yang sudah terlihat */
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.route-enter {
+  animation: enter-up 260ms var(--ease-out) both;
+}
+
+/* Kerangka muat: satu sapuan, bukan berkedip */
+.skeleton {
+  background-color: var(--surface-2);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(127, 143, 168, 0.16), transparent);
+  transform: translate3d(-100%, 0, 0);
+  animation: skeleton-sweep 1.4s var(--ease-out) infinite;
+}
+
+@keyframes skeleton-sweep {
+  to {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .skeleton::after {
+    animation: none;
   }
 }
