@@ -19,35 +19,49 @@ function normalizeTime(value: string): string | null {
 }
 
 interface ShiftInput {
-  employeeId: string
-  position: string
-  supervisorId?: string
+  companyId: string
+  name: string
+  code: string
+  description?: string
   startTime: string
   endTime: string
   workLocationId: string
   attendanceLocationIds: string[]
   status?: string
+  employeeId?: string
+  position?: string
+  supervisorId?: string
+  assignedEmployeeIds?: string[]
 }
 
 type ValidationResult =
   | {
       ok: true
       companyId: string
-      employeeId: string
-      position: string
-      supervisorId: string | null
+      name: string
+      code: string
+      description: string | null
       startTime: string
       endTime: string
       workLocationId: string
       attendanceLocationIds: string[]
       status: string
+      employeeId: string | null
+      position: string | null
+      supervisorId: string | null
+      assignedEmployeeIds?: string[]
     }
   | { ok: false; status: number; message: string }
 
 async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> {
-  const position = input.position.trim()
-  if (position.length < 2) {
-    return { ok: false, status: 400, message: 'Posisi kerja minimal 2 karakter.' }
+  const name = input.name?.trim()
+  if (!name || name.length < 2) {
+    return { ok: false, status: 400, message: 'Nama shift minimal 2 karakter.' }
+  }
+
+  const code = input.code?.trim().toUpperCase()
+  if (!code || code.length < 1) {
+    return { ok: false, status: 400, message: 'Kode shift wajib diisi.' }
   }
 
   const startTime = normalizeTime(input.startTime)
@@ -59,56 +73,12 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     return { ok: false, status: 400, message: 'Jam mulai dan jam selesai tidak boleh sama.' }
   }
 
-  const [employee] = await db
-    .select({
-      id: users.id,
-      companyId: users.companyId,
-      position: users.position,
-      status: users.status
-    })
-    .from(users)
-    .where(eq(users.id, input.employeeId))
-    .limit(1)
-
-  if (!employee) {
-    return { ok: false, status: 404, message: 'Karyawan tidak ditemukan.' }
-  }
-  if (!employee.companyId) {
-    return {
-      ok: false,
-      status: 400,
-      message: 'Karyawan belum terhubung ke perusahaan. Lengkapi data karyawan terlebih dahulu.'
-    }
-  }
-  if (employee.status !== 'active') {
-    return { ok: false, status: 400, message: 'Karyawan nonaktif tidak dapat diberi shift.' }
-  }
-
-  const supervisorId = input.supervisorId?.trim() || null
-  if (supervisorId) {
-    if (supervisorId === employee.id) {
-      return { ok: false, status: 400, message: 'Karyawan tidak dapat menjadi atasan dirinya sendiri.' }
-    }
-
-    const [supervisor] = await db
-      .select({ id: users.id, companyId: users.companyId, status: users.status })
-      .from(users)
-      .where(eq(users.id, supervisorId))
-      .limit(1)
-
-    if (!supervisor) {
-      return { ok: false, status: 400, message: 'Atasan yang dipilih tidak ditemukan.' }
-    }
-    if (supervisor.companyId !== employee.companyId) {
-      return { ok: false, status: 400, message: 'Atasan harus berasal dari perusahaan yang sama.' }
-    }
-    if (supervisor.status !== 'active') {
-      return { ok: false, status: 400, message: 'Atasan yang dipilih sedang nonaktif.' }
-    }
-  }
-
   const [workLocation] = await db
-    .select({ id: companyLocations.id, companyId: companyLocations.companyId, status: companyLocations.status })
+    .select({
+      id: companyLocations.id,
+      companyId: companyLocations.companyId,
+      status: companyLocations.status
+    })
     .from(companyLocations)
     .where(eq(companyLocations.id, input.workLocationId))
     .limit(1)
@@ -116,8 +86,10 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
   if (!workLocation) {
     return { ok: false, status: 400, message: 'Lokasi kerja tidak ditemukan.' }
   }
-  if (workLocation.companyId !== employee.companyId) {
-    return { ok: false, status: 400, message: 'Lokasi kerja harus berada di perusahaan karyawan.' }
+
+  const companyId = input.companyId || workLocation.companyId
+  if (workLocation.companyId !== companyId) {
+    return { ok: false, status: 400, message: 'Lokasi kerja tidak sesuai dengan perusahaan yang dipilih.' }
   }
   if (workLocation.status !== 'active') {
     return { ok: false, status: 400, message: 'Lokasi kerja sedang nonaktif.' }
@@ -129,31 +101,73 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
   }
 
   const locations = await db
-    .select({ id: companyLocations.id, companyId: companyLocations.companyId, status: companyLocations.status })
+    .select({
+      id: companyLocations.id,
+      companyId: companyLocations.companyId,
+      status: companyLocations.status
+    })
     .from(companyLocations)
     .where(inArray(companyLocations.id, attendanceLocationIds))
 
   if (locations.length !== attendanceLocationIds.length) {
     return { ok: false, status: 400, message: 'Salah satu lokasi absensi tidak ditemukan.' }
   }
-  if (locations.some((location) => location.companyId !== employee.companyId)) {
-    return { ok: false, status: 400, message: 'Semua lokasi absensi harus berada di perusahaan karyawan.' }
+  if (locations.some((location) => location.companyId !== companyId)) {
+    return { ok: false, status: 400, message: 'Semua lokasi absensi harus berada di perusahaan yang sama.' }
   }
   if (locations.some((location) => location.status !== 'active')) {
     return { ok: false, status: 400, message: 'Semua lokasi absensi harus berstatus aktif.' }
   }
 
+  let employeeId: string | null = null
+  let position: string | null = input.position?.trim() || null
+  let supervisorId: string | null = null
+
+  if (input.employeeId?.trim()) {
+    const [employee] = await db
+      .select({
+        id: users.id,
+        companyId: users.companyId,
+        position: users.position,
+        status: users.status
+      })
+      .from(users)
+      .where(eq(users.id, input.employeeId.trim()))
+      .limit(1)
+
+    if (employee && employee.companyId === companyId) {
+      employeeId = employee.id
+      if (!position) position = employee.position
+    }
+  }
+
+  if (input.supervisorId?.trim()) {
+    const [supervisor] = await db
+      .select({ id: users.id, companyId: users.companyId, status: users.status })
+      .from(users)
+      .where(eq(users.id, input.supervisorId.trim()))
+      .limit(1)
+
+    if (supervisor && supervisor.companyId === companyId) {
+      supervisorId = supervisor.id
+    }
+  }
+
   return {
     ok: true,
-    companyId: employee.companyId,
-    employeeId: employee.id,
-    position,
-    supervisorId,
+    companyId,
+    name,
+    code,
+    description: input.description?.trim() || null,
     startTime,
     endTime,
     workLocationId: workLocation.id,
     attendanceLocationIds,
-    status: input.status === 'inactive' ? 'inactive' : 'active'
+    status: input.status === 'inactive' ? 'inactive' : 'active',
+    employeeId,
+    position,
+    supervisorId,
+    assignedEmployeeIds: input.assignedEmployeeIds
   }
 }
 
@@ -167,6 +181,9 @@ async function listShiftRows(companyId?: string, shiftId?: string) {
     .select({
       id: shifts.id,
       companyId: shifts.companyId,
+      name: shifts.name,
+      code: shifts.code,
+      description: shifts.description,
       employeeId: shifts.employeeId,
       position: shifts.position,
       supervisorId: shifts.supervisorId,
@@ -194,7 +211,7 @@ async function listShiftRows(companyId?: string, shiftId?: string) {
       workLocationTimezone: companyLocations.timezone
     })
     .from(shifts)
-    .innerJoin(users, eq(shifts.employeeId, users.id))
+    .leftJoin(users, eq(shifts.employeeId, users.id))
     .leftJoin(departments, eq(users.departmentId, departments.id))
     .innerJoin(companyLocations, eq(shifts.workLocationId, companyLocations.id))
     .leftJoin(supervisor, eq(shifts.supervisorId, supervisor.id))
@@ -205,43 +222,93 @@ async function listShiftRows(companyId?: string, shiftId?: string) {
 async function attachAttendance<T extends { id: string }>(rows: T[]) {
   if (rows.length === 0) return []
 
-  const attendance = await db
-    .select({
-      shiftId: shiftAttendanceLocations.shiftId,
-      id: companyLocations.id,
-      name: companyLocations.name,
-      address: companyLocations.address,
-      city: companyLocations.city,
-      province: companyLocations.province,
-      latitude: companyLocations.latitude,
-      longitude: companyLocations.longitude,
-      radiusMeters: companyLocations.radiusMeters,
-      coordinatesType: companyLocations.coordinatesType,
-      polygonCoordinates: companyLocations.polygonCoordinates,
-      timezone: companyLocations.timezone
-    })
-    .from(shiftAttendanceLocations)
-    .innerJoin(companyLocations, eq(shiftAttendanceLocations.locationId, companyLocations.id))
-    .where(inArray(shiftAttendanceLocations.shiftId, rows.map((row) => row.id)))
-    .orderBy(companyLocations.name)
+  const shiftIds = rows.map((row) => row.id)
 
-  const grouped = new Map<string, typeof attendance>()
+  const [attendance, assignedUsers] = await Promise.all([
+    db
+      .select({
+        shiftId: shiftAttendanceLocations.shiftId,
+        id: companyLocations.id,
+        name: companyLocations.name,
+        address: companyLocations.address,
+        city: companyLocations.city,
+        province: companyLocations.province,
+        latitude: companyLocations.latitude,
+        longitude: companyLocations.longitude,
+        radiusMeters: companyLocations.radiusMeters,
+        coordinatesType: companyLocations.coordinatesType,
+        polygonCoordinates: companyLocations.polygonCoordinates,
+        timezone: companyLocations.timezone
+      })
+      .from(shiftAttendanceLocations)
+      .innerJoin(companyLocations, eq(shiftAttendanceLocations.locationId, companyLocations.id))
+      .where(inArray(shiftAttendanceLocations.shiftId, shiftIds))
+      .orderBy(companyLocations.name),
+
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        position: users.position,
+        status: users.status,
+        shiftId: users.shiftId
+      })
+      .from(users)
+      .where(inArray(users.shiftId, shiftIds))
+      .orderBy(users.name)
+  ])
+
+  const groupedAttendance = new Map<string, typeof attendance>()
   for (const location of attendance) {
-    const list = grouped.get(location.shiftId) ?? []
+    const list = groupedAttendance.get(location.shiftId) ?? []
     list.push(location)
-    grouped.set(location.shiftId, list)
+    groupedAttendance.set(location.shiftId, list)
+  }
+
+  const groupedUsers = new Map<string, typeof assignedUsers>()
+  for (const user of assignedUsers) {
+    if (user.shiftId) {
+      const list = groupedUsers.get(user.shiftId) ?? []
+      list.push(user)
+      groupedUsers.set(user.shiftId, list)
+    }
   }
 
   return rows.map((row) => {
-    const { employeeName, employeeEmail, departmentId, departmentName, departmentCode, supervisorName, supervisorEmail, workLocationName, workLocationAddress, workLocationCity, workLocationProvince, workLocationLatitude, workLocationLongitude, workLocationRadiusMeters, workLocationCoordinatesType, workLocationTimezone, ...shift } = row as T & Record<string, any>
+    const {
+      employeeName,
+      employeeEmail,
+      departmentId,
+      departmentName,
+      departmentCode,
+      supervisorName,
+      supervisorEmail,
+      workLocationName,
+      workLocationAddress,
+      workLocationCity,
+      workLocationProvince,
+      workLocationLatitude,
+      workLocationLongitude,
+      workLocationRadiusMeters,
+      workLocationCoordinatesType,
+      workLocationTimezone,
+      ...shift
+    } = row as T & Record<string, any>
+
+    const assigned = groupedUsers.get(row.id) ?? []
 
     return {
       ...shift,
-      employee: {
-        id: (row as any).employeeId,
-        name: employeeName,
-        email: employeeEmail
-      },
+      assignedCount: assigned.length,
+      assignedEmployees: assigned,
+      employee: (row as any).employeeId && employeeName
+        ? {
+            id: (row as any).employeeId,
+            name: employeeName,
+            email: employeeEmail
+          }
+        : null,
       department: departmentId
         ? { id: departmentId, name: departmentName, code: departmentCode }
         : null,
@@ -260,7 +327,7 @@ async function attachAttendance<T extends { id: string }>(rows: T[]) {
         coordinatesType: workLocationCoordinatesType,
         timezone: workLocationTimezone
       },
-      attendanceLocations: (grouped.get(row.id) ?? []).map((location) => ({
+      attendanceLocations: (groupedAttendance.get(row.id) ?? []).map((location) => ({
         id: location.id,
         name: location.name,
         address: location.address,
@@ -286,14 +353,19 @@ async function getShiftDetail(id: string) {
 
 const shiftBodySchema = {
   body: t.Object({
-    employeeId: t.String(),
-    position: t.String({ minLength: 2, maxLength: 150 }),
-    supervisorId: t.Optional(t.String()),
+    companyId: t.String(),
+    name: t.String({ minLength: 2, maxLength: 150 }),
+    code: t.String({ minLength: 1, maxLength: 50 }),
+    description: t.Optional(t.String()),
     startTime: t.String({ minLength: 5, maxLength: 8 }),
     endTime: t.String({ minLength: 5, maxLength: 8 }),
     workLocationId: t.String(),
     attendanceLocationIds: t.Array(t.String(), { minItems: 1 }),
-    status: t.Optional(t.String())
+    status: t.Optional(t.String()),
+    employeeId: t.Optional(t.String()),
+    position: t.Optional(t.String()),
+    supervisorId: t.Optional(t.String()),
+    assignedEmployeeIds: t.Optional(t.Array(t.String()))
   })
 }
 
@@ -336,12 +408,15 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
         .insert(shifts)
         .values({
           companyId: validated.companyId,
-          employeeId: validated.employeeId,
-          position: validated.position,
-          supervisorId: validated.supervisorId,
+          name: validated.name,
+          code: validated.code,
+          description: validated.description,
           startTime: validated.startTime,
           endTime: validated.endTime,
           workLocationId: validated.workLocationId,
+          employeeId: validated.employeeId,
+          position: validated.position,
+          supervisorId: validated.supervisorId,
           status: validated.status
         })
         .returning()
@@ -353,6 +428,16 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
         }))
       )
 
+      if (validated.assignedEmployeeIds && validated.assignedEmployeeIds.length > 0) {
+        await tx
+          .update(users)
+          .set({ shiftId: shift.id })
+          .where(and(
+            eq(users.companyId, validated.companyId),
+            inArray(users.id, validated.assignedEmployeeIds)
+          ))
+      }
+
       return [shift]
     })
 
@@ -360,7 +445,7 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
     return {
       success: true,
       data: await getShiftDetail(created.id),
-      message: 'Shift karyawan berhasil dibuat.'
+      message: 'Master shift berhasil dibuat.'
     }
   }, shiftBodySchema)
   .post('/', async ({ body, set }) => {
@@ -375,12 +460,15 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
         .insert(shifts)
         .values({
           companyId: validated.companyId,
-          employeeId: validated.employeeId,
-          position: validated.position,
-          supervisorId: validated.supervisorId,
+          name: validated.name,
+          code: validated.code,
+          description: validated.description,
           startTime: validated.startTime,
           endTime: validated.endTime,
           workLocationId: validated.workLocationId,
+          employeeId: validated.employeeId,
+          position: validated.position,
+          supervisorId: validated.supervisorId,
           status: validated.status
         })
         .returning()
@@ -392,6 +480,16 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
         }))
       )
 
+      if (validated.assignedEmployeeIds && validated.assignedEmployeeIds.length > 0) {
+        await tx
+          .update(users)
+          .set({ shiftId: shift.id })
+          .where(and(
+            eq(users.companyId, validated.companyId),
+            inArray(users.id, validated.assignedEmployeeIds)
+          ))
+      }
+
       return [shift]
     })
 
@@ -399,7 +497,7 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
     return {
       success: true,
       data: await getShiftDetail(created.id),
-      message: 'Shift karyawan berhasil dibuat.'
+      message: 'Master shift berhasil dibuat.'
     }
   }, shiftBodySchema)
   .put('/:id', async ({ params, body, set }) => {
@@ -425,12 +523,15 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
         .update(shifts)
         .set({
           companyId: validated.companyId,
-          employeeId: validated.employeeId,
-          position: validated.position,
-          supervisorId: validated.supervisorId,
+          name: validated.name,
+          code: validated.code,
+          description: validated.description,
           startTime: validated.startTime,
           endTime: validated.endTime,
           workLocationId: validated.workLocationId,
+          employeeId: validated.employeeId,
+          position: validated.position,
+          supervisorId: validated.supervisorId,
           status: validated.status,
           updatedAt: new Date()
         })
@@ -446,12 +547,29 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
           locationId
         }))
       )
+
+      if (validated.assignedEmployeeIds !== undefined) {
+        await tx
+          .update(users)
+          .set({ shiftId: null })
+          .where(eq(users.shiftId, params.id))
+
+        if (validated.assignedEmployeeIds.length > 0) {
+          await tx
+            .update(users)
+            .set({ shiftId: params.id })
+            .where(and(
+              eq(users.companyId, validated.companyId),
+              inArray(users.id, validated.assignedEmployeeIds)
+            ))
+        }
+      }
     })
 
     return {
       success: true,
       data: await getShiftDetail(params.id),
-      message: 'Shift karyawan berhasil diperbarui.'
+      message: 'Shift berhasil diperbarui.'
     }
   }, {
     params: t.Object({ id: t.String() }),
@@ -469,8 +587,12 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
       return { success: false, message: 'Shift tidak ditemukan.' }
     }
 
-    await db.delete(shifts).where(eq(shifts.id, params.id))
-    return { success: true, message: 'Shift karyawan berhasil dihapus.' }
+    await db.transaction(async (tx) => {
+      await tx.update(users).set({ shiftId: null }).where(eq(users.shiftId, params.id))
+      await tx.delete(shifts).where(eq(shifts.id, params.id))
+    })
+
+    return { success: true, message: 'Shift berhasil dihapus.' }
   }, {
     params: t.Object({ id: t.String() })
   })

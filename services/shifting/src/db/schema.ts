@@ -9,31 +9,33 @@ import {
 } from 'drizzle-orm/pg-core'
 import { companies, companyLocations, users } from 'auth-service/src/db/schema'
 
-// Shift selalu milik satu karyawan. Posisi dan atasan disimpan pada shift
-// agar penugasan historis tetap utuh saat data karyawan berubah.
+// Master data shift operasional perusahaan. Shift dapat dibuat secara mandiri
+// tanpa harus menunggu data karyawan terdaftar (karyawan akan memilih shift saat dibuat).
 export const shifts = pgTable('shifts', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id')
     .notNull()
     .references(() => companies.id, { onDelete: 'cascade' }),
-  employeeId: uuid('employee_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  position: varchar('position', { length: 150 }).notNull(),
-  supervisorId: uuid('supervisor_id')
-    .references(() => users.id, { onDelete: 'set null' }),
+  name: varchar('name', { length: 150 }).notNull(),
+  code: varchar('code', { length: 50 }).notNull(),
+  description: varchar('description', { length: 255 }),
   startTime: time('start_time').notNull(),
   endTime: time('end_time').notNull(),
   workLocationId: uuid('work_location_id')
     .notNull()
     .references(() => companyLocations.id, { onDelete: 'restrict' }),
+  employeeId: uuid('employee_id')
+    .references(() => users.id, { onDelete: 'set null' }),
+  position: varchar('position', { length: 150 }),
+  supervisorId: uuid('supervisor_id')
+    .references(() => users.id, { onDelete: 'set null' }),
   status: varchar('status', { length: 20 }).default('active').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 }, (table) => [
   index('idx_shifts_company_id').on(table.companyId),
+  index('idx_shifts_code').on(table.code),
   index('idx_shifts_employee_id').on(table.employeeId),
-  index('idx_shifts_supervisor_id').on(table.supervisorId),
   index('idx_shifts_work_location_id').on(table.workLocationId),
   index('idx_shifts_status').on(table.status)
 ])

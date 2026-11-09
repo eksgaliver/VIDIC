@@ -223,13 +223,17 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
 
 ---
 
-## § 7. Layanan Shifting & CRUD Shift Karyawan (`services/shifting`)
+## § 7. Layanan Shifting & CRUD Master Shift (`services/shifting`)
 
 ### 1. Fitur & Tanggung Jawab
 • **Layanan Mikroservis Mandiri (*Autonomous Service*)**:
   Berdiri sendiri pada port `3003` dengan runtime Bun dan framework ElysiaJS. Memiliki koneksi basis data terisolasi, skema Drizzle khusus, dan di-mount ke API Gateway pada prefix `/api/shifting`.
-• **Penugasan Melekat pada Karyawan**:
-  Setiap shift merepresentasikan penugasan operasional satu karyawan aktif (`employeeId`), dengan posisi penugasan, atasan langsung (`supervisorId`), jam mulai (`startTime`), jam selesai (`endTime`), dan lokasi kerja utama (`workLocationId`).
+• **Pembuatan Shift Independen (*Decoupled Master Shifts*)**:
+  Master shift dapat dibuat secara mandiri tanpa harus menunggu adanya karyawan di perusahaan (`canCreate` hanya mensyaratkan perusahaan dan lokasi kerja aktif). Hal ini memungkinkan administrator HR menyiapkan jadwal kerja terlebih dahulu agar langsung tersedia saat menambahkan karyawan baru.
+• **Penugasan Karyawan Bidirectional**:
+  - Kolom `shift_id` pada tabel `users` mengaitkan karyawan langsung ke master shift.
+  - Saat mendaftarkan atau memperbarui karyawan di menu Karyawan, admin dapat memilih shift kerja aktif.
+  - Layanan shift secara otomatis menghitung `assignedCount` dan mengembalikan daftar karyawan yang bertugas pada shift tersebut.
 • **Titik Penting Geolokasi Absensi (*Geofence Attendance*)**:
   - Setiap shift wajib memiliki minimal satu titik lokasi absensi (`attendanceLocationIds`).
   - Mendukung penugasan multi-lokasi (karyawan diizinkan absensi di beberapa kantor cabang yang valid).
@@ -241,14 +245,19 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
 • **Tabel `shifts`**:
   - `id` (UUID PK)
   - `company_id` (FK `companies.id`, `ON DELETE CASCADE`)
-  - `employee_id` (FK `users.id`, `ON DELETE CASCADE`)
-  - `position` (VARCHAR 150)
-  - `supervisor_id` (FK `users.id`, `ON DELETE SET NULL`)
-  - `start_time` (TIME)
-  - `end_time` (TIME)
+  - `name` (VARCHAR 150, Nama shift, misal "Shift Pagi", "Shift Siang", "Shift Malam")
+  - `code` (VARCHAR 50, Kode unik, misal "PAGI", "SIANG", "MALAM")
+  - `description` (VARCHAR 255, Keterangan operasional)
+  - `start_time` (TIME, Jam mulai kerja)
+  - `end_time` (TIME, Jam selesai kerja)
   - `work_location_id` (FK `company_locations.id`, `ON DELETE RESTRICT`)
+  - `employee_id` (FK `users.id`, nullable, `ON DELETE SET NULL`)
+  - `position` (VARCHAR 150, nullable)
+  - `supervisor_id` (FK `users.id`, nullable, `ON DELETE SET NULL`)
   - `status` (VARCHAR 20, default `'active'`)
   - `created_at`, `updated_at` (TIMESTAMPTZ)
+• **Tabel `users` (Pembaruan)**:
+  - `shift_id` (UUID, FK `shifts.id`, `ON DELETE SET NULL`, Berindeks)
 • **Tabel `shift_attendance_locations`**:
   - `id` (UUID PK)
   - `shift_id` (FK `shifts.id`, `ON DELETE CASCADE`)
@@ -257,16 +266,21 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
   - Indeks unik majemuk: `(shift_id, location_id)`
 
 ### 3. Kontrak Endpoint CRUD Shift
-• `GET /api/shifting/shifts`: Mengambil daftar shift dengan filter opsional `?companyId=...`.
-• `GET /api/shifting/shifts/:id`: Mengambil rincian shift tunggal beserta relasi karyawan, atasan, departemen, lokasi kerja, dan titik geofence absensi.
-• `POST /api/shifting/shifts`: Membuat penugasan shift baru dengan validasi integritas jam (HH:mm) dan lokasi absensi.
+• `GET /api/shifting/shifts`: Mengambil daftar master shift beserta relasi lokasi kerja, titik geofence absensi, jumlah karyawan bertugas (`assignedCount`), dan daftar karyawan bertugas (`assignedEmployees`).
+• `GET /api/shifting/shifts/:id`: Mengambil rincian spesifik satu master shift.
+• `POST /api/shifting/shifts`: Membuat master shift baru tanpa keharusan adanya karyawan (hanya membutuhkan nama, kode, jam kerja, lokasi kerja, dan titik geofence absensi).
 • `PUT /api/shifting/shifts/:id`: Memperbarui data shift dan memperbarui relasi lokasi absensi secara transaksional (`db.transaction`).
-• `DELETE /api/shifting/shifts/:id`: Menghapus data shift dan membersihkan relasi lokasi absensi secara otomatis.
+• `DELETE /api/shifting/shifts/:id`: Menghapus data shift dan me-reset penugasan `shift_id` pada karyawan terkait menjadi null.
 
-### 4. Integrasi Frontend (`apps/web/src/routes/shifts.tsx`)
-• Antarmuka tabel daftar shift interaktif dengan avatar inisial, lencana departemen, kartu jam kerja dengan ikon jam, lokasi kerja utama, dan daftar lencana titik geofence absensi.
-• Modal formulir tambah & ubah shift dengan validasi input, pemilih jam HTML5 time picker, pemilih atasan dalam satu perusahaan, dan daftar pilihan titik absensi berbasis kotak centang (*checkbox*).
-• Dialog konfirmasi penghapusan dengan peringatan dampak penghapusan titik absensi terkait.
+### 4. Integrasi Frontend (`apps/web/src/routes/shifts.tsx` & `employees.tsx`)
+• **Halaman Master Shift (`shifts.tsx`)**:
+  - Tombol "Buat Shift" aktif selama perusahaan memiliki lokasi kantor aktif (tidak terblokir oleh ketiadaan karyawan).
+  - Banner informasi bahwa shift dapat dibuat sebelum karyawan didaftarkan.
+  - Formulir dialog pembuatan & pengubahan shift: Nama, Kode, Jam Mulai, Jam Selesai, Lokasi Kerja Utama, Titik Absensi Geofence, Deskripsi, dan penugasan karyawan opsional jika ada karyawan aktif.
+  - Tabel master shift dengan lencana kode, jam kerja, lokasi utama, titik geofence, dan jumlah karyawan bertugas.
+• **Halaman Karyawan (`employees.tsx`)**:
+  - Formulir penambahan & pengubahan karyawan dilengkapi pemilih shift kerja (`SelectField` Shift kerja).
+  - Tabel karyawan menampilkan kolom shift kerja aktif dengan nama shift, kode badge, dan jam kerja.
 
 ---
 

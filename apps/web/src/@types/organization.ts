@@ -67,6 +67,7 @@ export interface Employee {
   companyId: string | null
   departmentId: string | null
   supervisorId: string | null
+  shiftId?: string | null
   name: string
   email: string
   position: string | null
@@ -75,6 +76,13 @@ export interface Employee {
   role: string
   department: Pick<Department, 'id' | 'name' | 'code'> | null
   supervisor: { id: string; name: string; email: string } | null
+  shift?: {
+    id: string
+    name: string
+    code: string
+    startTime: string
+    endTime: string
+  } | null
   createdAt?: string | Date
   updatedAt?: string | Date
 }
@@ -96,16 +104,27 @@ export interface ShiftLocation {
 export interface Shift {
   id: string
   companyId: string
-  employeeId: string
-  position: string
-  supervisorId: string | null
+  name: string
+  code: string
+  description?: string | null
+  employeeId?: string | null
+  position?: string | null
+  supervisorId?: string | null
   startTime: string
   endTime: string
   workLocationId: string
   status: string
-  employee: { id: string; name: string; email: string }
-  department: Pick<Department, 'id' | 'name' | 'code'> | null
-  supervisor: { id: string; name: string; email: string } | null
+  assignedCount: number
+  assignedEmployees: {
+    id: string
+    name: string
+    email: string
+    position?: string | null
+    status: string
+  }[]
+  employee?: { id: string; name: string; email: string } | null
+  department?: Pick<Department, 'id' | 'name' | 'code'> | null
+  supervisor?: { id: string; name: string; email: string } | null
   workLocation: ShiftLocation
   attendanceLocations: ShiftLocation[]
   createdAt?: string | Date

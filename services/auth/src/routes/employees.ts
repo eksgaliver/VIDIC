@@ -1,8 +1,18 @@
 import { Elysia, t } from 'elysia'
 import { and, eq, type SQL } from 'drizzle-orm'
-import { alias } from 'drizzle-orm/pg-core'
+import { alias, pgTable, time, uuid, varchar } from 'drizzle-orm/pg-core'
 import { db } from '../db'
 import { companies, departments, users } from '../db/schema'
+
+// Referensi tabel shifts untuk relasi penugasan shift pada karyawan
+const shifts = pgTable('shifts', {
+  id: uuid('id').primaryKey(),
+  companyId: uuid('company_id'),
+  name: varchar('name', { length: 150 }).notNull(),
+  code: varchar('code', { length: 50 }).notNull(),
+  startTime: time('start_time').notNull(),
+  endTime: time('end_time').notNull()
+})
 
 const INITIAL_PASSWORD = 'password'
 
@@ -12,6 +22,7 @@ interface EmployeeInput {
   position: string
   departmentId: string
   supervisorId?: string
+  shiftId?: string
   status?: string
 }
 
@@ -111,6 +122,10 @@ function mapEmployee(row: Record<string, any>) {
     departmentCode,
     supervisorName,
     supervisorEmail,
+    shiftName,
+    shiftCode,
+    shiftStartTime,
+    shiftEndTime,
     ...employee
   } = row
 
@@ -121,6 +136,15 @@ function mapEmployee(row: Record<string, any>) {
       : null,
     supervisor: employee.supervisorId && supervisorName
       ? { id: employee.supervisorId, name: supervisorName, email: supervisorEmail }
+      : null,
+    shift: employee.shiftId && shiftName
+      ? {
+          id: employee.shiftId,
+          name: shiftName,
+          code: shiftCode,
+          startTime: shiftStartTime,
+          endTime: shiftEndTime
+        }
       : null
   }
 }
@@ -137,6 +161,7 @@ async function listEmployeeRows(companyId?: string, employeeId?: string) {
       companyId: users.companyId,
       departmentId: users.departmentId,
       supervisorId: users.supervisorId,
+      shiftId: users.shiftId,
       name: users.name,
       email: users.email,
       position: users.position,
@@ -148,11 +173,16 @@ async function listEmployeeRows(companyId?: string, employeeId?: string) {
       departmentName: departments.name,
       departmentCode: departments.code,
       supervisorName: supervisor.name,
-      supervisorEmail: supervisor.email
+      supervisorEmail: supervisor.email,
+      shiftName: shifts.name,
+      shiftCode: shifts.code,
+      shiftStartTime: shifts.startTime,
+      shiftEndTime: shifts.endTime
     })
     .from(users)
     .leftJoin(departments, eq(users.departmentId, departments.id))
     .leftJoin(supervisor, eq(users.supervisorId, supervisor.id))
+    .leftJoin(shifts, eq(users.shiftId, shifts.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(users.name)
 }
@@ -169,7 +199,8 @@ const createEmployeeSchema = {
     email: t.String({ format: 'email' }),
     position: t.String({ minLength: 2, maxLength: 150 }),
     departmentId: t.String(),
-    supervisorId: t.Optional(t.String())
+    supervisorId: t.Optional(t.String()),
+    shiftId: t.Optional(t.String())
   })
 }
 
@@ -180,6 +211,7 @@ const updateEmployeeSchema = {
     position: t.String({ minLength: 2, maxLength: 150 }),
     departmentId: t.String(),
     supervisorId: t.Optional(t.String()),
+    shiftId: t.Optional(t.String()),
     status: t.Optional(t.String())
   })
 }
@@ -242,12 +274,15 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       cost: 10
     })
 
+    const shiftId = body.shiftId?.trim() || null
+
     const [created] = await db
       .insert(users)
       .values({
         companyId: body.companyId,
         departmentId: body.departmentId,
         supervisorId: validated.supervisorId,
+        shiftId,
         name,
         email,
         position,
@@ -296,12 +331,15 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       cost: 10
     })
 
+    const shiftId = body.shiftId?.trim() || null
+
     const [created] = await db
       .insert(users)
       .values({
         companyId: body.companyId,
         departmentId: body.departmentId,
         supervisorId: validated.supervisorId,
+        shiftId,
         name,
         email,
         position,
@@ -361,6 +399,8 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       return { success: false, message: validated.message }
     }
 
+    const shiftId = body.shiftId !== undefined ? (body.shiftId?.trim() || null) : undefined
+
     await db
       .update(users)
       .set({
@@ -369,6 +409,7 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
         position: body.position.trim(),
         departmentId: body.departmentId,
         supervisorId: validated.supervisorId,
+        ...(shiftId !== undefined ? { shiftId } : {}),
         status: body.status === 'inactive' ? 'inactive' : 'active',
         updatedAt: new Date()
       })

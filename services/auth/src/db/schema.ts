@@ -78,6 +78,7 @@ export const users = pgTable('users', {
   avatarUrl: text('avatar_url'),
   position: varchar('position', { length: 150 }),
   supervisorId: uuid('supervisor_id').references((): AnyPgColumn => users.id, { onDelete: 'set null' }),
+  shiftId: uuid('shift_id'),
   status: varchar('status', { length: 20 }).default('active').notNull(),
   role: varchar('role', { length: 50 }).default('member').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -87,6 +88,7 @@ export const users = pgTable('users', {
   index('idx_auth_users_company_id').on(table.companyId),
   index('idx_auth_users_department_id').on(table.departmentId),
   index('idx_auth_users_supervisor_id').on(table.supervisorId),
+  index('idx_auth_users_shift_id').on(table.shiftId),
   index('idx_auth_users_status').on(table.status)
 ])
 

@@ -7,6 +7,7 @@ import {
   HiOutlinePencil,
   HiOutlinePlus,
   HiOutlineTrash,
+  HiOutlineUserGroup,
 } from 'react-icons/hi'
 import { authenticatedRoute } from './_authenticated'
 import { api } from '@/lib/api'
@@ -30,7 +31,7 @@ import {
   TextField,
 } from '@/components/base'
 import { errorText } from '@/utils/apiError'
-import type { Company, CompanyLocation, Employee, Shift, ShiftLocation } from '@/@types/organization'
+import type { Company, Employee, Shift, ShiftLocation } from '@/@types/organization'
 import {
   COMPANIES_PATH,
   EMPLOYEES_PATH,
@@ -48,18 +49,17 @@ const SHIFT_STATUSES = [
   { value: 'inactive', label: 'Nonaktif' },
 ]
 
-const INITIAL_CREATE_FORM = {
-  employeeId: '',
-  position: '',
-  supervisorId: '',
+const INITIAL_FORM = {
+  name: '',
+  code: '',
+  description: '',
   startTime: '08:00',
   endTime: '17:00',
   workLocationId: '',
   attendanceLocationIds: [] as string[],
   status: 'active',
+  assignedEmployeeIds: [] as string[],
 }
-
-const INITIAL_EDIT_FORM = { ...INITIAL_CREATE_FORM }
 
 function displayTime(value: string) {
   return value?.slice(0, 5) || '—'
@@ -67,18 +67,6 @@ function displayTime(value: string) {
 
 function isOvernight(startTime: string, endTime: string) {
   return endTime <= startTime
-}
-
-function initials(name: string) {
-  return (
-    name
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase() || 'KR'
-  )
 }
 
 function locationLine(location: ShiftLocation) {
@@ -95,11 +83,11 @@ export function ShiftsPage() {
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null)
 
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
-  const [createForm, setCreateForm] = React.useState(INITIAL_CREATE_FORM)
+  const [createForm, setCreateForm] = React.useState(INITIAL_FORM)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const [editItem, setEditItem] = React.useState<Shift | null>(null)
-  const [editForm, setEditForm] = React.useState(INITIAL_EDIT_FORM)
+  const [editForm, setEditForm] = React.useState(INITIAL_FORM)
 
   const [deleteItem, setDeleteItem] = React.useState<Shift | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
@@ -110,10 +98,6 @@ export function ShiftsPage() {
   )
   const primaryLocation = locations.find((location) => location.isPrimary) ?? locations[0]
   const activeEmployees = employees.filter((employee) => employee.status === 'active')
-
-  const supervisorOptions = employees.filter(
-    (employee) => employee.status === 'active' && employee.id !== createForm.employeeId
-  )
 
   const fetchCompanies = React.useCallback(async () => {
     try {
@@ -144,7 +128,6 @@ export function ShiftsPage() {
       ])
 
       if (employeesRes.error) {
-        setErrorMsg(errorText(employeesRes, 'Gagal memuat data karyawan.'))
         setEmployees([])
       } else {
         setEmployees(
@@ -181,39 +164,16 @@ export function ShiftsPage() {
     }
   }, [selectedCompanyId, fetchShiftData])
 
-  const applyEmployeeDefaults = (
-    employeeId: string,
-    form: typeof INITIAL_CREATE_FORM
-  ) => {
-    const employee = employees.find((item) => item.id === employeeId)
-    return {
-      ...form,
-      employeeId,
-      position: employee?.position ?? form.position,
-      supervisorId: employee?.supervisorId ?? '',
-    }
-  }
-
   const openCreate = () => {
     setErrorMsg(null)
     setSuccessMsg(null)
 
-    const firstEmployee = activeEmployees[0]
-    const base = {
-      ...INITIAL_CREATE_FORM,
-      employeeId: firstEmployee?.id ?? '',
-      position: firstEmployee?.position ?? '',
-      supervisorId: firstEmployee?.supervisorId ?? '',
+    setCreateForm({
+      ...INITIAL_FORM,
       workLocationId: primaryLocation?.id ?? '',
       attendanceLocationIds: primaryLocation ? [primaryLocation.id] : [],
-    }
-
-    setCreateForm(base)
+    })
     setIsCreateOpen(true)
-  }
-
-  const handleCreateEmployeeChange = (employeeId: string) => {
-    setCreateForm((current) => applyEmployeeDefaults(employeeId, current))
   }
 
   const toggleCreateAttendance = (locationId: string, checked: boolean) => {
@@ -225,9 +185,30 @@ export function ShiftsPage() {
     }))
   }
 
+  const toggleCreateEmployee = (employeeId: string, checked: boolean) => {
+    setCreateForm((current) => ({
+      ...current,
+      assignedEmployeeIds: checked
+        ? [...new Set([...current.assignedEmployeeIds, employeeId])]
+        : current.assignedEmployeeIds.filter((id) => id !== employeeId),
+    }))
+  }
+
   const handleCreateSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
 
+    if (!createForm.name.trim()) {
+      setErrorMsg('Nama shift wajib diisi.')
+      return
+    }
+    if (!createForm.code.trim()) {
+      setErrorMsg('Kode shift wajib diisi.')
+      return
+    }
+    if (!createForm.workLocationId) {
+      setErrorMsg('Pilih lokasi kerja utama.')
+      return
+    }
     if (createForm.attendanceLocationIds.length === 0) {
       setErrorMsg('Pilih minimal satu lokasi absensi.')
       return
@@ -238,14 +219,19 @@ export function ShiftsPage() {
 
     try {
       const res = await api.shifting.shifts.post({
-        employeeId: createForm.employeeId,
-        position: createForm.position.trim(),
-        supervisorId: createForm.supervisorId || undefined,
+        companyId: selectedCompanyId,
+        name: createForm.name.trim(),
+        code: createForm.code.trim().toUpperCase(),
+        description: createForm.description.trim() || undefined,
         startTime: createForm.startTime,
         endTime: createForm.endTime,
         workLocationId: createForm.workLocationId,
         attendanceLocationIds: createForm.attendanceLocationIds,
         status: createForm.status,
+        assignedEmployeeIds:
+          createForm.assignedEmployeeIds.length > 0
+            ? createForm.assignedEmployeeIds
+            : undefined,
       })
 
       if (res.error) {
@@ -253,7 +239,7 @@ export function ShiftsPage() {
         return
       }
 
-      setSuccessMsg('Shift karyawan berhasil dibuat.')
+      setSuccessMsg('Master shift berhasil dibuat.')
       setIsCreateOpen(false)
       fetchShiftData(selectedCompanyId)
     } catch {
@@ -268,19 +254,16 @@ export function ShiftsPage() {
     setSuccessMsg(null)
     setEditItem(shift)
     setEditForm({
-      employeeId: shift.employeeId,
-      position: shift.position,
-      supervisorId: shift.supervisorId ?? '',
+      name: shift.name,
+      code: shift.code,
+      description: shift.description ?? '',
       startTime: displayTime(shift.startTime),
       endTime: displayTime(shift.endTime),
       workLocationId: shift.workLocationId,
       attendanceLocationIds: shift.attendanceLocations.map((location) => location.id),
       status: shift.status,
+      assignedEmployeeIds: shift.assignedEmployees?.map((emp) => emp.id) ?? [],
     })
-  }
-
-  const handleEditEmployeeChange = (employeeId: string) => {
-    setEditForm((current) => applyEmployeeDefaults(employeeId, current))
   }
 
   const toggleEditAttendance = (locationId: string, checked: boolean) => {
@@ -292,10 +275,31 @@ export function ShiftsPage() {
     }))
   }
 
+  const toggleEditEmployee = (employeeId: string, checked: boolean) => {
+    setEditForm((current) => ({
+      ...current,
+      assignedEmployeeIds: checked
+        ? [...new Set([...current.assignedEmployeeIds, employeeId])]
+        : current.assignedEmployeeIds.filter((id) => id !== employeeId),
+    }))
+  }
+
   const handleEditSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!editItem) return
 
+    if (!editForm.name.trim()) {
+      setErrorMsg('Nama shift wajib diisi.')
+      return
+    }
+    if (!editForm.code.trim()) {
+      setErrorMsg('Kode shift wajib diisi.')
+      return
+    }
+    if (!editForm.workLocationId) {
+      setErrorMsg('Pilih lokasi kerja utama.')
+      return
+    }
     if (editForm.attendanceLocationIds.length === 0) {
       setErrorMsg('Pilih minimal satu lokasi absensi.')
       return
@@ -306,14 +310,16 @@ export function ShiftsPage() {
 
     try {
       const res = await api.shifting.shifts({ id: editItem.id }).put({
-        employeeId: editForm.employeeId,
-        position: editForm.position.trim(),
-        supervisorId: editForm.supervisorId || undefined,
+        companyId: selectedCompanyId,
+        name: editForm.name.trim(),
+        code: editForm.code.trim().toUpperCase(),
+        description: editForm.description.trim() || undefined,
         startTime: editForm.startTime,
         endTime: editForm.endTime,
         workLocationId: editForm.workLocationId,
         attendanceLocationIds: editForm.attendanceLocationIds,
         status: editForm.status,
+        assignedEmployeeIds: editForm.assignedEmployeeIds,
       })
 
       if (res.error) {
@@ -321,7 +327,7 @@ export function ShiftsPage() {
         return
       }
 
-      setSuccessMsg('Shift karyawan berhasil diperbarui.')
+      setSuccessMsg('Master shift berhasil diperbarui.')
       setEditItem(null)
       fetchShiftData(selectedCompanyId)
     } catch {
@@ -344,7 +350,7 @@ export function ShiftsPage() {
         return
       }
 
-      setSuccessMsg('Shift karyawan berhasil dihapus.')
+      setSuccessMsg('Shift berhasil dihapus.')
       setDeleteItem(null)
       fetchShiftData(selectedCompanyId)
     } catch {
@@ -354,14 +360,14 @@ export function ShiftsPage() {
     }
   }
 
-  const canCreate =
-    Boolean(selectedCompanyId) && activeEmployees.length > 0 && locations.length > 0
+  // Shift dapat dibuat secara mandiri tanpa harus ada karyawan terlebih dahulu
+  const canCreate = Boolean(selectedCompanyId) && locations.length > 0
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Shift Karyawan"
-        description="Satu shift melekat pada satu karyawan. Tentukan jam kerja, lokasi kerja, posisi, atasan, dan titik geofence absensi."
+        title="Master Shift Operasional"
+        description="Kelola shift kerja perusahaan (jam mulai, jam selesai, lokasi kerja, dan geofence absensi). Shift dapat dibuat sebelum karyawan didaftarkan."
         actions={
           <Button
             tone="primary"
@@ -390,7 +396,7 @@ export function ShiftsPage() {
         <Panel>
           <EmptyState
             title="Belum ada badan usaha"
-            description="Shift membutuhkan karyawan dan lokasi geofence. Daftarkan perusahaan terlebih dahulu."
+            description="Shift membutuhkan entitas perusahaan dan lokasi kerja. Daftarkan perusahaan terlebih dahulu."
             action={
               <Link to={COMPANIES_PATH} className="inline-flex">
                 <Button tone="primary" icon={<HiOutlineArrowRight className="h-4 w-4" />}>
@@ -420,36 +426,36 @@ export function ShiftsPage() {
               <p className="pb-1 text-xs text-ink-2 sm:pb-2 sm:text-[13px] 2xl:text-sm">
                 <span className="font-mono font-bold text-ink">{selectedCompany.code}</span>
                 {' · '}
-                {isLoading ? 'memuat' : `${shifts.length} shift`}
+                {isLoading ? 'memuat' : `${shifts.length} shift terdaftar`}
                 {' · '}
                 {activeEmployees.length} karyawan aktif
                 {' · '}
-                {locations.length} lokasi absensi
+                {locations.length} titik geofence
               </p>
             ) : null}
           </div>
 
-          {activeEmployees.length === 0 && !isLoading ? (
-            <Notice tone="info" title="Karyawan aktif belum tersedia">
-              Tambahkan karyawan aktif terlebih dahulu sebelum menyusun shift.{' '}
+          {locations.length === 0 && !isLoading ? (
+            <Notice tone="info" title="Lokasi kantor belum tersedia">
+              Shift membutuhkan minimal satu lokasi kantor dan titik geofence absensi.{' '}
               <Link
-                to={EMPLOYEES_PATH}
+                to={COMPANIES_PATH}
                 className="font-semibold text-primary underline-offset-4 hover:underline"
               >
-                Buka halaman karyawan
+                Atur lokasi kantor perusahaan
               </Link>
               .
             </Notice>
           ) : null}
 
-          {locations.length === 0 && !isLoading ? (
-            <Notice tone="info" title="Lokasi geofence belum tersedia">
-              Shift membutuhkan minimal satu lokasi kerja dan lokasi absensi.{' '}
+          {activeEmployees.length === 0 && !isLoading && locations.length > 0 ? (
+            <Notice tone="info" title="Master Shift Mandiri">
+              Perusahaan ini belum memiliki karyawan. Anda dapat membuat master shift terlebih dahulu agar langsung siap dipilih saat pendaftaran karyawan.{' '}
               <Link
-                to={COMPANIES_PATH}
+                to={EMPLOYEES_PATH}
                 className="font-semibold text-primary underline-offset-4 hover:underline"
               >
-                Atur lokasi perusahaan
+                Buka menu karyawan
               </Link>
               .
             </Notice>
@@ -457,9 +463,9 @@ export function ShiftsPage() {
 
           <Panel>
             <PanelHeader
-              title="Penugasan shift"
-              description="Titik absensi memakai koordinat dan radius geofence dari lokasi perusahaan."
-              meta={isLoading ? undefined : `${shifts.length} penugasan`}
+              title="Daftar Master Shift"
+              description="Shift mengikat jadwal jam kerja operasional dan titik geofence presensi yang diizinkan."
+              meta={isLoading ? undefined : `${shifts.length} shift`}
             />
 
             {isLoading ? (
@@ -469,8 +475,8 @@ export function ShiftsPage() {
                 title="Belum ada shift"
                 description={
                   canCreate
-                    ? `Buat penugasan shift pertama untuk ${selectedCompany?.name ?? 'perusahaan ini'}.`
-                    : 'Lengkapi karyawan aktif dan lokasi perusahaan untuk mulai membuat shift.'
+                    ? `Buat master shift pertama untuk ${selectedCompany?.name ?? 'perusahaan ini'}.`
+                    : 'Lengkapi lokasi kantor perusahaan untuk mulai membuat shift.'
                 }
                 action={
                   canCreate ? (
@@ -489,11 +495,11 @@ export function ShiftsPage() {
                 <table className="w-full min-w-[1040px] border-collapse text-left text-[13px] 2xl:text-sm">
                   <thead>
                     <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">
-                      <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Karyawan</th>
+                      <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Nama & Kode Shift</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Jam kerja</th>
-                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Lokasi kerja</th>
-                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Titik absensi</th>
-                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Atasan</th>
+                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Lokasi kerja utama</th>
+                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Titik absensi (Geofence)</th>
+                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Karyawan bertugas</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Status</th>
                       <th className="px-4 py-2.5 text-right font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Aksi</th>
                     </tr>
@@ -502,19 +508,14 @@ export function ShiftsPage() {
                     {shifts.map((shift) => (
                       <tr key={shift.id} className="transition-colors hover:bg-surface-2">
                         <td className="px-4 py-3.5 align-top sm:px-5 2xl:px-7 2xl:py-4">
-                          <div className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-[11px] font-bold text-primary">
-                              {initials(shift.employee.name)}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold text-ink">{shift.employee.name}</p>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                <span className="text-xs text-ink-2">{shift.position}</span>
-                                {shift.department ? (
-                                  <Badge tone="accent">{shift.department.code}</Badge>
-                                ) : null}
-                              </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-ink">{shift.name}</p>
+                              <Badge tone="accent">{shift.code}</Badge>
                             </div>
+                            {shift.description ? (
+                              <p className="mt-0.5 text-xs text-ink-3 truncate max-w-xs">{shift.description}</p>
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-4 py-3.5 align-top 2xl:py-4">
@@ -525,7 +526,7 @@ export function ShiftsPage() {
                             </span>
                           </div>
                           {isOvernight(shift.startTime, shift.endTime) ? (
-                            <p className="mt-1 text-[11px] text-ink-3">Melewati tengah malam</p>
+                            <p className="mt-1 text-[11px] font-medium text-amber-600">Melewati tengah malam</p>
                           ) : null}
                         </td>
                         <td className="px-4 py-3.5 align-top 2xl:py-4">
@@ -546,19 +547,24 @@ export function ShiftsPage() {
                           <ul className="mt-1 space-y-0.5">
                             {shift.attendanceLocations.map((location) => (
                               <li key={location.id} className="truncate text-xs text-ink-2">
-                                {location.name}
+                                • {location.name} ({location.city})
                               </li>
                             ))}
                           </ul>
                         </td>
                         <td className="px-4 py-3.5 align-top text-ink-2 2xl:py-4">
-                          {shift.supervisor ? (
-                            <div>
-                              <p className="font-medium text-ink">{shift.supervisor.name}</p>
-                              <p className="text-xs text-ink-3">Atasan langsung</p>
-                            </div>
+                          <div className="flex items-center gap-1.5">
+                            <HiOutlineUserGroup className="h-4 w-4 text-ink-3 shrink-0" />
+                            <span className="text-xs font-medium text-ink">
+                              {shift.assignedCount ?? shift.assignedEmployees?.length ?? 0} karyawan
+                            </span>
+                          </div>
+                          {shift.assignedEmployees && shift.assignedEmployees.length > 0 ? (
+                            <p className="mt-1 text-xs text-ink-3 truncate max-w-[200px]">
+                              {shift.assignedEmployees.map((e) => e.name).join(', ')}
+                            </p>
                           ) : (
-                            <span className="text-xs font-medium text-ink-3">Independen</span>
+                            <p className="mt-1 text-xs text-ink-3 italic">Belum ada penugasan</p>
                           )}
                         </td>
                         <td className="px-4 py-3.5 align-top 2xl:py-4">
@@ -570,7 +576,7 @@ export function ShiftsPage() {
                               size="iconSm"
                               tone="quiet"
                               onClick={() => openEdit(shift)}
-                              aria-label={`Ubah shift ${shift.employee.name}`}
+                              aria-label={`Ubah shift ${shift.name}`}
                               title="Ubah shift"
                             >
                               <HiOutlinePencil className="h-4 w-4" />
@@ -584,7 +590,7 @@ export function ShiftsPage() {
                                 setSuccessMsg(null)
                                 setDeleteItem(shift)
                               }}
-                              aria-label={`Hapus shift ${shift.employee.name}`}
+                              aria-label={`Hapus shift ${shift.name}`}
                               title="Hapus shift"
                             >
                               <HiOutlineTrash className="h-4 w-4" />
@@ -601,6 +607,7 @@ export function ShiftsPage() {
         </>
       )}
 
+      {/* Dialog Buat Shift */}
       <Dialog
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
@@ -608,8 +615,8 @@ export function ShiftsPage() {
         width={720}
       >
         <DialogHeading
-          title="Buat Shift Karyawan"
-          description="Posisi dan atasan mengikuti data karyawan saat dipilih, lalu dapat disesuaikan untuk shift ini."
+          title="Buat Master Shift"
+          description="Tentukan nama shift, kode identifikasi, jam kerja operasional, dan titik absensi geofence yang diizinkan."
         />
         <form onSubmit={handleCreateSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogBody className="px-4 py-5 sm:px-5">
@@ -621,35 +628,22 @@ export function ShiftsPage() {
 
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <SelectField
-                  label="Karyawan"
-                  value={createForm.employeeId}
-                  onChange={(event) => handleCreateEmployeeChange(event.target.value)}
-                  required
-                >
-                  <option value="" disabled>
-                    Pilih karyawan
-                  </option>
-                  {employees.map((employee) => (
-                    <option
-                      key={employee.id}
-                      value={employee.id}
-                      disabled={employee.status !== 'active'}
-                    >
-                      {employee.name}
-                      {employee.department ? ` — ${employee.department.name}` : ''}
-                      {employee.status !== 'active' ? ' (nonaktif)' : ''}
-                    </option>
-                  ))}
-                </SelectField>
-
                 <TextField
-                  label="Posisi kerja pada shift"
-                  value={createForm.position}
+                  label="Nama shift"
+                  value={createForm.name}
                   onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, position: event.target.value }))
+                    setCreateForm((current) => ({ ...current, name: event.target.value }))
                   }
-                  placeholder="Posisi saat menjalankan shift"
+                  placeholder="Misal: Shift Reguler Pagi, Shift Malam"
+                  required
+                />
+                <TextField
+                  label="Kode shift"
+                  value={createForm.code}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
+                  }
+                  placeholder="Misal: SH-PAGI, REG-01, MALAM"
                   required
                 />
               </div>
@@ -672,24 +666,26 @@ export function ShiftsPage() {
                     setCreateForm((current) => ({ ...current, endTime: event.target.value }))
                   }
                   required
-                  hint="Jika jam selesai lebih awal, shift dianggap melewati tengah malam."
+                  hint="Jika jam selesai lebih awal, shift otomatis dihitung melewati tengah malam."
                 />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <SelectField
-                  label="Atasan pada shift"
-                  value={createForm.supervisorId}
+                  label="Lokasi kerja utama"
+                  value={createForm.workLocationId}
                   onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, supervisorId: event.target.value }))
+                    setCreateForm((current) => ({ ...current, workLocationId: event.target.value }))
                   }
-                  hint="Kosongkan jika karyawan independen."
+                  required
+                  hint="Titik kantor tempat shift ini berpusat."
                 >
-                  <option value="">Tidak ada atasan (independen)</option>
-                  {supervisorOptions.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.name}
-                      {employee.position ? ` — ${employee.position}` : ''}
+                  <option value="" disabled>
+                    Pilih lokasi kerja
+                  </option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {locationLine(location)}
                     </option>
                   ))}
                 </SelectField>
@@ -709,41 +705,31 @@ export function ShiftsPage() {
                 </SelectField>
               </div>
 
-              <SelectField
-                label="Lokasi kerja"
-                value={createForm.workLocationId}
+              <TextField
+                label="Keterangan / Deskripsi (opsional)"
+                value={createForm.description}
                 onChange={(event) =>
-                  setCreateForm((current) => ({ ...current, workLocationId: event.target.value }))
+                  setCreateForm((current) => ({ ...current, description: event.target.value }))
                 }
-                required
-                hint="Lokasi tempat karyawan menjalankan pekerjaan pada shift ini."
-              >
-                <option value="" disabled>
-                  Pilih lokasi kerja
-                </option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {locationLine(location)}
-                  </option>
-                ))}
-              </SelectField>
+                placeholder="Catatan operasional shift, toleransi presensi, atau penugasan khusus"
+              />
 
               <div className="space-y-2.5">
                 <div>
                   <p className="text-xs font-semibold text-ink-2">
-                    Lokasi absensi (geofence)
+                    Lokasi absensi berizin (Geofence)
                     <span className="ml-1 text-error" aria-hidden="true">
                       *
                     </span>
                   </p>
                   <p className="mt-1 text-[11px] leading-snug text-ink-3">
-                    Pilih minimal satu titik. Karyawan dapat absen di lebih dari satu lokasi.
+                    Pilih minimal satu titik lokasi kantor. Karyawan yang menggunakan shift ini dapat melakukan presensi di lokasi yang dicentang.
                   </p>
                 </div>
 
                 {locations.length === 0 ? (
                   <p className="rounded-control border border-dashed border-line px-3 py-3 text-xs text-ink-3">
-                    Belum ada lokasi aktif. Atur lokasi perusahaan terlebih dahulu.
+                    Belum ada lokasi kantor aktif. Atur lokasi perusahaan terlebih dahulu.
                   </p>
                 ) : (
                   <div className="grid gap-2.5 rounded-panel border border-line p-3 sm:grid-cols-2">
@@ -755,12 +741,39 @@ export function ShiftsPage() {
                         onChange={(event) =>
                           toggleCreateAttendance(location.id, event.target.checked)
                         }
-                        hint={`${location.city} · radius ${location.radiusMeters} m · ${location.address}`}
+                        hint={`${location.city} · radius ${location.radiusMeters} m`}
                       />
                     ))}
                   </div>
                 )}
               </div>
+
+              {activeEmployees.length > 0 ? (
+                <div className="space-y-2.5 border-t border-line pt-4">
+                  <div>
+                    <p className="text-xs font-semibold text-ink-2">
+                      Tetapkan ke karyawan aktif saat ini (opsional)
+                    </p>
+                    <p className="mt-1 text-[11px] leading-snug text-ink-3">
+                      Anda dapat langsung menugaskan karyawan ke shift ini sekarang, atau melakukannya nanti di halaman pendaftaran karyawan.
+                    </p>
+                  </div>
+
+                  <div className="grid max-h-48 gap-2 overflow-y-auto rounded-panel border border-line p-3 sm:grid-cols-2">
+                    {activeEmployees.map((employee) => (
+                      <CheckboxField
+                        key={employee.id}
+                        label={employee.name}
+                        checked={createForm.assignedEmployeeIds.includes(employee.id)}
+                        onChange={(event) =>
+                          toggleCreateEmployee(employee.id, event.target.checked)
+                        }
+                        hint={`${employee.position || 'Staf'} ${employee.department ? `· ${employee.department.name}` : ''}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </DialogBody>
 
@@ -780,6 +793,7 @@ export function ShiftsPage() {
         </form>
       </Dialog>
 
+      {/* Dialog Ubah Shift */}
       <Dialog
         isOpen={!!editItem}
         onClose={() => setEditItem(null)}
@@ -787,8 +801,8 @@ export function ShiftsPage() {
         width={720}
       >
         <DialogHeading
-          title={`Ubah Shift ${editItem?.employee.name ?? ''}`}
-          description="Perubahan berlaku pada penugasan shift ini saja, bukan pada seluruh karyawan."
+          title={`Ubah Shift ${editItem?.name ?? ''}`}
+          description="Sesuaikan jam operasional, lokasi kantor, dan titik absensi geofence."
         />
         <form onSubmit={handleEditSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogBody className="px-4 py-5 sm:px-5">
@@ -800,33 +814,19 @@ export function ShiftsPage() {
 
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <SelectField
-                  label="Karyawan"
-                  value={editForm.employeeId}
-                  onChange={(event) => handleEditEmployeeChange(event.target.value)}
-                  required
-                >
-                  <option value="" disabled>
-                    Pilih karyawan
-                  </option>
-                  {employees.map((employee) => (
-                    <option
-                      key={employee.id}
-                      value={employee.id}
-                      disabled={employee.status !== 'active' && employee.id !== editForm.employeeId}
-                    >
-                      {employee.name}
-                      {employee.department ? ` — ${employee.department.name}` : ''}
-                      {employee.status !== 'active' ? ' (nonaktif)' : ''}
-                    </option>
-                  ))}
-                </SelectField>
-
                 <TextField
-                  label="Posisi kerja pada shift"
-                  value={editForm.position}
+                  label="Nama shift"
+                  value={editForm.name}
                   onChange={(event) =>
-                    setEditForm((current) => ({ ...current, position: event.target.value }))
+                    setEditForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                  required
+                />
+                <TextField
+                  label="Kode shift"
+                  value={editForm.code}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
                   }
                   required
                 />
@@ -850,31 +850,27 @@ export function ShiftsPage() {
                     setEditForm((current) => ({ ...current, endTime: event.target.value }))
                   }
                   required
-                  hint="Jika jam selesai lebih awal, shift dianggap melewati tengah malam."
+                  hint="Jika jam selesai lebih awal, shift otomatis dihitung melewati tengah malam."
                 />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <SelectField
-                  label="Atasan pada shift"
-                  value={editForm.supervisorId}
+                  label="Lokasi kerja utama"
+                  value={editForm.workLocationId}
                   onChange={(event) =>
-                    setEditForm((current) => ({ ...current, supervisorId: event.target.value }))
+                    setEditForm((current) => ({ ...current, workLocationId: event.target.value }))
                   }
-                  hint="Kosongkan jika karyawan independen."
+                  required
                 >
-                  <option value="">Tidak ada atasan (independen)</option>
-                  {employees
-                    .filter(
-                      (employee) =>
-                        employee.status === 'active' && employee.id !== editForm.employeeId
-                    )
-                    .map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {employee.name}
-                        {employee.position ? ` — ${employee.position}` : ''}
-                      </option>
-                    ))}
+                  <option value="" disabled>
+                    Pilih lokasi kerja
+                  </option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {locationLine(location)}
+                    </option>
+                  ))}
                 </SelectField>
 
                 <SelectField
@@ -892,34 +888,24 @@ export function ShiftsPage() {
                 </SelectField>
               </div>
 
-              <SelectField
-                label="Lokasi kerja"
-                value={editForm.workLocationId}
+              <TextField
+                label="Keterangan / Deskripsi (opsional)"
+                value={editForm.description}
                 onChange={(event) =>
-                  setEditForm((current) => ({ ...current, workLocationId: event.target.value }))
+                  setEditForm((current) => ({ ...current, description: event.target.value }))
                 }
-                required
-              >
-                <option value="" disabled>
-                  Pilih lokasi kerja
-                </option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {locationLine(location)}
-                  </option>
-                ))}
-              </SelectField>
+              />
 
               <div className="space-y-2.5">
                 <div>
                   <p className="text-xs font-semibold text-ink-2">
-                    Lokasi absensi (geofence)
+                    Lokasi absensi berizin (Geofence)
                     <span className="ml-1 text-error" aria-hidden="true">
                       *
                     </span>
                   </p>
                   <p className="mt-1 text-[11px] leading-snug text-ink-3">
-                    Pilih minimal satu titik. Perubahan langsung mengganti daftar titik untuk shift ini.
+                    Pilih minimal satu titik lokasi kantor untuk presensi shift ini.
                   </p>
                 </div>
 
@@ -932,11 +918,38 @@ export function ShiftsPage() {
                       onChange={(event) =>
                         toggleEditAttendance(location.id, event.target.checked)
                       }
-                      hint={`${location.city} · radius ${location.radiusMeters} m · ${location.address}`}
+                      hint={`${location.city} · radius ${location.radiusMeters} m`}
                     />
                   ))}
                 </div>
               </div>
+
+              {activeEmployees.length > 0 ? (
+                <div className="space-y-2.5 border-t border-line pt-4">
+                  <div>
+                    <p className="text-xs font-semibold text-ink-2">
+                      Karyawan yang ditugaskan pada shift ini
+                    </p>
+                    <p className="mt-1 text-[11px] leading-snug text-ink-3">
+                      Centang karyawan yang mengikuti shift operasional ini.
+                    </p>
+                  </div>
+
+                  <div className="grid max-h-48 gap-2 overflow-y-auto rounded-panel border border-line p-3 sm:grid-cols-2">
+                    {activeEmployees.map((employee) => (
+                      <CheckboxField
+                        key={employee.id}
+                        label={employee.name}
+                        checked={editForm.assignedEmployeeIds.includes(employee.id)}
+                        onChange={(event) =>
+                          toggleEditEmployee(employee.id, event.target.checked)
+                        }
+                        hint={`${employee.position || 'Staf'} ${employee.department ? `· ${employee.department.name}` : ''}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </DialogBody>
 
@@ -956,10 +969,11 @@ export function ShiftsPage() {
         </form>
       </Dialog>
 
+      {/* Konfirmasi Hapus */}
       <ConfirmDialog
         isOpen={!!deleteItem}
         type="danger"
-        title="Hapus Shift"
+        title="Hapus Master Shift"
         confirmText={isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
         cancelText="Batal"
         onClose={() => setDeleteItem(null)}
@@ -967,9 +981,9 @@ export function ShiftsPage() {
         onConfirm={handleConfirmDelete}
       >
         <p>
-          Hapus shift <strong className="font-semibold text-ink">{deleteItem?.employee.name}</strong>{' '}
-          pada {displayTime(deleteItem?.startTime ?? '')} — {displayTime(deleteItem?.endTime ?? '')}?
-          Titik absensi pada shift ini ikut dihapus.
+          Hapus master shift <strong className="font-semibold text-ink">{deleteItem?.name}</strong>{' '}
+          ({displayTime(deleteItem?.startTime ?? '')} — {displayTime(deleteItem?.endTime ?? '')})?
+          Penugasan shift pada karyawan terkait akan diatur ulang.
         </p>
       </ConfirmDialog>
     </div>
