@@ -151,6 +151,16 @@ export function LeafletMapPicker({
   const [isResolvingAddress, setIsResolvingAddress] = React.useState(false)
   const [lastResolvedAddress, setLastResolvedAddress] = React.useState<ResolvedGeocoding | null>(null)
 
+  // Sinkronisasi mode dari prop luar
+  React.useEffect(() => {
+    setCurrentMode(mode)
+  }, [mode])
+
+  // Sinkronisasi polygon dari prop luar
+  React.useEffect(() => {
+    setCurrentPolygon(polygon || [])
+  }, [polygon])
+
   // Reverse Geocoding Otomatis ke Alamat Fisik Lengkap
   const resolveAddressFromCoords = React.useCallback(
     async (lat: number, lng: number) => {
@@ -226,7 +236,7 @@ export function LeafletMapPicker({
 
   // Render Ulang Layer Poligon & Handle Sudut
   const updatePolygonLayers = React.useCallback(
-    (coords: [number, number][], map: L.Map) => {
+    (coords: [number, number][], map: L.Map, activeMode: GeofenceMode = currentMode) => {
       // Hapus layer poligon lama jika ada
       if (polygonLayerRef.current) {
         map.removeLayer(polygonLayerRef.current)
@@ -237,7 +247,8 @@ export function LeafletMapPicker({
       vertexMarkersRef.current.forEach((m) => map.removeLayer(m))
       vertexMarkersRef.current = []
 
-      if (coords.length < 2) return
+      // Jika bukan mode polygon atau koordinat kurang dari 2 titik, jangan buat poligon
+      if (activeMode !== 'polygon' || coords.length < 2) return
 
       // Buat Layer Poligon Baru Bergaya Google Maps (Biru #1a73e8 dengan Fill Opacity)
       const poly = L.polygon(coords, {
@@ -251,7 +262,7 @@ export function LeafletMapPicker({
       polygonLayerRef.current = poly
 
       // Buat Drag Handle pada Setiap Titik Sudut
-      if (!readOnly && currentMode === 'polygon') {
+      if (!readOnly && activeMode === 'polygon') {
         const markers: L.Marker[] = []
         coords.forEach((point, idx) => {
           const vMarker = L.marker(point, {
@@ -350,7 +361,7 @@ export function LeafletMapPicker({
           longitude: lng,
           radiusMeters,
           coordinatesType: currentMode,
-          polygonCoordinates: currentPolygon,
+          polygonCoordinates: currentMode === 'point' ? [] : currentPolygon,
         })
         resolveAddressFromCoords(lat, lng)
       })
@@ -361,6 +372,14 @@ export function LeafletMapPicker({
         const lng = Number(e.latlng.lng.toFixed(7))
 
         if (currentMode === 'point') {
+          // Bersihkan sisa poligon jika ada
+          if (polygonLayerRef.current) {
+            map.removeLayer(polygonLayerRef.current)
+            polygonLayerRef.current = null
+          }
+          vertexMarkersRef.current.forEach((m) => map.removeLayer(m))
+          vertexMarkersRef.current = []
+
           // Pindahkan Titik & Radius
           marker.setLatLng([lat, lng])
           circle.setLatLng([lat, lng])
@@ -369,17 +388,17 @@ export function LeafletMapPicker({
             longitude: lng,
             radiusMeters,
             coordinatesType: 'point',
-            polygonCoordinates: currentPolygon,
+            polygonCoordinates: [],
           })
           resolveAddressFromCoords(lat, lng)
         } else {
           // Tambahkan Titik Sudut ke Poligon
           const nextPoly: [number, number][] = [...currentPolygon, [lat, lng]]
           setCurrentPolygon(nextPoly)
-          updatePolygonLayers(nextPoly, map)
+          updatePolygonLayers(nextPoly, map, 'polygon')
           onChange({
-            latitude: lat,
-            longitude: lng,
+            latitude,
+            longitude,
             radiusMeters,
             coordinatesType: 'polygon',
             polygonCoordinates: nextPoly,
@@ -393,9 +412,9 @@ export function LeafletMapPicker({
     markerRef.current = marker
     circleRef.current = circle
 
-    // Render poligon awal jika ada
-    if (currentPolygon.length > 0) {
-      updatePolygonLayers(currentPolygon, map)
+    // Render poligon awal HANYA JIKA dalam mode poligon
+    if (mode === 'polygon' && currentPolygon.length > 0) {
+      updatePolygonLayers(currentPolygon, map, 'polygon')
     }
 
     // Pantau perubahan ukuran kontainer secara dinamis
@@ -445,11 +464,16 @@ export function LeafletMapPicker({
 
     if (currentMode === 'point') {
       circleRef.current.setStyle({ opacity: 0.9, fillOpacity: 0.16 })
+      // Hapus total layer poligon dan titik sudut dari kanvas peta
+      if (polygonLayerRef.current) {
+        mapRef.current.removeLayer(polygonLayerRef.current)
+        polygonLayerRef.current = null
+      }
       vertexMarkersRef.current.forEach((m) => mapRef.current?.removeLayer(m))
       vertexMarkersRef.current = []
     } else {
       circleRef.current.setStyle({ opacity: 0.2, fillOpacity: 0.04 })
-      updatePolygonLayers(currentPolygon, mapRef.current)
+      updatePolygonLayers(currentPolygon, mapRef.current, 'polygon')
     }
   }, [currentMode, currentPolygon, updatePolygonLayers])
 
@@ -471,6 +495,72 @@ export function LeafletMapPicker({
     circleRef.current.setRadius(radiusMeters)
   }, [latitude, longitude, radiusMeters])
 
+  // Beralih Kembali ke Mode Pointer (Titik & Radius) dan Hapus Poligon
+  const handleSwitchToPoint = React.useCallback(() => {
+    setCurrentMode('point')
+    setCurrentPolygon([])
+    if (mapRef.current) {
+      if (polygonLayerRef.current) {
+        mapRef.current.removeLayer(polygonLayerRef.current)
+        polygonLayerRef.current = null
+      }
+      vertexMarkersRef.current.forEach((m) => mapRef.current?.removeLayer(m))
+      vertexMarkersRef.current = []
+      if (circleRef.current) {
+        circleRef.current.setStyle({ opacity: 0.9, fillOpacity: 0.16 })
+      }
+    }
+    onChange({
+      latitude,
+      longitude,
+      radiusMeters,
+      coordinatesType: 'point',
+      polygonCoordinates: [],
+    })
+  }, [latitude, longitude, radiusMeters, onChange])
+
+  // Beralih ke Mode Poligon (Area Bidang)
+  const handleSwitchToPolygon = React.useCallback(() => {
+    setCurrentMode('polygon')
+    if (circleRef.current) {
+      circleRef.current.setStyle({ opacity: 0.2, fillOpacity: 0.04 })
+    }
+    if (currentPolygon.length === 0) {
+      const latDelta = (radiusMeters / 111320) * 0.9
+      const lngDelta = (radiusMeters / (111320 * Math.cos((latitude * Math.PI) / 180))) * 0.9
+
+      const rect: [number, number][] = [
+        [Number((latitude + latDelta).toFixed(7)), Number((longitude - lngDelta).toFixed(7))],
+        [Number((latitude + latDelta).toFixed(7)), Number((longitude + lngDelta).toFixed(7))],
+        [Number((latitude - latDelta).toFixed(7)), Number((longitude + lngDelta).toFixed(7))],
+        [Number((latitude - latDelta).toFixed(7)), Number((longitude - lngDelta).toFixed(7))],
+      ]
+
+      setCurrentPolygon(rect)
+      if (mapRef.current) {
+        updatePolygonLayers(rect, mapRef.current, 'polygon')
+      }
+      onChange({
+        latitude,
+        longitude,
+        radiusMeters,
+        coordinatesType: 'polygon',
+        polygonCoordinates: rect,
+      })
+    } else {
+      if (mapRef.current) {
+        updatePolygonLayers(currentPolygon, mapRef.current, 'polygon')
+      }
+      onChange({
+        latitude,
+        longitude,
+        radiusMeters,
+        coordinatesType: 'polygon',
+        polygonCoordinates: currentPolygon,
+      })
+    }
+  }, [currentPolygon, updatePolygonLayers, latitude, longitude, radiusMeters, onChange])
+
   // Buat Bentuk Poligon Persegi Otomatis di Sekitar Titik Pusat
   const handleGenerateDefaultPolygon = () => {
     if (!mapRef.current) return
@@ -485,7 +575,7 @@ export function LeafletMapPicker({
     ]
 
     setCurrentPolygon(rect)
-    updatePolygonLayers(rect, mapRef.current)
+    updatePolygonLayers(rect, mapRef.current, 'polygon')
     onChange({
       latitude,
       longitude,
@@ -500,7 +590,7 @@ export function LeafletMapPicker({
     if (!mapRef.current || currentPolygon.length === 0) return
     const nextPoly = currentPolygon.slice(0, -1)
     setCurrentPolygon(nextPoly)
-    updatePolygonLayers(nextPoly, mapRef.current)
+    updatePolygonLayers(nextPoly, mapRef.current, 'polygon')
     onChange({
       latitude,
       longitude,
@@ -514,7 +604,7 @@ export function LeafletMapPicker({
   const handleClearPolygon = () => {
     if (!mapRef.current) return
     setCurrentPolygon([])
-    updatePolygonLayers([], mapRef.current)
+    updatePolygonLayers([], mapRef.current, 'polygon')
     onChange({
       latitude,
       longitude,
@@ -673,52 +763,30 @@ export function LeafletMapPicker({
 
         {/* Header Kontrol Mengambang Kiri Atas: Pengalih Mode Geofence & Jenis Peta */}
         <div className="absolute left-3 top-3 z-[1000] flex flex-wrap items-center gap-2">
-          {/* Pemilih Mode: Titik (Point) vs Perimeter (Polygon) */}
+          {/* Pemilih Mode: Pointer (Point) vs Perimeter (Polygon) */}
           {!readOnly && (
             <div className="flex items-center overflow-hidden rounded-md border border-[#dadce0] bg-white text-xs font-semibold shadow-[0_1px_4px_rgba(0,0,0,0.22)]">
               <button
                 type="button"
-                onClick={() => {
-                  setCurrentMode('point')
-                  onChange({
-                    latitude,
-                    longitude,
-                    radiusMeters,
-                    coordinatesType: 'point',
-                    polygonCoordinates: currentPolygon,
-                  })
-                }}
+                onClick={handleSwitchToPoint}
                 className={`px-3 py-1.5 transition-colors ${
                   currentMode === 'point'
                     ? 'bg-[#1a73e8] font-bold text-white'
                     : 'text-[#3c4043] hover:bg-[#f1f3f4]'
                 }`}
               >
-                Titik & Radius (Point)
+                Pointer (Titik & Radius)
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setCurrentMode('polygon')
-                  if (currentPolygon.length === 0) {
-                    handleGenerateDefaultPolygon()
-                  } else {
-                    onChange({
-                      latitude,
-                      longitude,
-                      radiusMeters,
-                      coordinatesType: 'polygon',
-                      polygonCoordinates: currentPolygon,
-                    })
-                  }
-                }}
+                onClick={handleSwitchToPolygon}
                 className={`border-l border-[#dadce0] px-3 py-1.5 transition-colors ${
                   currentMode === 'polygon'
                     ? 'bg-[#1a73e8] font-bold text-white'
                     : 'text-[#3c4043] hover:bg-[#f1f3f4]'
                 }`}
               >
-                Area Poligon (Polygon)
+                Poligon (Area Bidang)
               </button>
             </div>
           )}
@@ -765,9 +833,15 @@ export function LeafletMapPicker({
         {/* Toolbar Operasi Poligon (Muncul saat Mode Poligon Aktif) */}
         {!readOnly && currentMode === 'polygon' && (
           <div className="absolute left-3 top-13 z-[1000] flex flex-wrap items-center gap-1.5 rounded-md border border-[#dadce0] bg-white/95 p-1.5 text-[11px] font-medium text-ink shadow-md backdrop-blur-sm">
-            <span className="px-1 text-ink-3">
-              Klik peta untuk tambah titik · Geser titik untuk ubah bentuk
-            </span>
+            <button
+              type="button"
+              onClick={handleSwitchToPoint}
+              className="inline-flex items-center gap-1 rounded bg-[#e8f0fe] px-2 py-0.5 font-bold text-[#1a73e8] hover:bg-[#d2e3fc] transition-colors"
+              title="Kembali ke mode pointer dan hilangkan area poligon"
+            >
+              ← Kembali ke Pointer
+            </button>
+            <span className="h-3 w-px bg-line" />
             <button
               type="button"
               onClick={handleGenerateDefaultPolygon}

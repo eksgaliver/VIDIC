@@ -301,6 +301,10 @@ Berkas: [`apps/web/src/routes/companies.tsx`](file:///c:/project/apps/web/src/ro
   - Alamat jalan, nomor, dan kota otomatis terisi berkat integrasi reverse geocoding Leaflet.
   - Administrator dapat menambahkan lebih dari 1 lokasi presensi (`+ Tambah Titik Presensi`) dan wajib menyertakan minimal 1 lokasi aktif.
   - Tab navigator antar-titik presensi memudahkan penyuntingan atribut titik secara individual (nama titik, alamat, radius toleransi meter, zona waktu).
+  - **Penyempurnaan Mode Geofence & Transisi Pointer**:
+    - Memperbaiki bug di mana layer poligon dan marker sudut (handle 1, 2, 3, 4) tetap tertinggal di peta saat beralih kembali ke mode pointer/titik.
+    - Menambahkan tombol aksi `← Kembali ke Pointer` pada floating toolbar poligon dan selector `Tipe Geofence Presensi` di panel atribut titik.
+    - Sinkronisasi reaktif: saat berpindah ke mode pointer, seluruh layer poligon Leaflet dan vertex markers dihapus total dari kanvas, `polygonCoordinates` di-reset ke array kosong `[]`, dan lingkaran toleransi radius kembali aktif dengan opasitas penuh.
 • **Halaman Karyawan (`employees.tsx`)**:
   - Formulir penambahan & pengubahan karyawan dilengkapi pemilih shift kerja (`SelectField` Shift kerja).
   - Tabel karyawan menampilkan kolom shift kerja aktif dengan nama shift, kode badge, dan jam kerja.

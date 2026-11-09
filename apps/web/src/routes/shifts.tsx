@@ -1164,6 +1164,7 @@ export function ShiftsPage() {
                         </span>
                       </div>
                       <LeafletMapPicker
+                        key={`create-map-${createActivePointIndex}-${createForm.attendanceLocations[createActivePointIndex].coordinatesType}`}
                         latitude={createForm.attendanceLocations[createActivePointIndex].latitude}
                         longitude={createForm.attendanceLocations[createActivePointIndex].longitude}
                         radiusMeters={createForm.attendanceLocations[createActivePointIndex].radiusMeters}
@@ -1177,7 +1178,7 @@ export function ShiftsPage() {
                             longitude,
                             radiusMeters,
                             coordinatesType,
-                            polygonCoordinates,
+                            polygonCoordinates: coordinatesType === 'point' ? [] : polygonCoordinates,
                           })
                         }}
                         onAddressSelect={(resolved) => {
@@ -1214,6 +1215,46 @@ export function ShiftsPage() {
                         )}
                       </div>
 
+                      {/* Pemilih Tipe Geofence Presensi (Pointer vs Poligon) */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-ink">
+                          Tipe Geofence Presensi
+                        </label>
+                        <div className="grid grid-cols-2 gap-1 rounded-control border border-line bg-surface-2 p-1 text-xs">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateCreatePoint({
+                                coordinatesType: 'point',
+                                polygonCoordinates: [],
+                              })
+                            }
+                            className={`rounded px-2.5 py-1.5 font-medium transition-colors ${
+                              createForm.attendanceLocations[createActivePointIndex].coordinatesType === 'point'
+                                ? 'bg-white font-bold text-primary shadow-xs'
+                                : 'text-ink-2 hover:text-ink'
+                            }`}
+                          >
+                            Pointer (Titik & Radius)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateCreatePoint({
+                                coordinatesType: 'polygon',
+                              })
+                            }
+                            className={`rounded px-2.5 py-1.5 font-medium transition-colors ${
+                              createForm.attendanceLocations[createActivePointIndex].coordinatesType === 'polygon'
+                                ? 'bg-white font-bold text-primary shadow-xs'
+                                : 'text-ink-2 hover:text-ink'
+                            }`}
+                          >
+                            Poligon (Area Bidang)
+                          </button>
+                        </div>
+                      </div>
+
                       <TextField
                         label="Nama titik presensi"
                         value={createForm.attendanceLocations[createActivePointIndex].name}
@@ -1247,31 +1288,70 @@ export function ShiftsPage() {
                         />
                       </div>
 
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <TextField
-                          label="Radius presensi (meter)"
-                          type="number"
-                          value={createForm.attendanceLocations[createActivePointIndex].radiusMeters}
-                          onChange={(e) =>
-                            handleUpdateCreatePoint({ radiusMeters: Number(e.target.value) || 50 })
-                          }
-                          min={10}
-                          max={5000}
-                          required
-                          hint="Toleransi lingkaran"
-                        />
-                        <SelectField
-                          label="Zona waktu"
-                          value={createForm.attendanceLocations[createActivePointIndex].timezone}
-                          onChange={(e) => handleUpdateCreatePoint({ timezone: e.target.value })}
-                        >
-                          {TIMEZONES.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </SelectField>
-                      </div>
+                      {createForm.attendanceLocations[createActivePointIndex].coordinatesType === 'point' ? (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <TextField
+                            label="Radius presensi (meter)"
+                            type="number"
+                            value={createForm.attendanceLocations[createActivePointIndex].radiusMeters}
+                            onChange={(e) =>
+                              handleUpdateCreatePoint({ radiusMeters: Number(e.target.value) || 50 })
+                            }
+                            min={10}
+                            max={5000}
+                            required
+                            hint="Toleransi lingkaran dari pin"
+                          />
+                          <SelectField
+                            label="Zona waktu"
+                            value={createForm.attendanceLocations[createActivePointIndex].timezone}
+                            onChange={(e) => handleUpdateCreatePoint({ timezone: e.target.value })}
+                          >
+                            {TIMEZONES.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </SelectField>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="rounded border border-line bg-surface-2 p-2.5 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between font-semibold text-primary">
+                              <span>Mode Poligon Aktif</span>
+                              <span className="font-mono text-[11px] text-ink-3">
+                                {createForm.attendanceLocations[createActivePointIndex].polygonCoordinates?.length || 0} sudut
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-ink-3">
+                              Batas presensi ditentukan oleh bidang poligon di peta.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateCreatePoint({
+                                  coordinatesType: 'point',
+                                  polygonCoordinates: [],
+                                })
+                              }
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                            >
+                              ← Kembali ke Pointer (Titik & Radius)
+                            </button>
+                          </div>
+                          <SelectField
+                            label="Zona waktu"
+                            value={createForm.attendanceLocations[createActivePointIndex].timezone}
+                            onChange={(e) => handleUpdateCreatePoint({ timezone: e.target.value })}
+                          >
+                            {TIMEZONES.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </SelectField>
+                        </div>
+                      )}
 
                       <div className="rounded border border-line bg-surface-2 px-2.5 py-1.5 text-[11px] text-ink-3">
                         Koordinat GPS:{' '}
@@ -1680,6 +1760,7 @@ export function ShiftsPage() {
                         </span>
                       </div>
                       <LeafletMapPicker
+                        key={`edit-map-${editActivePointIndex}-${editForm.attendanceLocations[editActivePointIndex].coordinatesType}`}
                         latitude={editForm.attendanceLocations[editActivePointIndex].latitude}
                         longitude={editForm.attendanceLocations[editActivePointIndex].longitude}
                         radiusMeters={editForm.attendanceLocations[editActivePointIndex].radiusMeters}
@@ -1693,7 +1774,7 @@ export function ShiftsPage() {
                             longitude,
                             radiusMeters,
                             coordinatesType,
-                            polygonCoordinates,
+                            polygonCoordinates: coordinatesType === 'point' ? [] : polygonCoordinates,
                           })
                         }}
                         onAddressSelect={(resolved) => {
@@ -1730,6 +1811,46 @@ export function ShiftsPage() {
                         )}
                       </div>
 
+                      {/* Pemilih Tipe Geofence Presensi (Pointer vs Poligon) */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-ink">
+                          Tipe Geofence Presensi
+                        </label>
+                        <div className="grid grid-cols-2 gap-1 rounded-control border border-line bg-surface-2 p-1 text-xs">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateEditPoint({
+                                coordinatesType: 'point',
+                                polygonCoordinates: [],
+                              })
+                            }
+                            className={`rounded px-2.5 py-1.5 font-medium transition-colors ${
+                              editForm.attendanceLocations[editActivePointIndex].coordinatesType === 'point'
+                                ? 'bg-white font-bold text-primary shadow-xs'
+                                : 'text-ink-2 hover:text-ink'
+                            }`}
+                          >
+                            Pointer (Titik & Radius)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateEditPoint({
+                                coordinatesType: 'polygon',
+                              })
+                            }
+                            className={`rounded px-2.5 py-1.5 font-medium transition-colors ${
+                              editForm.attendanceLocations[editActivePointIndex].coordinatesType === 'polygon'
+                                ? 'bg-white font-bold text-primary shadow-xs'
+                                : 'text-ink-2 hover:text-ink'
+                            }`}
+                          >
+                            Poligon (Area Bidang)
+                          </button>
+                        </div>
+                      </div>
+
                       <TextField
                         label="Nama titik presensi"
                         value={editForm.attendanceLocations[editActivePointIndex].name}
@@ -1763,31 +1884,70 @@ export function ShiftsPage() {
                         />
                       </div>
 
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <TextField
-                          label="Radius presensi (meter)"
-                          type="number"
-                          value={editForm.attendanceLocations[editActivePointIndex].radiusMeters}
-                          onChange={(e) =>
-                            handleUpdateEditPoint({ radiusMeters: Number(e.target.value) || 50 })
-                          }
-                          min={10}
-                          max={5000}
-                          required
-                          hint="Toleransi lingkaran"
-                        />
-                        <SelectField
-                          label="Zona waktu"
-                          value={editForm.attendanceLocations[editActivePointIndex].timezone}
-                          onChange={(e) => handleUpdateEditPoint({ timezone: e.target.value })}
-                        >
-                          {TIMEZONES.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </SelectField>
-                      </div>
+                      {editForm.attendanceLocations[editActivePointIndex].coordinatesType === 'point' ? (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <TextField
+                            label="Radius presensi (meter)"
+                            type="number"
+                            value={editForm.attendanceLocations[editActivePointIndex].radiusMeters}
+                            onChange={(e) =>
+                              handleUpdateEditPoint({ radiusMeters: Number(e.target.value) || 50 })
+                            }
+                            min={10}
+                            max={5000}
+                            required
+                            hint="Toleransi lingkaran dari pin"
+                          />
+                          <SelectField
+                            label="Zona waktu"
+                            value={editForm.attendanceLocations[editActivePointIndex].timezone}
+                            onChange={(e) => handleUpdateEditPoint({ timezone: e.target.value })}
+                          >
+                            {TIMEZONES.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </SelectField>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="rounded border border-line bg-surface-2 p-2.5 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between font-semibold text-primary">
+                              <span>Mode Poligon Aktif</span>
+                              <span className="font-mono text-[11px] text-ink-3">
+                                {editForm.attendanceLocations[editActivePointIndex].polygonCoordinates?.length || 0} sudut
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-ink-3">
+                              Batas presensi ditentukan oleh bidang poligon di peta.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateEditPoint({
+                                  coordinatesType: 'point',
+                                  polygonCoordinates: [],
+                                })
+                              }
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                            >
+                              ← Kembali ke Pointer (Titik & Radius)
+                            </button>
+                          </div>
+                          <SelectField
+                            label="Zona waktu"
+                            value={editForm.attendanceLocations[editActivePointIndex].timezone}
+                            onChange={(e) => handleUpdateEditPoint({ timezone: e.target.value })}
+                          >
+                            {TIMEZONES.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </SelectField>
+                        </div>
+                      )}
 
                       <div className="rounded border border-line bg-surface-2 px-2.5 py-1.5 text-[11px] text-ink-3">
                         Koordinat GPS:{' '}
