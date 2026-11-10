@@ -74,3 +74,4 @@ kubectl get all -n srikaya-system
 # 3. Buka visualizer Kubernetes (contoh: K9s atau Lens):
 # Pilih namespace: srikaya-system
 ```
+

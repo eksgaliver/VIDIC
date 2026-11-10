@@ -72,3 +72,4 @@ spec:
   selector:
     app.kubernetes.io/name: srikaya
     app.kubernetes.io/component: web-client
+
