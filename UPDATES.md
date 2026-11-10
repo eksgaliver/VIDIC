@@ -502,7 +502,32 @@ Untuk meningkatkan kemudahan dan fleksibilitas manajer HR dalam mengelola alokas
 
 ---
 
-## § 14. Panduan Perintah Operasional
+## § 14. Integrasi Kalender Kerja & Hari Libur Nasional 2026 pada Dasbor
+
+Halaman utama Dasbor (`apps/web/src/routes/dashboard.tsx`) kini telah dilengkapi dengan modul kalender operasional interaktif tahun 2026 (`apps/web/src/components/dashboard/HolidayCalendar2026.tsx`) yang terhubung langsung dengan API resmi Hari Libur Indonesia:
+
+### 1. Sinkronisasi API Eksternal (`https://tanggalmerah.upset.dev/api/holidays?year=2026`)
+• **Live Integration**: Kalender secara otomatis mengambil data hari libur nasional dan cuti bersama resmi Pemerintah RI tahun 2026 saat halaman dasbor dimuat.
+• **High Availability & Fallback**: Dilengkapi dengan dataset bawaan lengkap 25 hari libur resmi 2026 (SKB 3 Menteri) sebagai *fallback cache* sehingga kalender tetap berfungsi 100% cepat dan akurat saat luring (*offline*).
+• **Indikator Status Sambungan**: Menampilkan badge live connection `API Terhubung ✓` beserta tombol segarkan data (`HiOutlineRefresh`).
+
+### 2. Fitur Kalender & Penandaan Hari Libur (*Visual Marking*)
+• **Grid Matriks 7 Hari**:
+  - Penandaan hari libur nasional (`type: 'holiday'`) dengan aksen merah/rose tegas (`bg-rose-500/10 text-rose-700 border-rose-500/30`) dan badge judul hari libur.
+  - Penandaan cuti bersama (`type: 'leave'`) dengan aksen amber/oranye (`bg-amber-500/10 text-amber-700 border-amber-500/30`).
+  - Penandaan tanggal hari ini (`today`) dengan ring primer dan tag indikator `Hari ini`.
+  - Hari Minggu ditandai dengan tipografi merah/rose reguler.
+• **Navigasi Cepat 12 Bulan 2026**:
+  - Tombol bulan sebelumnya (`←`) dan bulan berikutnya (`→`).
+  - Tombol cepat loncat ke "Hari Ini".
+  - *Month Pills Selector* (Jan s/d Des 2026) dengan penghitung jumlah tanggal merah di setiap bulan secara instan.
+• **Panel Inspeksi Tanggal & Filter Hari Libur**:
+  - Saat kotak tanggal diklik, panel rincian secara dinamis menampilkan status resmi: `Libur Nasional Resmi ✓`, `Cuti Bersama Resmi Pemerintah ✓`, `Akhir Pekan`, atau `Hari Kerja Efektif ✓`.
+  - Panel daftar hari libur yang dapat difilter berdasarkan: `Bulan Ini`, `Semua Libur 2026`, `Libur Nasional`, atau `Cuti Bersama`, lengkap dengan pencarian nama libur instan.
+
+---
+
+## § 15. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):
