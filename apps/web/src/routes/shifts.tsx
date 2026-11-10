@@ -1597,7 +1597,7 @@ export function ShiftsPage() {
                         </span>
                       </div>
                       <LeafletMapPicker
-                        key={`create-map-${createActivePointIndex}-${createForm.attendanceLocations[createActivePointIndex].coordinatesType}`}
+                        key={`create-map-${createActivePointIndex}`}
                         latitude={createForm.attendanceLocations[createActivePointIndex].latitude}
                         longitude={createForm.attendanceLocations[createActivePointIndex].longitude}
                         radiusMeters={createForm.attendanceLocations[createActivePointIndex].radiusMeters}
@@ -1672,11 +1672,27 @@ export function ShiftsPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              const currentPt = createForm.attendanceLocations[createActivePointIndex]
+                              let poly = currentPt.polygonCoordinates
+                              if (!poly || poly.length < 3) {
+                                const lat = currentPt.latitude
+                                const lng = currentPt.longitude
+                                const rad = currentPt.radiusMeters || 50
+                                const latDelta = (rad / 111320) * 0.9
+                                const lngDelta = (rad / (111320 * Math.cos((lat * Math.PI) / 180))) * 0.9
+                                poly = [
+                                  [Number((lat + latDelta).toFixed(7)), Number((lng - lngDelta).toFixed(7))],
+                                  [Number((lat + latDelta).toFixed(7)), Number((lng + lngDelta).toFixed(7))],
+                                  [Number((lat - latDelta).toFixed(7)), Number((lng + lngDelta).toFixed(7))],
+                                  [Number((lat - latDelta).toFixed(7)), Number((lng - lngDelta).toFixed(7))],
+                                ]
+                              }
                               handleUpdateCreatePoint({
                                 coordinatesType: 'polygon',
+                                polygonCoordinates: poly,
                               })
-                            }
+                            }}
                             className={`rounded px-2.5 py-1.5 font-medium transition-colors ${
                               createForm.attendanceLocations[createActivePointIndex].coordinatesType === 'polygon'
                                 ? 'bg-white font-bold text-primary shadow-xs'
@@ -2151,7 +2167,7 @@ export function ShiftsPage() {
                         </span>
                       </div>
                       <LeafletMapPicker
-                        key={`edit-map-${editActivePointIndex}-${editForm.attendanceLocations[editActivePointIndex].coordinatesType}`}
+                        key={`edit-map-${editActivePointIndex}`}
                         latitude={editForm.attendanceLocations[editActivePointIndex].latitude}
                         longitude={editForm.attendanceLocations[editActivePointIndex].longitude}
                         radiusMeters={editForm.attendanceLocations[editActivePointIndex].radiusMeters}
@@ -2226,11 +2242,27 @@ export function ShiftsPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              const currentPt = editForm.attendanceLocations[editActivePointIndex]
+                              let poly = currentPt.polygonCoordinates
+                              if (!poly || poly.length < 3) {
+                                const lat = currentPt.latitude
+                                const lng = currentPt.longitude
+                                const rad = currentPt.radiusMeters || 50
+                                const latDelta = (rad / 111320) * 0.9
+                                const lngDelta = (rad / (111320 * Math.cos((lat * Math.PI) / 180))) * 0.9
+                                poly = [
+                                  [Number((lat + latDelta).toFixed(7)), Number((lng - lngDelta).toFixed(7))],
+                                  [Number((lat + latDelta).toFixed(7)), Number((lng + lngDelta).toFixed(7))],
+                                  [Number((lat - latDelta).toFixed(7)), Number((lng + lngDelta).toFixed(7))],
+                                  [Number((lat - latDelta).toFixed(7)), Number((lng - lngDelta).toFixed(7))],
+                                ]
+                              }
                               handleUpdateEditPoint({
                                 coordinatesType: 'polygon',
+                                polygonCoordinates: poly,
                               })
-                            }
+                            }}
                             className={`rounded px-2.5 py-1.5 font-medium transition-colors ${
                               editForm.attendanceLocations[editActivePointIndex].coordinatesType === 'polygon'
                                 ? 'bg-white font-bold text-primary shadow-xs'
