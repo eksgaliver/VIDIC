@@ -220,16 +220,147 @@ async function seedDefaultData() {
       }
     }
 
-    // Pastikan setiap karyawan memiliki relasi dengan tabel mail dan baris biodata
+    // Data Biodata bawaan untuk akun demo dan karyawan awal
+    const DEFAULT_BIODATA_MAP: Record<string, any> = {
+      'budi.santoso@srikaya.id': {
+        nik: '3174051203920001',
+        kkNumber: '3174050101180005',
+        npwp: '81.423.567.8-015.000',
+        bpjsKetenagakerjaan: '21098472910',
+        bpjsKesehatan: '0001847291023',
+        gender: 'male',
+        placeOfBirth: 'Jakarta',
+        dateOfBirth: '1992-03-12',
+        religion: 'Islam',
+        bloodType: 'O',
+        maritalStatus: 'married',
+        phone: '081289234561',
+        emergencyContactName: 'Dewi Lestari',
+        emergencyContactPhone: '081298765432',
+        emergencyContactRelation: 'Istri',
+        addressKtp: 'Jl. Tebet Barat Dalam VII No. 14, RT 004/RW 03',
+        addressCurrent: 'Jl. Tebet Barat Dalam VII No. 14, RT 004/RW 03',
+        postalCode: '12810',
+        city: 'Jakarta Selatan',
+        province: 'DKI Jakarta',
+        lastEducation: 'D4/S1',
+        major: 'Teknik Informatika',
+        institution: 'Institut Teknologi Bandung',
+        bankName: 'BCA',
+        bankAccountNumber: '7120938421',
+        bankAccountHolder: 'Budi Santoso',
+        isCompleted: true,
+        completedAt: new Date()
+      },
+      'siti.rahma@srikaya.id': {
+        nik: '3275034507950002',
+        kkNumber: '3275030205190008',
+        npwp: '72.819.345.1-017.000',
+        bpjsKetenagakerjaan: '21098472911',
+        bpjsKesehatan: '0001847291024',
+        gender: 'female',
+        placeOfBirth: 'Bandung',
+        dateOfBirth: '1995-07-15',
+        religion: 'Islam',
+        bloodType: 'A',
+        maritalStatus: 'single',
+        phone: '081377889922',
+        emergencyContactName: 'Hj. Maryam',
+        emergencyContactPhone: '081399887766',
+        emergencyContactRelation: 'Ibu Kandung',
+        addressKtp: 'Jl. Dago Asri No. 28, RT 002/RW 05',
+        addressCurrent: 'Jl. Mampang Prapatan VIII No. 12',
+        postalCode: '12790',
+        city: 'Jakarta Selatan',
+        province: 'DKI Jakarta',
+        lastEducation: 'D4/S1',
+        major: 'Manajemen SDM / Psikologi',
+        institution: 'Universitas Padjadjaran',
+        bankName: 'Mandiri',
+        bankAccountNumber: '1310018293041',
+        bankAccountHolder: 'Siti Rahma',
+        isCompleted: true,
+        completedAt: new Date()
+      },
+      'ahmad.fauzi@srikaya.id': {
+        nik: '3578012010930003',
+        kkNumber: '3578010508170004',
+        npwp: '63.928.471.2-021.000',
+        bpjsKetenagakerjaan: '21098472912',
+        bpjsKesehatan: '0001847291025',
+        gender: 'male',
+        placeOfBirth: 'Surabaya',
+        dateOfBirth: '1993-10-20',
+        religion: 'Islam',
+        bloodType: 'B',
+        maritalStatus: 'married',
+        phone: '081233445566',
+        emergencyContactName: 'Nurul Hidayah',
+        emergencyContactPhone: '081255667788',
+        emergencyContactRelation: 'Istri',
+        addressKtp: 'Jl. Rungkut Madya No. 45',
+        addressCurrent: 'Jl. Panglima Polim XIII No. 7',
+        postalCode: '12160',
+        city: 'Jakarta Selatan',
+        province: 'DKI Jakarta',
+        lastEducation: 'D4/S1',
+        major: 'Sistem Informasi',
+        institution: 'Institut Teknologi Sepuluh Nopember',
+        bankName: 'BRI',
+        bankAccountNumber: '034101002345501',
+        bankAccountHolder: 'Ahmad Fauzi',
+        isCompleted: true,
+        completedAt: new Date()
+      },
+      [DEMO_USER.email]: {
+        nik: '3171011508880001',
+        kkNumber: '3171010204120003',
+        npwp: '91.823.412.5-011.000',
+        bpjsKetenagakerjaan: '21098472901',
+        bpjsKesehatan: '0001847291001',
+        gender: 'male',
+        placeOfBirth: 'Jakarta',
+        dateOfBirth: '1988-08-15',
+        religion: 'Islam',
+        bloodType: 'O',
+        maritalStatus: 'married',
+        phone: '08119876543',
+        emergencyContactName: 'Rina Kartika',
+        emergencyContactPhone: '08119876544',
+        emergencyContactRelation: 'Istri',
+        addressKtp: 'Jl. Jenderal Sudirman Kav. 52-53, Senayan',
+        addressCurrent: 'Jl. Senopati No. 88, Kebayoran Baru',
+        postalCode: '12190',
+        city: 'Jakarta Selatan',
+        province: 'DKI Jakarta',
+        lastEducation: 'S2',
+        major: 'Manajemen Bisnis & Teknologi',
+        institution: 'Universitas Indonesia',
+        bankName: 'BCA',
+        bankAccountNumber: '5001239841',
+        bankAccountHolder: 'Srikaya Administrator',
+        isCompleted: true,
+        completedAt: new Date()
+      }
+    }
+
+    // Pastikan setiap karyawan memiliki relasi dengan tabel mail dan baris biodata terisi lengkap
     const allUsers = await db.select().from(users)
     for (const u of allUsers) {
+      const defaultBio = DEFAULT_BIODATA_MAP[u.email.toLowerCase()]
       const [existingBiodata] = await db.select().from(biodata).where(eq(biodata.userId, u.id)).limit(1)
+
       if (!existingBiodata) {
         await db.insert(biodata).values({
           userId: u.id,
           companyId: u.companyId,
-          isCompleted: false
+          ...(defaultBio || { isCompleted: false })
         })
+      } else if (defaultBio && !existingBiodata.isCompleted) {
+        await db.update(biodata).set({
+          ...defaultBio,
+          updatedAt: new Date()
+        }).where(eq(biodata.userId, u.id))
       }
 
       const [existingMail] = await db.select().from(mail).where(eq(mail.userId, u.id)).limit(1)

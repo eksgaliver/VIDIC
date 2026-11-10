@@ -3,6 +3,7 @@ import { Link, createRoute } from '@tanstack/react-router'
 import {
   HiOutlineArrowRight,
   HiOutlineClock,
+  HiOutlineIdentification,
   HiOutlineMail,
   HiOutlinePencil,
   HiOutlinePlus,
@@ -29,7 +30,7 @@ import {
   TextField,
 } from '@/components/base'
 import { errorText } from '@/utils/apiError'
-import type { Company, Department, Employee, Shift } from '@/@types/organization'
+import type { Company, Department, Employee, Shift, Biodata } from '@/@types/organization'
 import { COMPANIES_PATH, EMPLOYEES_PATH, SHIFTS_PATH } from '@/constants/route.constant'
 
 export const employeesRoute = createRoute({
@@ -74,6 +75,31 @@ function initials(name: string) {
   )
 }
 
+function formatDate(value?: string | Date | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+}
+
+function formatGender(gender?: string | null) {
+  if (gender === 'male') return 'Laki-laki'
+  if (gender === 'female') return 'Perempuan'
+  return gender || '—'
+}
+
+function formatMaritalStatus(status?: string | null) {
+  if (status === 'married') return 'Menikah'
+  if (status === 'single') return 'Belum Menikah'
+  if (status === 'widow') return 'Janda'
+  if (status === 'widower') return 'Duda'
+  return status || '—'
+}
+
 function displayTime(value?: string | null) {
   return value?.slice(0, 5) || '—'
 }
@@ -97,6 +123,12 @@ export function EmployeesPage() {
 
   const [deleteItem, setDeleteItem] = React.useState<Employee | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
+
+  // State Dialog Biodata Karyawan
+  const [viewBiodataEmployee, setViewBiodataEmployee] = React.useState<Employee | null>(null)
+  const [employeeBiodata, setEmployeeBiodata] = React.useState<Biodata | null>(null)
+  const [isLoadingBiodata, setIsLoadingBiodata] = React.useState(false)
+  const [biodataModalError, setBiodataModalError] = React.useState<string | null>(null)
 
   const selectedCompany = companies.find((item) => item.id === selectedCompanyId)
   const activeDepartments = departments.filter((department) => department.status === 'active')
@@ -306,6 +338,27 @@ export function EmployeesPage() {
     }
   }
 
+  const handleOpenBiodata = async (employee: Employee) => {
+    setViewBiodataEmployee(employee)
+    setIsLoadingBiodata(true)
+    setBiodataModalError(null)
+    setEmployeeBiodata(null)
+
+    try {
+      const res = await api.employees({ id: employee.id }).biodata.get()
+      if (res.error) {
+        setBiodataModalError(errorText(res, 'Gagal mengambil rincian biodata karyawan.'))
+      } else {
+        const raw = (res.data as any)?.data || res.data
+        setEmployeeBiodata(raw as Biodata)
+      }
+    } catch {
+      setBiodataModalError('Terjadi kesalahan jaringan saat mengambil biodata.')
+    } finally {
+      setIsLoadingBiodata(false)
+    }
+  }
+
   const canCreate = Boolean(selectedCompanyId) && activeDepartments.length > 0
 
   return (
@@ -490,13 +543,23 @@ export function EmployeesPage() {
                         <td className="px-4 py-3.5 align-top 2xl:py-4">
                           <div className="space-y-1">
                             {employee.biodataCompleted ? (
-                              <span className="inline-flex items-center gap-1 rounded bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenBiodata(employee)}
+                                className="inline-flex items-center gap-1 rounded bg-success/15 px-2 py-0.5 text-xs font-semibold text-success hover:bg-success/25 transition-colors cursor-pointer text-left"
+                                title="Klik untuk melihat rincian biodata lengkap"
+                              >
                                 Lengkap ✓
-                              </span>
+                              </button>
                             ) : (
-                              <span className="inline-flex items-center gap-1 rounded bg-surface-3 px-2 py-0.5 text-xs font-medium text-ink-3">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenBiodata(employee)}
+                                className="inline-flex items-center gap-1 rounded bg-surface-3 px-2 py-0.5 text-xs font-medium text-ink-3 hover:bg-surface-2 transition-colors cursor-pointer text-left"
+                                title="Klik untuk melihat status biodata"
+                              >
                                 Belum Diisi ○
-                              </span>
+                              </button>
                             )}
                             <p className="flex items-center gap-1 text-[11px] text-ink-3">
                               <HiOutlineMail className="h-3.5 w-3.5 text-primary" />
@@ -519,6 +582,15 @@ export function EmployeesPage() {
                         </td>
                         <td className="px-4 py-3.5 text-right align-top sm:px-5 2xl:px-7 2xl:py-4">
                           <div className="inline-flex items-center gap-1">
+                            <Button
+                              size="iconSm"
+                              tone="quiet"
+                              onClick={() => handleOpenBiodata(employee)}
+                              aria-label={`Lihat biodata ${employee.name}`}
+                              title="Lihat biodata karyawan"
+                            >
+                              <HiOutlineIdentification className="h-4 w-4 text-primary" />
+                            </Button>
                             <Button
                               size="iconSm"
                               tone="quiet"
@@ -841,6 +913,246 @@ export function EmployeesPage() {
           pada karyawan ini akan dicabut dan akun dinonaktifkan.
         </p>
       </ConfirmDialog>
+
+      {/* Dialog Rincian Biodata Karyawan */}
+      <Dialog
+        isOpen={!!viewBiodataEmployee}
+        onClose={() => setViewBiodataEmployee(null)}
+        width={760}
+      >
+        <DialogHeading
+          title="Rincian Biodata Karyawan"
+          description={`Data kepegawaian, kependudukan, dan perpajakan untuk ${viewBiodataEmployee?.name || 'karyawan'}.`}
+        />
+
+        <DialogBody>
+          {isLoadingBiodata ? (
+            <div className="space-y-4 py-6">
+              <TableSkeleton rows={4} columns={3} />
+            </div>
+          ) : biodataModalError ? (
+            <Notice tone="danger" title="Gagal Memuat Biodata">
+              {biodataModalError}
+            </Notice>
+          ) : employeeBiodata ? (
+            <div className="space-y-5">
+              {/* Header Ringkasan Profil Karyawan */}
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-surface-2 p-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-sm font-bold text-primary">
+                    {initials(viewBiodataEmployee?.name || '')}
+                  </span>
+                  <div>
+                    <h4 className="text-sm font-semibold text-ink">
+                      {viewBiodataEmployee?.name}
+                    </h4>
+                    <p className="text-xs text-ink-3">
+                      {viewBiodataEmployee?.email} · {viewBiodataEmployee?.position || 'Staff'}
+                    </p>
+                    {viewBiodataEmployee?.department ? (
+                      <p className="mt-0.5 text-xs text-ink-2">
+                        Departemen: <span className="font-medium text-ink">{viewBiodataEmployee.department.name} ({viewBiodataEmployee.department.code})</span>
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  {employeeBiodata.isCompleted ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
+                      Biodata Terisi Lengkap ✓
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-xs font-semibold text-warning">
+                      Biodata Belum Lengkap ○
+                    </span>
+                  )}
+                  {employeeBiodata.completedAt ? (
+                    <p className="mt-1 text-[11px] text-ink-3">
+                      Diverifikasi: {formatDate(employeeBiodata.completedAt)}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Grid 4 Seksi Data Biodata */}
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* 1. Kependudukan & Pajak */}
+                <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-line pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-primary">§ 1</span>
+                    <h5 className="text-xs font-semibold uppercase tracking-wider text-ink">Kependudukan & Pajak</h5>
+                  </div>
+                  <dl className="space-y-2 text-xs">
+                    <div>
+                      <dt className="text-ink-3 font-medium">Nomor Induk Kependudukan (NIK)</dt>
+                      <dd className="font-mono text-sm font-semibold text-ink tracking-wide mt-0.5">
+                        {employeeBiodata.nik || '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-3 font-medium">Nomor Kartu Keluarga (KK)</dt>
+                      <dd className="font-mono font-medium text-ink mt-0.5">
+                        {employeeBiodata.kkNumber || '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-3 font-medium">NPWP</dt>
+                      <dd className="font-mono font-medium text-ink mt-0.5">
+                        {employeeBiodata.npwp || '—'}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-line/50">
+                      <div>
+                        <dt className="text-ink-3 font-medium">BPJS Ketenagakerjaan</dt>
+                        <dd className="font-mono font-medium text-ink mt-0.5">
+                          {employeeBiodata.bpjsKetenagakerjaan || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-ink-3 font-medium">BPJS Kesehatan</dt>
+                        <dd className="font-mono font-medium text-ink mt-0.5">
+                          {employeeBiodata.bpjsKesehatan || '—'}
+                        </dd>
+                      </div>
+                    </div>
+                  </dl>
+                </div>
+
+                {/* 2. Data Pribadi & Demografi */}
+                <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-line pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-primary">§ 2</span>
+                    <h5 className="text-xs font-semibold uppercase tracking-wider text-ink">Pribadi & Demografi</h5>
+                  </div>
+                  <dl className="space-y-2 text-xs">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <dt className="text-ink-3 font-medium">Jenis Kelamin</dt>
+                        <dd className="font-medium text-ink mt-0.5">
+                          {formatGender(employeeBiodata.gender)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-ink-3 font-medium">Golongan Darah</dt>
+                        <dd className="font-semibold text-ink mt-0.5">
+                          {employeeBiodata.bloodType || '—'}
+                        </dd>
+                      </div>
+                    </div>
+                    <div>
+                      <dt className="text-ink-3 font-medium">Tempat, Tanggal Lahir</dt>
+                      <dd className="font-medium text-ink mt-0.5">
+                        {employeeBiodata.placeOfBirth || '—'}, {formatDate(employeeBiodata.dateOfBirth)}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <dt className="text-ink-3 font-medium">Agama</dt>
+                        <dd className="font-medium text-ink mt-0.5">
+                          {employeeBiodata.religion || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-ink-3 font-medium">Status Pernikahan</dt>
+                        <dd className="font-medium text-ink mt-0.5">
+                          {formatMaritalStatus(employeeBiodata.maritalStatus)}
+                        </dd>
+                      </div>
+                    </div>
+                  </dl>
+                </div>
+
+                {/* 3. Kontak & Domisili */}
+                <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-line pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-primary">§ 3</span>
+                    <h5 className="text-xs font-semibold uppercase tracking-wider text-ink">Kontak & Domisili</h5>
+                  </div>
+                  <dl className="space-y-2 text-xs">
+                    <div>
+                      <dt className="text-ink-3 font-medium">Nomor Telepon / Seluler</dt>
+                      <dd className="font-mono font-semibold text-ink mt-0.5">
+                        {employeeBiodata.phone || '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-3 font-medium">Alamat Sesuai KTP</dt>
+                      <dd className="font-medium text-ink mt-0.5 leading-relaxed">
+                        {employeeBiodata.addressKtp || '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-3 font-medium">Alamat Domisili Sekarang</dt>
+                      <dd className="font-medium text-ink mt-0.5 leading-relaxed">
+                        {employeeBiodata.addressCurrent || '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-3 font-medium">Kota & Wilayah</dt>
+                      <dd className="font-medium text-ink mt-0.5">
+                        {employeeBiodata.city ? `${employeeBiodata.city}, ${employeeBiodata.province || ''} ${employeeBiodata.postalCode ? `(${employeeBiodata.postalCode})` : ''}` : '—'}
+                      </dd>
+                    </div>
+                    <div className="pt-1 border-t border-line/50">
+                      <dt className="text-ink-3 font-medium">Kontak Darurat</dt>
+                      <dd className="font-medium text-ink mt-0.5">
+                        {employeeBiodata.emergencyContactName ? `${employeeBiodata.emergencyContactName} (${employeeBiodata.emergencyContactRelation || 'Kerabat'}) · ${employeeBiodata.emergencyContactPhone || '—'}` : '—'}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                {/* 4. Pendidikan & Rekening Bank */}
+                <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-line pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-primary">§ 4</span>
+                    <h5 className="text-xs font-semibold uppercase tracking-wider text-ink">Pendidikan & Payroll</h5>
+                  </div>
+                  <dl className="space-y-2 text-xs">
+                    <div>
+                      <dt className="text-ink-3 font-medium">Pendidikan Terakhir</dt>
+                      <dd className="font-medium text-ink mt-0.5">
+                        {employeeBiodata.lastEducation || '—'} {employeeBiodata.major ? `· ${employeeBiodata.major}` : ''}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-3 font-medium">Institusi Pendidikan</dt>
+                      <dd className="font-medium text-ink mt-0.5">
+                        {employeeBiodata.institution || '—'}
+                      </dd>
+                    </div>
+                    <div className="pt-1 border-t border-line/50">
+                      <dt className="text-ink-3 font-medium">Rekening Bank Penggajian</dt>
+                      <dd className="font-medium text-ink mt-0.5">
+                        <span className="font-bold text-primary">{employeeBiodata.bankName || '—'}</span>
+                        {employeeBiodata.bankAccountNumber ? (
+                          <span className="font-mono ml-2 font-semibold text-ink">{employeeBiodata.bankAccountNumber}</span>
+                        ) : null}
+                      </dd>
+                      {employeeBiodata.bankAccountHolder ? (
+                        <p className="text-[11px] text-ink-3 mt-0.5">
+                          a.n. {employeeBiodata.bankAccountHolder}
+                        </p>
+                      ) : null}
+                    </div>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Notice tone="info" title="Biodata Belum Lengkap">
+              Karyawan ini belum melengkapi seluruh atribut biodata. Informasi ini dapat dilengkapi oleh karyawan melalui portal profil setelah berhasil masuk.
+            </Notice>
+          )}
+        </DialogBody>
+
+        <DialogFooter>
+          <Button type="button" onClick={() => setViewBiodataEmployee(null)}>
+            Tutup
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   )
 }

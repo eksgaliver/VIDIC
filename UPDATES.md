@@ -449,7 +449,33 @@ Untuk memangkas friksi dan mempercepat pembuatan master shift (*anti-slop*), sis
 
 ---
 
-## § 12. Panduan Perintah Operasional
+## § 12. Pembaruan Sinkronisasi Biodata Karyawan & Dialog Inspeksi HR
+
+Untuk memastikan seluruh data kepegawaian memenuhi standar kelengkapan administrasi, BPJS, perpajakan, dan payroll, sistem telah dilengkapi dengan sinkronisasi biodata terpadu:
+
+### 1. Inisialisasi & Sinkronisasi Biodata Karyawan Lengkap
+• **Database PostgreSQL (`biodata` table)**:
+  - Seluruh pengguna terdaftar (`budi.santoso@srikaya.id`, `siti.rahma@srikaya.id`, `ahmad.fauzi@srikaya.id`, dan `admin@srikaya.id`) telah disinkronisasi dengan biodata lengkap: NIK 16 digit, No. KK, NPWP, BPJS Ketenagakerjaan, BPJS Kesehatan, demografi (tempat/tanggal lahir, agama, golongan darah, status pernikahan), kontak darurat, alamat KTP, alamat domisili, pendidikan terakhir, dan nomor rekening bank payroll.
+  - Status `is_completed` diset `true` dan `completed_at` tercatat otomatis.
+• **Otomatisasi Seeding Bawaan (`services/auth/src/index.ts`)**:
+  - Fungsi `seedDefaultData()` diperkaya dengan `DEFAULT_BIODATA_MAP` sehingga akun awal atau akun yang belum lengkap otomatis terisi data valid saat servis dijalankan.
+• **Script Sinkronisasi Mandiri (`services/auth/src/scripts/seedBiodata.ts`)**:
+  - Disediakan script mandiri untuk inspeksi dan sinkronisasi biodata cepat via `bun run services/auth/src/scripts/seedBiodata.ts`.
+
+### 2. Dialog Inspeksi Rincian Biodata Karyawan pada Antarmuka HR
+• **Halaman Manajemen Karyawan (`apps/web/src/routes/employees.tsx`)**:
+  - Kolom **Biodata & Mail**: Badge status (`Lengkap ✓` / `Belum Diisi ○`) kini bersifat interaktif dan dapat diklik untuk membuka dialog rincian lengkap biodata karyawan.
+  - Kolom **Aksi**: Ditambahkan tombol aksi inspeksi biodata (`HiOutlineIdentification`) untuk akses cepat.
+  - **Dialog Rincian Biodata**:
+    - **Header Profil**: Menampilkan avatar inisial, nama, surel, posisi, departemen, dan badge status kelengkapan serta tanggal verifikasi.
+    - **§ 1 Kependudukan & Pajak**: Menampilkan NIK (16 digit), No. KK, NPWP, BPJS Ketenagakerjaan, dan BPJS Kesehatan.
+    - **§ 2 Pribadi & Demografi**: Menampilkan jenis kelamin, golongan darah, tempat & tanggal lahir, agama, dan status pernikahan.
+    - **§ 3 Kontak & Domisili**: Menampilkan nomor telepon/seluler, alamat KTP, alamat domisili sekarang, kota/provinsi/kodepos, dan kontak darurat (nama, relasi, nomor HP).
+    - **§ 4 Pendidikan & Payroll**: Menampilkan jenjang pendidikan & jurusan, institusi, nama bank payroll, nomor rekening, dan nama pemilik rekening.
+
+---
+
+## § 13. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):
