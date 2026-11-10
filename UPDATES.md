@@ -535,7 +535,49 @@ Halaman utama Dasbor (`apps/web/src/routes/dashboard.tsx`) kini telah dilengkapi
 
 ---
 
-## § 15. Panduan Perintah Operasional
+## § 15. Halaman Postingan Berita & Pengumuman Bergaya X (Twitter) & Instagram
+
+Telah dibangun modul lengkap halaman publikasi dan interaksi sosial linimasa perusahaan (`apps/web/src/routes/posts.tsx`) dengan endpoint backend PostgreSQL (`services/auth/src/routes/posts.ts`):
+
+### 1. Desain Linimasa Modern (*Anti-Slop X / Twitter & Instagram Style*)
+• **Komposer Postingan Fleksibel**:
+  - Input teks dinamis ("Ada berita, jadwal operasional, atau edaran penting apa hari ini?") yang otomatis membesar saat difokuskan.
+  - Bidang opsional judul berita/edaran dengan tipografi tajam dan berbobot.
+  - Pemilih kategori instan (Pengumuman Resmi, Berita Internal, Operasional & Shift, Prestasi Tim, Umum).
+  - Unggah foto/gambar langsung dari komputer/perangkat (terkompresi WebP via `storage-service`) atau sematkan tautan URL web, dilengkapi kartu pratinjau dan opsi hapus gambar.
+  - Opsi sematkan pengumuman prioritas (*pin to top*) khusus untuk pengguna bertingkat admin atau HR.
+  - Indikator penghitung karakter dan tombol kirim dengan transisi halus.
+• **Feed Kartu Postingan Elegan**:
+  - **Banner Disematkan**: Menampilkan penanda prioritas amber `★ Pengumuman Prioritas · Disematkan oleh Manajemen` untuk edaran wajib.
+  - **Identitas Penulis**: Avatar foto/inisial bulat, nama tebal, badge terverifikasi `✓` (untuk admin/HR), jabatan, divisi perusahaan, penanda waktu relatif (*relative time*: "Baru saja", "15 mnt lalu", "2 jam lalu", "Kemarin"), dan badge kategori.
+  - **Tipografi Bersih**: Judul terstruktur jelas dan konten paragraf menjaga kerapian jarak baris.
+  - **Tampilan Media Bergaya Instagram / X**: Pratinjau gambar terlampir dengan rasio proporsional, sudut membulat, dan fitur perbesaran dialog modal gambar penuh (*full zoom*) saat diklik.
+  - **Bar Interaksi Sosial Terpadu**:
+    - Tombol Suka / Hati (`♥` / `♡`) dengan pembaruan instan (*optimistic UI*) dan penghitung live.
+    - Tombol Komentar (`HiOutlineChatAlt2`) dengan penghitung komentar yang membuka thread diskusi.
+    - Tombol Bagikan (`HiOutlineShare`) yang menyalin tautan jangkar postingan langsung ke papan klip (*clipboard*) disertai notifikasi konfirmasi `✓ Tersalin`.
+    - Tombol Hapus Postingan (`HiOutlineTrash`) dengan konfirmasi dialog, khusus untuk pembuat postingan atau admin.
+• **Thread Komentar Interaktif (*Inline Comments*)**:
+  - Menampilkan daftar tanggapan terdahulu dengan avatar, nama pembuat komentar, label peran, dan waktu relatif.
+  - Formulir kirim komentar cepat dengan tombol kirim `HiOutlinePaperAirplane`.
+• **Filter & Pencarian Real-time**:
+  - Filter kategori berbentuk tombol pil (*pills*): `Semua Postingan`, `Pengumuman Resmi`, `Berita Internal`, `Operasional & Shift`, `Prestasi Tim`, `Umum & Diskusi`.
+  - Bilah pencarian instan untuk mencari kata kunci isi, judul, maupun nama penulis berita.
+
+### 2. Arsitektur Basis Data & Backend Microservice
+• **Tabel PostgreSQL**:
+  - `posts`: Menyimpan `company_id`, `author_id`, `title`, `content`, `category`, `media_urls` (JSONB array), `is_pinned`, `likes_count`, `liked_user_ids` (JSONB array), `comments_count`, `created_at`, `updated_at`.
+  - `post_comments`: Menyimpan `post_id` (foreign key berjenjang `onDelete: cascade`), `author_id`, `content`, `created_at`, `updated_at`.
+• **API Endpoints (`services/auth/src/routes/posts.ts`)**:
+  - `GET /api/posts`: Mengambil feed linimasa lengkap dengan relasi `author`, `department`, penghitung like, status `isLiked` per sesi aktif, dan komentar terurut.
+  - `POST /api/posts`: Validasi JWT dan pembuatan postingan baru.
+  - `POST /api/posts/:id/like`: Mengaktifkan/menonaktifkan (toggle) like pengguna dan menyesuaikan `likes_count`.
+  - `POST /api/posts/:id/comments`: Menambahkan komentar baru dan menaikkan `comments_count`.
+  - `DELETE /api/posts/:id`: Menghapus postingan beserta seluruh relasi komentar (otorisasi author atau admin).
+
+---
+
+## § 16. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):

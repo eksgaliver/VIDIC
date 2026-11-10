@@ -199,3 +199,46 @@ export interface Shift {
   createdAt?: string | Date
   updatedAt?: string | Date
 }
+
+export interface PostAuthor {
+  id: string
+  name: string
+  email: string
+  avatarUrl?: string | null
+  position?: string | null
+  role: string
+  department?: {
+    name: string
+    code: string
+  } | null
+}
+
+export interface PostCommentItem {
+  id: string
+  postId: string
+  authorId: string
+  content: string
+  createdAt: string | Date
+  authorName: string | null
+  authorEmail: string | null
+  authorAvatarUrl?: string | null
+  authorRole?: string | null
+}
+
+export interface PostItem {
+  id: string
+  companyId: string
+  title?: string | null
+  content: string
+  category: 'announcement' | 'news' | 'operational' | 'achievement' | 'general' | string
+  mediaUrls: string[]
+  isPinned: boolean
+  likesCount: number
+  commentsCount: number
+  createdAt: string | Date
+  updatedAt: string | Date
+  isLiked?: boolean
+  author: PostAuthor
+  comments?: PostCommentItem[]
+}
+

@@ -8,12 +8,14 @@ import { companyRoutes } from './routes/companies'
 import { departmentRoutes } from './routes/departments'
 import { employeeRoutes } from './routes/employees'
 import { uploadRoutes } from './routes/upload'
+import { postRoutes } from './routes/posts'
 import { handleAvatarUpload, deleteStoredAvatar } from './handlers/uploadHandler'
 
 export { companyRoutes } from './routes/companies'
 export { departmentRoutes } from './routes/departments'
 export { employeeRoutes } from './routes/employees'
 export { uploadRoutes } from './routes/upload'
+export { postRoutes } from './routes/posts'
 
 interface AuthUser {
   id: string
@@ -909,6 +911,7 @@ export const authApp = new Elysia()
   .use(departmentRoutes)
   .use(employeeRoutes)
   .use(uploadRoutes)
+  .use(postRoutes)
 
 // Jalankan server jika dieksekusi langsung
 if (import.meta.main) {

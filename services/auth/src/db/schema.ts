@@ -266,6 +266,47 @@ export const biodataRelations = relations(biodata, ({ one }) => ({
   })
 }))
 
+// 8. Tabel Postingan Berita & Pengumuman (Posts)
+export const posts = pgTable('posts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id')
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  authorId: uuid('author_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }),
+  content: text('content').notNull(),
+  category: varchar('category', { length: 50 }).default('general').notNull(),
+  mediaUrls: jsonb('media_urls').$type<string[]>().default([]),
+  isPinned: boolean('is_pinned').default(false).notNull(),
+  likesCount: integer('likes_count').default(0).notNull(),
+  likedUserIds: jsonb('liked_user_ids').$type<string[]>().default([]),
+  commentsCount: integer('comments_count').default(0).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_posts_company_id').on(table.companyId),
+  index('idx_posts_author_id').on(table.authorId),
+  index('idx_posts_category').on(table.category),
+  index('idx_posts_is_pinned').on(table.isPinned),
+  index('idx_posts_created_at').on(table.createdAt)
+])
+
+// 9. Tabel Komentar Postingan (Post Comments)
+export const postComments = pgTable('post_comments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  postId: uuid('post_id')
+    .notNull()
+    .references(() => posts.id, { onDelete: 'cascade' }),
+  authorId: uuid('author_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_post_comments_post_id').on(table.postId)
+])
+
 // Inferensi Tipe TypeScript
 export type Company = typeof companies.$inferSelect
 export type NewCompany = typeof companies.$inferInsert
@@ -281,4 +322,8 @@ export type Mail = typeof mail.$inferSelect
 export type NewMail = typeof mail.$inferInsert
 export type Biodata = typeof biodata.$inferSelect
 export type NewBiodata = typeof biodata.$inferInsert
+export type Post = typeof posts.$inferSelect
+export type NewPost = typeof posts.$inferInsert
+export type PostComment = typeof postComments.$inferSelect
+export type NewPostComment = typeof postComments.$inferInsert
 

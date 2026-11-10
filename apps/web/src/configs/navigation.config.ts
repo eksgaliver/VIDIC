@@ -3,6 +3,7 @@ import {
   HiOutlineClock,
   HiOutlineHome,
   HiOutlineOfficeBuilding,
+  HiOutlineSpeakerphone,
   HiOutlineUserCircle,
   HiOutlineUsers,
   HiOutlineViewGrid
@@ -12,6 +13,7 @@ import {
   COMPANIES_PATH,
   DEPARTMENTS_PATH,
   EMPLOYEES_PATH,
+  POSTS_PATH,
   PROFILE_PATH,
   SHIFTS_PATH
 } from '@/constants/route.constant'
@@ -59,6 +61,13 @@ export const navigationConfig: NavigationItem[] = [
     title: 'Shift',
     path: SHIFTS_PATH,
     icon: HiOutlineClock,
+    section: 'workspace'
+  },
+  {
+    key: 'posts',
+    title: 'Postingan',
+    path: POSTS_PATH,
+    icon: HiOutlineSpeakerphone,
     section: 'workspace'
   },
   {

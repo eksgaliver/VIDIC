@@ -8,6 +8,7 @@ import { companiesRoute } from './routes/companies'
 import { departmentsRoute } from './routes/departments'
 import { employeesRoute } from './routes/employees'
 import { shiftsRoute } from './routes/shifts'
+import { postsRoute } from './routes/posts'
 import { profileRoute } from './routes/profile'
 import { QueryClient } from '@tanstack/react-query'
 
@@ -30,6 +31,7 @@ const routeTree = rootRoute.addChildren([
     departmentsRoute,
     employeesRoute,
     shiftsRoute,
+    postsRoute,
     profileRoute
   ])
 ])
