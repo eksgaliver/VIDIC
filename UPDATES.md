@@ -577,7 +577,41 @@ Telah dibangun modul lengkap halaman publikasi dan interaksi sosial linimasa per
 
 ---
 
-## § 16. Panduan Perintah Operasional
+## § 16. Penegakan Isolasi Multi-Tenant & Halaman Skala Sub-User (Zero Cross-Tenant Data Leak)
+
+Telah diimplementasikan arsitektur proteksi multi-tenant penuh di seluruh mikroservis backend (`auth-service` dan `shifting-service`) serta antarmuka web khusus **Skala Sub-User & Isolasi Perusahaan** (`apps/web/src/routes/sub-users.tsx`):
+
+### 1. Penegakan Batas Multi-Tenant Backend (*Tenant Boundary Isolation*)
+• **Resolusi Otomatis Sub-User via JWT**:
+  - Token JWT kini menyertakan `companyId` resmi pengguna.
+  - Setiap permintaan API divalidasi silang terhadap identitas `companyId` pengguna aktif melalui utilitas [`tenant.ts`](file:///c:/project/services/auth/src/utils/tenant.ts).
+• **Pencegahan Kebocoran Data Lintas Perusahaan (*Cross-Tenant Leak Prevention*)**:
+  - **Profil Badan Usaha (`/companies`)**: Sub-user hanya diizinkan melihat data perusahaannya sendiri. Percobaan membaca, mengubah, atau menghapus profil perusahaan lain ditolak dengan respons status **`403 Forbidden`**.
+  - **Departemen Organisasi (`/departments`)**: Permintaan daftar departemen secara otomatis dikunci pada `departments.companyId === user.companyId`. Jika klien mengirimkan kueri `companyId` milik perusahaan lain, sistem mengembalikan **`403 Forbidden`**.
+  - **Data Karyawan & Biodata (`/employees`)**: Sub-user Perusahaan A tidak dapat membaca atau memodifikasi karyawan Perusahaan B. Akses diblokir dengan **`403 Forbidden`**.
+  - **Shift Kerja & Geofence Titik Presensi (`/shifts`)**: Jadwal kerja, jam operasional harian, dan perimeter koordinat presensi dikunci ketat per `companyId`. Usaha akses lintas entitas menghasilkan **`403 Forbidden`**.
+  - **Feed Postingan & Pengumuman (`/posts`)**: Linimasa kabar perusahaan hanya menampilkan edaran internal milik perusahaan bersangkutan.
+
+### 2. Modul Skala Sub-User & Audit Penetrasi Interaktif (`/sub-users`)
+• **Kartu Lingkup Batas Tenant (*Tenant Boundary Scope Card*)**:
+  - Menampilkan profil perusahaan aktif, kode badan usaha, jumlah sub-user yang terikat, serta status perlindungan *Zero Cross-Tenant Leak Active*.
+• **Audit Penetrasi & Simulasi Isolasi Antar-Perusahaan (*Interactive Cross-Tenant Audit Tool*)**:
+  - Panel interaktif yang memungkinkan admin perusahaan memilih badan usaha pembanding (misal: PT Nusantara Logistik Prima vs PT Srikaya Digital Solusindo).
+  - Melakukan simulasi pengujian penetrasi 4 titik rawan data secara *real-time* melalui endpoint backend `POST /api/sub-users/test-isolation`:
+    1. *Uji Akses Profil Badan Usaha* -> `403 Forbidden (Terisolasi Aman ✓)`
+    2. *Uji Akses Departemen Organisasi* -> `403 Forbidden (Terisolasi Aman ✓)`
+    3. *Uji Akses Data Karyawan & Biodata* -> `403 Forbidden (Terisolasi Aman ✓)`
+    4. *Uji Akses Jam Kerja & Shift Geofence* -> `403 Forbidden (Terisolasi Aman ✓)`
+  - Menampilkan putusan keamanan definitif (*security verdict*) bahwa batas organisasi terisolasi 100%.
+• **Tata Kelola Akun Sub-User**:
+  - Tabel daftar sub-user lengkap dengan filter peran (*Admin Perusahaan*, *Sub-User / Anggota*) dan pencarian cepat.
+  - Formulir pendaftaran sub-user baru yang secara otomatis mengunci `companyId` pada perusahaan aktif.
+  - Dialog perubahan peran, departemen, dan reset kata sandi sub-user.
+  - Dialog konfirmasi pencabutan hak akses sub-user.
+
+---
+
+## § 17. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):
@@ -589,7 +623,10 @@ bun run --cwd services/shifting src/index.ts   # Port 3003
 bun run --cwd services/storage src/index.ts    # Port 3002
 bun run --cwd services/gateway src/index.ts    # Port 3000
 
-# 3. Kompilasi & validasi tipe frontend:
+# 3. Menjalankan pengujian otomatis isolasi multi-tenant:
+bun run services/auth/src/scripts/testIsolation.ts
+
+# 4. Kompilasi & validasi tipe frontend:
 npm --prefix apps/web run build
 ```
 

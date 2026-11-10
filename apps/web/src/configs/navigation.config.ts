@@ -3,6 +3,7 @@ import {
   HiOutlineClock,
   HiOutlineHome,
   HiOutlineOfficeBuilding,
+  HiOutlineShieldCheck,
   HiOutlineSpeakerphone,
   HiOutlineUserCircle,
   HiOutlineUsers,
@@ -15,7 +16,8 @@ import {
   EMPLOYEES_PATH,
   POSTS_PATH,
   PROFILE_PATH,
-  SHIFTS_PATH
+  SHIFTS_PATH,
+  SUBUSERS_PATH
 } from '@/constants/route.constant'
 
 export interface NavigationItem {
@@ -68,6 +70,13 @@ export const navigationConfig: NavigationItem[] = [
     title: 'Postingan',
     path: POSTS_PATH,
     icon: HiOutlineSpeakerphone,
+    section: 'workspace'
+  },
+  {
+    key: 'sub-users',
+    title: 'Skala Sub-User',
+    path: SUBUSERS_PATH,
+    icon: HiOutlineShieldCheck,
     section: 'workspace'
   },
   {

@@ -443,3 +443,4 @@ export const postRoutes = new Elysia({ prefix: '/posts' })
   }, {
     params: t.Object({ id: t.String() })
   })
+

@@ -1,8 +1,10 @@
 import { Elysia, t } from 'elysia'
+import { jwt } from '@elysiajs/jwt'
 import { db } from '../db'
 import { companies, companyLocations, departments, companyOperationalAreas } from '../db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { handleLogoUpload } from '../handlers/uploadHandler'
+import { resolveTenantUser, assertCompanyAccess } from '../utils/tenant'
 
 const listCompanies = async () => {
   return await db.query.companies.findMany({
@@ -176,11 +178,55 @@ const handleCreateCompany = async ({ body, set }: any) => {
 }
 
 export const companyRoutes = new Elysia({ prefix: '/companies' })
-  // 1. Daftar Perusahaan
-  .get('', listCompanies)
-  .get('/', listCompanies)
-  // 2. Detail Satu Perusahaan
-  .get('/:id', async ({ params, set }) => {
+  .use(
+    jwt({
+      name: 'jwt',
+      secret: process.env.JWT_SECRET || 'srikaya-enterprise-jwt-secret-key-2026',
+      exp: '7d'
+    })
+  )
+  // 1. Daftar Perusahaan (Dibatasi hanya perusahaan sendiri bagi sub-user)
+  .get('', async ({ headers, jwt }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user && user.companyId && user.role !== 'superadmin') {
+      return await db.query.companies.findMany({
+        where: eq(companies.id, user.companyId),
+        orderBy: [desc(companies.createdAt)],
+        with: {
+          locations: true,
+          departments: true,
+          operationalAreas: true
+        }
+      })
+    }
+    return await listCompanies()
+  })
+  .get('/', async ({ headers, jwt }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user && user.companyId && user.role !== 'superadmin') {
+      return await db.query.companies.findMany({
+        where: eq(companies.id, user.companyId),
+        orderBy: [desc(companies.createdAt)],
+        with: {
+          locations: true,
+          departments: true,
+          operationalAreas: true
+        }
+      })
+    }
+    return await listCompanies()
+  })
+  // 2. Detail Satu Perusahaan (Dilindungi batas isolasi tenant)
+  .get('/:id', async ({ params, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user) {
+      const check = assertCompanyAccess(user, params.id)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const company = await db.query.companies.findFirst({
       where: eq(companies.id, params.id),
       with: {
@@ -201,7 +247,16 @@ export const companyRoutes = new Elysia({ prefix: '/companies' })
     })
   })
   // 2b. Perbarui / Set Wilayah & Kota Operasional Perusahaan
-  .put('/:id/operational-areas', async ({ params, body, set }) => {
+  .put('/:id/operational-areas', async ({ params, headers, jwt, body, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user) {
+      const check = assertCompanyAccess(user, params.id)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const [existing] = await db.select().from(companies).where(eq(companies.id, params.id)).limit(1)
     if (!existing) {
       set.status = 404
@@ -251,7 +306,16 @@ export const companyRoutes = new Elysia({ prefix: '/companies' })
   .post('', handleCreateCompany, createCompanySchema)
   .post('/', handleCreateCompany, createCompanySchema)
   // 4. Ubah Data Profil Perusahaan
-  .put('/:id', async ({ params, body, set }) => {
+  .put('/:id', async ({ params, headers, jwt, body, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user) {
+      const check = assertCompanyAccess(user, params.id)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const [existing] = await db.select().from(companies).where(eq(companies.id, params.id)).limit(1)
     if (!existing) {
       set.status = 404
@@ -291,7 +355,16 @@ export const companyRoutes = new Elysia({ prefix: '/companies' })
     })
   })
   // 4b. Unggah & Perbarui Logo Perusahaan
-  .post('/:id/logo', async ({ params, body, set }) => {
+  .post('/:id/logo', async ({ params, headers, jwt, body, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user) {
+      const check = assertCompanyAccess(user, params.id)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const [existing] = await db.select().from(companies).where(eq(companies.id, params.id)).limit(1)
     if (!existing) {
       set.status = 404
@@ -334,7 +407,16 @@ export const companyRoutes = new Elysia({ prefix: '/companies' })
     })
   })
   // 5. Hapus Perusahaan (Cascade ke Lokasi dan Departemen)
-  .delete('/:id', async ({ params, set }) => {
+  .delete('/:id', async ({ params, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user) {
+      const check = assertCompanyAccess(user, params.id)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const [existing] = await db.select().from(companies).where(eq(companies.id, params.id)).limit(1)
     if (!existing) {
       set.status = 404
@@ -349,7 +431,16 @@ export const companyRoutes = new Elysia({ prefix: '/companies' })
     })
   })
   // 6. Tambah Titik Lokasi Operasional Tambahan ke Perusahaan
-  .post('/:id/locations', async ({ params, body, set }) => {
+  .post('/:id/locations', async ({ params, headers, jwt, body, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user) {
+      const check = assertCompanyAccess(user, params.id)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const [company] = await db.select().from(companies).where(eq(companies.id, params.id)).limit(1)
     if (!company) {
       set.status = 404

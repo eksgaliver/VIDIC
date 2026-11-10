@@ -9,6 +9,7 @@ import { departmentRoutes } from './routes/departments'
 import { employeeRoutes } from './routes/employees'
 import { uploadRoutes } from './routes/upload'
 import { postRoutes } from './routes/posts'
+import { subUserRoutes } from './routes/subusers'
 import { handleAvatarUpload, deleteStoredAvatar } from './handlers/uploadHandler'
 
 export { companyRoutes } from './routes/companies'
@@ -16,6 +17,7 @@ export { departmentRoutes } from './routes/departments'
 export { employeeRoutes } from './routes/employees'
 export { uploadRoutes } from './routes/upload'
 export { postRoutes } from './routes/posts'
+export { subUserRoutes } from './routes/subusers'
 
 interface AuthUser {
   id: string
@@ -410,6 +412,7 @@ async function resolveSessionUser(payload: unknown): Promise<AuthUser | null> {
 function toPublicUser(user: AuthUser) {
   return {
     id: user.id,
+    companyId: user.companyId ?? null,
     name: user.name,
     email: user.email,
     role: user.role,
@@ -473,20 +476,14 @@ export const authService = new Elysia({ prefix: '/auth' })
     const token = await jwt.sign({
       sub: foundUser.id,
       email: foundUser.email,
-      role: foundUser.role
+      role: foundUser.role,
+      companyId: foundUser.companyId ?? null
     })
 
     return {
       success: true,
       token,
-      user: {
-        id: foundUser.id,
-        name: foundUser.name,
-        email: foundUser.email,
-        role: foundUser.role,
-        avatarUrl: foundUser.avatarUrl ?? null,
-        createdAt: foundUser.createdAt
-      },
+      user: toPublicUser(foundUser),
       message: 'Autentikasi berhasil'
     }
   }, {
@@ -912,6 +909,7 @@ export const authApp = new Elysia()
   .use(employeeRoutes)
   .use(uploadRoutes)
   .use(postRoutes)
+  .use(subUserRoutes)
 
 // Jalankan server jika dieksekusi langsung
 if (import.meta.main) {

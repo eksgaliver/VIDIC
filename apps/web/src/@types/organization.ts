@@ -242,3 +242,52 @@ export interface PostItem {
   comments?: PostCommentItem[]
 }
 
+export interface SubUserItem {
+  id: string
+  name: string
+  email: string
+  position?: string | null
+  role: string
+  status: string
+  companyId: string
+  departmentId?: string | null
+  shiftId?: string | null
+  departmentName?: string | null
+  departmentCode?: string | null
+  createdAt: string | Date
+  updatedAt: string | Date
+}
+
+export interface IsolationAuditTestItem {
+  testName: string
+  endpoint: string
+  simulatedUser: string
+  callerCompany: string
+  targetCompany: string
+  status: number
+  passed: boolean
+  result: string
+  detail: string
+}
+
+export interface IsolationAuditReport {
+  success: boolean
+  timestamp: string
+  caller: {
+    id: string
+    name: string
+    email: string
+    companyId: string
+    companyName: string
+  }
+  target: {
+    companyId: string
+    companyName: string
+    companyCode: string
+  }
+  isDifferentCompany: boolean
+  allPassed: boolean
+  tests: IsolationAuditTestItem[]
+  verdict: string
+}
+

@@ -1,4 +1,5 @@
 import { Elysia, t } from 'elysia'
+import { jwt } from '@elysiajs/jwt'
 import { and, desc, eq, inArray, type SQL } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import {
@@ -672,29 +673,80 @@ const shiftBodySchema = {
   })
 }
 
+async function resolveShiftingUser(headers: Record<string, string | undefined>, jwtInstance: any) {
+  const authHeader = headers['authorization']
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null
+  try {
+    const payload = (await jwtInstance.verify(authHeader.slice(7))) as { sub?: string }
+    if (!payload?.sub) return null
+    const [row] = await db.select().from(users).where(eq(users.id, payload.sub)).limit(1)
+    return row || null
+  } catch {
+    return null
+  }
+}
+
 export const shiftRoutes = new Elysia({ prefix: '/shifts' })
-  .get('', async ({ query }) => {
-    const rows = await listShiftRows(query.companyId)
+  .use(
+    jwt({
+      name: 'jwt',
+      secret: process.env.JWT_SECRET || 'srikaya-enterprise-jwt-secret-key-2026',
+      exp: '7d'
+    })
+  )
+  .get('', async ({ query, headers, jwt, set }) => {
+    const user = await resolveShiftingUser(headers, jwt)
+    let companyId = query.companyId
+
+    if (user && user.companyId && user.role !== 'superadmin') {
+      if (companyId && companyId !== user.companyId) {
+        set.status = 403
+        return { success: false, message: 'Akses ditolak: Anda tidak memiliki izin untuk melihat jadwal shift perusahaan lain.' }
+      }
+      companyId = user.companyId
+    }
+
+    const rows = await listShiftRows(companyId)
     return { success: true, data: await attachAttendance(rows) }
   }, {
     query: t.Object({
       companyId: t.Optional(t.String())
     })
   })
-  .get('/', async ({ query }) => {
-    const rows = await listShiftRows(query.companyId)
+  .get('/', async ({ query, headers, jwt, set }) => {
+    const user = await resolveShiftingUser(headers, jwt)
+    let companyId = query.companyId
+
+    if (user && user.companyId && user.role !== 'superadmin') {
+      if (companyId && companyId !== user.companyId) {
+        set.status = 403
+        return { success: false, message: 'Akses ditolak: Anda tidak memiliki izin untuk melihat jadwal shift perusahaan lain.' }
+      }
+      companyId = user.companyId
+    }
+
+    const rows = await listShiftRows(companyId)
     return { success: true, data: await attachAttendance(rows) }
   }, {
     query: t.Object({
       companyId: t.Optional(t.String())
     })
   })
-  .get('/:id', async ({ params, set }) => {
+  .get('/:id', async ({ params, headers, jwt, set }) => {
+    const user = await resolveShiftingUser(headers, jwt)
     const shift = await getShiftDetail(params.id)
     if (!shift) {
       set.status = 404
       return { success: false, message: 'Shift tidak ditemukan.' }
     }
+
+    if (user && user.companyId && user.role !== 'superadmin') {
+      if (shift.companyId !== user.companyId) {
+        set.status = 403
+        return { success: false, message: 'Akses ditolak: Anda tidak memiliki izin untuk mengakses shift perusahaan lain.' }
+      }
+    }
+
     return { success: true, data: shift }
   }, {
     params: t.Object({ id: t.String() })
@@ -769,7 +821,15 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
       longitude: t.Number()
     })
   })
-  .post('', async ({ body, set }) => {
+  .post('', async ({ body, headers, jwt, set }) => {
+    const user = await resolveShiftingUser(headers, jwt)
+    if (user && user.companyId && user.role !== 'superadmin') {
+      if (body.companyId !== user.companyId) {
+        set.status = 403
+        return { success: false, message: 'Akses ditolak: Anda tidak memiliki wewenang membuat shift untuk perusahaan lain.' }
+      }
+    }
+
     const validated = await validateShiftInput(body)
     if (!validated.ok) {
       set.status = validated.status
@@ -920,9 +980,10 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
       message: 'Master shift berhasil dibuat.'
     }
   }, shiftBodySchema)
-  .put('/:id', async ({ params, body, set }) => {
+  .put('/:id', async ({ params, headers, jwt, body, set }) => {
+    const user = await resolveShiftingUser(headers, jwt)
     const [existing] = await db
-      .select({ id: shifts.id })
+      .select({ id: shifts.id, companyId: shifts.companyId })
       .from(shifts)
       .where(eq(shifts.id, params.id))
       .limit(1)
@@ -930,6 +991,13 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
     if (!existing) {
       set.status = 404
       return { success: false, message: 'Shift tidak ditemukan.' }
+    }
+
+    if (user && user.companyId && user.role !== 'superadmin') {
+      if (existing.companyId !== user.companyId) {
+        set.status = 403
+        return { success: false, message: 'Akses ditolak: Anda tidak dapat memperbarui shift perusahaan lain.' }
+      }
     }
 
     const validated = await validateShiftInput(body)
@@ -1022,9 +1090,10 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
     params: t.Object({ id: t.String() }),
     ...shiftBodySchema
   })
-  .delete('/:id', async ({ params, set }) => {
+  .delete('/:id', async ({ params, headers, jwt, set }) => {
+    const user = await resolveShiftingUser(headers, jwt)
     const [existing] = await db
-      .select({ id: shifts.id })
+      .select({ id: shifts.id, companyId: shifts.companyId })
       .from(shifts)
       .where(eq(shifts.id, params.id))
       .limit(1)
@@ -1032,6 +1101,13 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
     if (!existing) {
       set.status = 404
       return { success: false, message: 'Shift tidak ditemukan.' }
+    }
+
+    if (user && user.companyId && user.role !== 'superadmin') {
+      if (existing.companyId !== user.companyId) {
+        set.status = 403
+        return { success: false, message: 'Akses ditolak: Anda tidak dapat menghapus shift perusahaan lain.' }
+      }
     }
 
     await db.transaction(async (tx) => {

@@ -11,9 +11,10 @@ export type LoginInput = z.infer<typeof loginSchema>
 // 2. Data Transfer Object (DTO) Pengguna
 export const userDtoSchema = z.object({
   id: z.string().uuid(),
+  companyId: z.string().nullable().optional(),
   email: z.string().email(),
   name: z.string(),
-  role: z.enum(['admin', 'member', 'guest']),
+  role: z.enum(['admin', 'member', 'guest', 'superadmin']),
   avatarUrl: z.string().nullable().optional(),
   createdAt: z.string().or(z.date())
 })

@@ -1,8 +1,10 @@
 import { Elysia, t } from 'elysia'
+import { jwt } from '@elysiajs/jwt'
 import { and, eq, type SQL } from 'drizzle-orm'
 import { alias, pgTable, time, uuid, varchar } from 'drizzle-orm/pg-core'
 import { db } from '../db'
 import { companies, departments, users, mail, biodata } from '../db/schema'
+import { resolveTenantUser, assertCompanyAccess } from '../utils/tenant'
 
 // Referensi tabel shifts untuk relasi penugasan shift pada karyawan
 const shifts = pgTable('shifts', {
@@ -132,6 +134,7 @@ function mapEmployee(row: Record<string, any>) {
 
   return {
     ...employee,
+    companyId: (employee.companyId as string) || '',
     biodataCompleted: Boolean(biodataCompleted),
     department: employee.departmentId
       ? { id: employee.departmentId, name: departmentName, code: departmentCode }
@@ -240,33 +243,81 @@ const updateEmployeeSchema = {
 }
 
 export const employeeRoutes = new Elysia({ prefix: '/employees' })
-  .get('', async ({ query }) => {
-    const rows = await listEmployeeRows(query.companyId)
+  .use(
+    jwt({
+      name: 'jwt',
+      secret: process.env.JWT_SECRET || 'srikaya-enterprise-jwt-secret-key-2026',
+      exp: '7d'
+    })
+  )
+  .get('', async ({ query, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    let companyId = query.companyId
+
+    if (user && user.companyId && user.role !== 'superadmin') {
+      if (companyId && companyId !== user.companyId) {
+        set.status = 403
+        return { success: false, message: 'Akses ditolak: Anda tidak memiliki wewenang melihat data karyawan perusahaan lain.' }
+      }
+      companyId = user.companyId
+    }
+
+    const rows = await listEmployeeRows(companyId)
     return { success: true, data: rows.map(mapEmployee) }
   }, {
     query: t.Object({
       companyId: t.Optional(t.String())
     })
   })
-  .get('/', async ({ query }) => {
-    const rows = await listEmployeeRows(query.companyId)
+  .get('/', async ({ query, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    let companyId = query.companyId
+
+    if (user && user.companyId && user.role !== 'superadmin') {
+      if (companyId && companyId !== user.companyId) {
+        set.status = 403
+        return { success: false, message: 'Akses ditolak: Anda tidak memiliki wewenang melihat data karyawan perusahaan lain.' }
+      }
+      companyId = user.companyId
+    }
+
+    const rows = await listEmployeeRows(companyId)
     return { success: true, data: rows.map(mapEmployee) }
   }, {
     query: t.Object({
       companyId: t.Optional(t.String())
     })
   })
-  .get('/:id', async ({ params, set }) => {
+  .get('/:id', async ({ params, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
     const employee = await getEmployeeDetail(params.id)
     if (!employee) {
       set.status = 404
       return { success: false, message: 'Karyawan tidak ditemukan.' }
     }
+
+    if (user) {
+      const check = assertCompanyAccess(user, employee.companyId)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     return { success: true, data: employee }
   }, {
     params: t.Object({ id: t.String() })
   })
-  .post('', async ({ body, set }) => {
+  .post('', async ({ body, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    if (user) {
+      const check = assertCompanyAccess(user, body.companyId)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const name = body.name.trim()
     const email = body.email.trim().toLowerCase()
     const position = body.position.trim()
@@ -424,7 +475,8 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       message: `Karyawan berhasil ditambahkan. Kata sandi awal: ${INITIAL_PASSWORD}`
     }
   }, createEmployeeSchema)
-  .put('/:id', async ({ params, body, set }) => {
+  .put('/:id', async ({ params, headers, jwt, body, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
     const [existing] = await db
       .select({
         id: users.id,
@@ -441,6 +493,14 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
     if (!existing.companyId) {
       set.status = 400
       return { success: false, message: 'Karyawan belum terhubung ke perusahaan.' }
+    }
+
+    if (user) {
+      const check = assertCompanyAccess(user, existing.companyId)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
     }
 
     const email = body.email.trim().toLowerCase()
@@ -491,9 +551,10 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
     params: t.Object({ id: t.String() }),
     ...updateEmployeeSchema
   })
-  .delete('/:id', async ({ params, set }) => {
+  .delete('/:id', async ({ params, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
     const [existing] = await db
-      .select({ id: users.id, name: users.name })
+      .select({ id: users.id, name: users.name, companyId: users.companyId })
       .from(users)
       .where(eq(users.id, params.id))
       .limit(1)
@@ -501,6 +562,14 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
     if (!existing) {
       set.status = 404
       return { success: false, message: 'Karyawan tidak ditemukan.' }
+    }
+
+    if (user) {
+      const check = assertCompanyAccess(user, existing.companyId)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
     }
 
     await db.delete(users).where(eq(users.id, params.id))
@@ -511,7 +580,27 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
   }, {
     params: t.Object({ id: t.String() })
   })
-  .get('/:id/biodata', async ({ params, set }) => {
+  .get('/:id/biodata', async ({ params, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    const [existing] = await db
+      .select({ id: users.id, companyId: users.companyId })
+      .from(users)
+      .where(eq(users.id, params.id))
+      .limit(1)
+
+    if (!existing) {
+      set.status = 404
+      return { success: false, message: 'Karyawan tidak ditemukan.' }
+    }
+
+    if (user) {
+      const check = assertCompanyAccess(user, existing.companyId)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const [row] = await db
       .select()
       .from(biodata)
@@ -526,7 +615,27 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
   }, {
     params: t.Object({ id: t.String() })
   })
-  .get('/:id/mails', async ({ params }) => {
+  .get('/:id/mails', async ({ params, headers, jwt, set }) => {
+    const user = await resolveTenantUser(headers, jwt)
+    const [existing] = await db
+      .select({ id: users.id, companyId: users.companyId })
+      .from(users)
+      .where(eq(users.id, params.id))
+      .limit(1)
+
+    if (!existing) {
+      set.status = 404
+      return { success: false, message: 'Karyawan tidak ditemukan.' }
+    }
+
+    if (user) {
+      const check = assertCompanyAccess(user, existing.companyId)
+      if (!check.allowed) {
+        set.status = 403
+        return { success: false, message: check.message }
+      }
+    }
+
     const mails = await db
       .select()
       .from(mail)
