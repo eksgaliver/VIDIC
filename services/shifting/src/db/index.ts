@@ -23,4 +23,4 @@ export const db = drizzle(queryClient, {
 })
 
 export { companies, companyLocations, departments, users } from 'auth-service/src/db/schema'
-export { shifts, shiftAttendanceLocations, shiftSchedules } from './schema'
+export { shifts, shiftAttendanceLocations, shiftSchedules, attendanceStatuses, attendances } from './schema'

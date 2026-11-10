@@ -12,6 +12,7 @@ export type LoginInput = z.infer<typeof loginSchema>
 export const userDtoSchema = z.object({
   id: z.string().uuid(),
   companyId: z.string().nullable().optional(),
+  companyName: z.string().nullable().optional(),
   email: z.string().email(),
   name: z.string(),
   role: z.enum(['admin', 'member', 'guest', 'superadmin']),

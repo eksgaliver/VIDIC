@@ -17,6 +17,7 @@ import {
   StatusFromValue
 } from '@/components/base'
 import { HolidayCalendar2026 } from '@/components/dashboard/HolidayCalendar2026'
+import { ClockInCard } from '@/components/attendance/ClockInCard'
 import { errorText } from '@/utils/apiError'
 import {
   departmentCount,
@@ -153,6 +154,8 @@ function DashboardPage() {
         </Panel>
 
         <div className="space-y-5">
+          <ClockInCard />
+
           <HolidayCalendar2026 />
 
           <Panel>

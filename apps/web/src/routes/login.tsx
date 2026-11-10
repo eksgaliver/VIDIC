@@ -52,6 +52,8 @@ export function LoginPage() {
       if (data && 'token' in data && data.token && data.user) {
         setAuth(data.token, {
           id: data.user.id,
+          companyId: data.user.companyId ?? null,
+          companyName: data.user.companyName ?? null,
           email: data.user.email,
           name: data.user.name,
           role: data.user.role as 'admin' | 'member' | 'guest',

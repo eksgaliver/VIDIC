@@ -13,31 +13,27 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController(text: 'admin@srikaya.id');
-  final _passwordController = TextEditingController(text: 'rahasia123');
-  final _companyIdController = TextEditingController(text: 'cid-srikaya-01');
+  final _passwordController = TextEditingController(text: DemoAccount.password);
+  final _gatewayController =
+      TextEditingController(text: AuthService().gatewayBaseUrl);
 
   bool _obscurePassword = true;
-  bool _isMockMode = true;
+  bool _isMockMode = false;
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void dispose() {
-    _emailController.dispose;
-    _passwordController.dispose;
-    _companyIdController.dispose;
+    _emailController.dispose();
+    _passwordController.dispose();
+    _gatewayController.dispose();
     super.dispose();
   }
 
-  void _applyQuickCredentials({
-    required String email,
-    required String password,
-    required String companyId,
-  }) {
+  void _applyQuickCredentials({required String email, required String password}) {
     setState(() {
       _emailController.text = email;
       _passwordController.text = password;
-      _companyIdController.text = companyId;
       _errorMessage = null;
     });
   }
@@ -50,11 +46,15 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
+    final service = AuthService();
+    if (!_isMockMode) {
+      service.gatewayBaseUrl = _gatewayController.text.trim();
+    }
+
     try {
-      final session = await AuthService().login(
+      final session = await service.login(
         email: _emailController.text,
         password: _passwordController.text,
-        companyId: _companyIdController.text.trim(),
         isMock: _isMockMode,
       );
 
@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '✓ Autentikasi berhasil sebagai ${session.name}',
+            'Autentikasi berhasil sebagai ${session.name} (${session.role})',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           backgroundColor: AppTheme.emeraldGreen,
@@ -79,7 +79,9 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = e is AuthFailure
+            ? e.message
+            : e.toString().replaceAll('Exception: ', '');
       });
     } finally {
       if (mounted) {
@@ -136,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Quick Preset Chips
                     const Text(
-                      'Pilih Profil Uji Cepat:',
+                      'Akun contoh di layanan auth:',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -148,36 +150,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        _buildPresetChip(
-                          label: 'Admin (Srikaya)',
-                          company: 'CID-01',
-                          isSelected: _emailController.text == 'admin@srikaya.id',
-                          onTap: () => _applyQuickCredentials(
-                            email: 'admin@srikaya.id',
-                            password: 'rahasia123',
-                            companyId: 'cid-srikaya-01',
+                        for (final account in AuthService.demoAccounts)
+                          _buildPresetChip(
+                            label: account.label,
+                            company: account.role,
+                            isSelected: _emailController.text == account.email,
+                            onTap: () => _applyQuickCredentials(
+                              email: account.email,
+                              password: DemoAccount.password,
+                            ),
                           ),
-                        ),
-                        _buildPresetChip(
-                          label: 'HRD (Nusantara)',
-                          company: 'CID-02',
-                          isSelected: _emailController.text == 'hrd@nusantara.id',
-                          onTap: () => _applyQuickCredentials(
-                            email: 'hrd@nusantara.id',
-                            password: 'rahasia123',
-                            companyId: 'cid-nusantara-02',
-                          ),
-                        ),
-                        _buildPresetChip(
-                          label: 'Staff (Srikaya)',
-                          company: 'CID-01',
-                          isSelected: _emailController.text == 'staff@srikaya.id',
-                          onTap: () => _applyQuickCredentials(
-                            email: 'staff@srikaya.id',
-                            password: 'rahasia123',
-                            companyId: 'cid-srikaya-01',
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -310,9 +292,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // Input Tenant / Company ID
+                          // Alamat Gateway Bun yang dipakai mode daring
                           const Text(
-                            'ID Perusahaan (Tenant ID)',
+                            'URL Gateway (Bun)',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -321,14 +303,38 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 6),
                           TextFormField(
-                            controller: _companyIdController,
+                            controller: _gatewayController,
+                            enabled: !_isMockMode,
+                            keyboardType: TextInputType.url,
                             decoration: const InputDecoration(
-                              hintText: 'cid-srikaya-01 atau cid-nusantara-02',
+                              hintText: 'http://localhost:3000',
                               prefixIcon: Icon(
-                                Icons.business_outlined,
+                                Icons.dns_outlined,
                                 size: 18,
                                 color: AppTheme.slate400,
                               ),
+                            ),
+                            validator: (val) {
+                              if (_isMockMode) return null;
+                              final value = (val ?? '').trim();
+                              if (value.isEmpty) {
+                                return 'URL gateway wajib diisi';
+                              }
+                              if (!value.startsWith('http://') &&
+                                  !value.startsWith('https://')) {
+                                return 'URL harus diawali http:// atau https://';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _isMockMode
+                                ? 'Mode luring: alamat gateway diabaikan.'
+                                : 'Emulator Android memakai http://10.0.2.2:3000 untuk menjangkau host.',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.slate500,
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -362,7 +368,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       Text(
                                         _isMockMode
                                             ? 'Mandiri lokal (tanpa perlu backend aktif)'
-                                            : 'Koneksi jaringan ke Gateway (:3000)',
+                                            : 'Koneksi jaringan ke Gateway Bun',
                                         style: const TextStyle(
                                           fontSize: 11,
                                           color: AppTheme.slate500,

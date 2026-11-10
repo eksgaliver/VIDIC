@@ -698,4 +698,83 @@ Telah dibangun modul aplikasi Flutter mandiri pada direktori [`flutter/`](file:/
   4. `✓ Guest sandbox mode navigates directly to Home Dashboard`
 • `flutter analyze` tervalidasi bersih tanpa peringatan (*0 issues found*).
 
+---
 
+## § 20. Sistem Absensi Karyawan dengan Status Fleksibel HRD
+
+Presensi kini memiliki tabelnya sendiri di `services/shifting`, terpisah dari konfigurasi shift. Seluruh kejadian presensi disimpan pada satu tabel, sedangkan daftar statusnya disusun bebas oleh HRD lewat tabel master.
+
+### 1. Skema Basis Data (`services/shifting/src/db/schema.ts`)
+• **`attendance_statuses`** — master status milik tiap perusahaan: `code` (unik per perusahaan), `name`, `description`, `color`, tiga flag perilaku `is_present` / `is_paid` / `is_absent`, penanda `is_system`, `sort_order`, dan `status` aktif/nonaktif. Unique index `(company_id, code)`.
+• **`attendances`** — satu baris per karyawan per tanggal kerja. Unique index `(employee_id, attendance_date)` menutup kemungkinan presensi ganda. Kolom waktu `check_in_at` / `check_out_at`, koordinat masuk dan pulang `numeric(10,7)`, `attendance_location_id`, `check_in_distance_meters`, `late_minutes`, `work_minutes`, `source` (`auto` / `clock_in` / `manual`), `note`, dan `timezone`.
+• Integritas: `status_id` memakai `ON DELETE RESTRICT` (status terpakai tidak bisa dihapus), sedangkan `shift_id` dan `attendance_location_id` memakai `SET NULL` agar riwayat presensi tetap utuh ketika master shift atau titik geofence dihapus.
+• Relasi Drizzle `attendanceStatusRelations` dan `attendanceRelations` beserta tipe inferensi `Attendance`, `NewAttendance`, `AttendanceStatus`, `NewAttendanceStatus`.
+
+### 2. Migrasi & Seeder
+• Berkas baru `services/shifting/src/db/migrate_attendance.ts` mengikuti pola idempotent `migrate_schedules.ts`: `CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS`, tanpa query builder. Perintah: `bun run services/shifting/src/db/migrate_attendance.ts`.
+• Tujuh status bawaan pada `lib/attendance-status-defaults.ts`: `unfilled` (Belum Diisi), `hadir`, `dinas`, `izin`, `sakit`, `cuti`, dan `alpa`.
+• `unfilled` sengaja tidak berstatus hadir maupun alpa. Hasil generate tidak boleh menebak "Alpa", karena tebakan itu berisiko memotong gaji karyawan yang sebenarnya masuk.
+• `ensureAttendanceStatuses()` dipanggil sekali saat boot di `services/shifting/src/index.ts`, dibungkus `try/catch`, sehingga perusahaan tanpa status langsung terisi tanpa menggandakan data yang sudah ada.
+
+### 3. Ekstraksi Helper Geofence (`services/shifting/src/lib/geofence.ts`)
+• `haversineDistanceMeters` dan `isInsidePolygon` dipindahkan dari `routes/shifts.ts` agar presensi dan `verify-attendance` memakai perhitungan yang sama.
+• Tambahan: `matchAttendanceLocation` (mengembalikan titik terdekat beserta deviasi meter), `resolveLocalDate`, `getLocalDayOfWeek`, `computeLateMinutes`, `computeWorkMinutes`, dan `isOvernightShift`.
+• Perbaikan yang ikut terbawa: penentuan hari kerja tidak lagi memakai `new Date().getDay()` (jam server) melainkan tanggal lokal zona waktu perusahaan. Karyawan WITA yang presensi pukul 00:30 kini tercatat pada tanggal lokal yang benar.
+
+### 4. Endpoint (`services/shifting/src/routes/attendance.ts`, prefix `/attendance`)
+• **Master status** — `GET /statuses` (termasuk `usageCount`), `POST /statuses`, `PUT /statuses/:id`, `DELETE /statuses/:id`. Guard tulis hanya `admin` / `superadmin`. Penghapusan status bawaan atau status yang sudah dipakai ditolak `409` dengan arahan menonaktifkan. Perubahan yang membuat perusahaan kehilangan status hadir aktif terakhir juga ditolak `409`.
+• **Presensi** — `GET /` (filter `companyId`, `month`, `employeeId`, `statusId`), `GET /today`, `GET /summary`, `POST /generate`, `POST /clock-in`, `POST /clock-out`, `PUT /:id` (override HRD).
+• `POST /generate` melewati hari libur jadwal, tanggal masa depan, dan tanggal sebelum karyawan bergabung; idempotent via `ON CONFLICT (employee_id, attendance_date) DO NOTHING` dan mengembalikan `{ created, skipped, employees }`.
+• `POST /clock-in` memverifikasi geofence dengan titik terdekat. Di luar seluruh radius/perimeter, respons `200 { verified: false, distanceMeters }` tanpa menulis apa pun. Di dalam radius, `check_in_at`, koordinat, titik presensi, dan `late_minutes` tersimpan; status `unfilled` otomatis berpindah ke status hadir aktif pertama menurut `sort_order`.
+• `PUT /:id` mewajibkan `note` ketika status berubah, mengunci `statusId` ke perusahaan yang sama, menandai `source: 'manual'`, dan menghitung ulang `late_minutes` / `work_minutes` bila jam masuk atau pulang diubah.
+
+### 5. Antarmuka Web
+• Rute baru `/attendance` (`attendance.tsx`) dengan dua tab: **Rekap Presensi** dan **Status Absensi**.
+• Komponen pada `apps/web/src/components/attendance/`: `AttendanceStatusBadge` (warna chip dari basis data dengan kontras teks terhitung), `AttendanceStatusMaster` (CRUD + pratinjau warna), `ClockInCard` (jam langsung per zona waktu, tombol masuk/pulang via `navigator.geolocation`, umpan balik `verified` dan deviasi meter), `AttendanceRecapTable`, dan `HrOverrideDialog` (status + catatan wajib + peringatan status alpa).
+• `ClockInCard` disisipkan ke dasbor, dan item navigasi **Presensi** ditambahkan setelah **Shift**.
+
+### 6. Hasil Verifikasi
+• `npm --prefix apps/web run build` (termasuk `tsc -b` yang mengetik seluruh layanan lewat alias `gateway`) lolos tanpa galat.
+• Uji endpoint langsung terhadap layanan shifting:
+  1. `POST /generate` dua kali → `created: 8` lalu `created: 0` (idempotent).
+  2. Clock-in di luar geofence → `verified: false`, deviasi 11.275.018 m, tidak ada baris berubah.
+  3. Clock-in di dalam radius → `verified: true`, deviasi 0 m, status berpindah dari `unfilled` ke `hadir`, `source: clock_in`, `late_minutes` 383.
+  4. Clock-in kedua di hari sama → `409`.
+  5. Clock-out tanpa clock-in → `409`; clock-out normal mengisi `work_minutes`.
+  6. Override status tanpa catatan → `400`; dengan catatan → `200`, `source: manual`, `note` tersimpan.
+  7. Override jam masuk ke 08:15 → `late_minutes` dihitung ulang menjadi 15 menit dan `work_minutes` 368.
+  8. Menghapus status bawaan → `409`; status buatan HRD dapat dibuat, diubah, dinonaktifkan, lalu dihapus.
+  9. Warna bukan hex → `400`.
+  10. Mematikan satu-satunya status hadir aktif → `409`.
+  11. Member membuka rekap perusahaan lain → `403`.
+
+---
+
+## § 21. Penyambungan Login Bun ke Klien Web dan Aplikasi Flutter
+
+Layanan auth sudah menjadi satu-satunya sumber kebenaran kredensial. Bagian ini menyambungkan kedua klien ke endpoint yang sama, `POST /api/auth/login` lewat gateway, tanpa jalur tiruan yang menyamar sebagai sesi sah.
+
+### 1. Layanan Auth (`services/auth/src/index.ts`)
+• Balasan `POST /auth/login` dan `GET /auth/me` kini menyertakan `companyName` dari tabel `companies`, sehingga klien web dan mobile tidak perlu permintaan tambahan hanya untuk menampilkan nama perusahaan.
+• `toPublicUser()` menjadi asinkron dan dipakai seluruh endpoint profil serta avatar, sehingga bentuk balasan tetap seragam di delapan titik pemakaian.
+• `companyId` tetap berasal dari rekaman pengguna, bukan dari isian klien. Kolom Tenant ID pada klien karena itu dihapus.
+
+### 2. Klien Web (`apps/web`, `packages/shared-types`)
+• `login.tsx` meneruskan `companyId` dan `companyName` hasil login ke `setAuth()`, sehingga sesi di `localStorage` (`srikaya_auth_session`) memuat identitas perusahaan, bukan hanya token.
+• `userDtoSchema` pada `shared-types` menambah `companyName` opsional agar tipe sesi web sesuai dengan balasan layanan auth.
+• Token tetap ditempel otomatis ke seluruh permintaan berikutnya oleh klien Eden Treaty melalui header `Authorization: Bearer`.
+
+### 3. Aplikasi Flutter (`flutter/lib`)
+• `UserSession.fromLoginResponse()` membaca bentuk balasan nyata `{ success, token, user: { ... } }`. Sebelumnya objek `user` tidak dibaca sehingga identitas pengguna jatuh ke nilai bawaan tebakan.
+• `UserSession.normalizeRole()` memetakan peran basis data (`admin`, `superadmin`, `member`, `guest`) ke label tampilan (`ADMIN`, `SUPER ADMIN`, `STAFF`, `GUEST`). Akun contoh `hrd@nusantara.id` dan `staff@srikaya.id` yang tidak ada di basis data dihapus.
+• `AuthService.login()` kini berjalan daring secara bawaan (`isMock: false`), mengirim `{ email, password }` tanpa `companyId`, dan membedakan kegagalan jaringan dari penolakan kredensial. Sebelumnya seluruh kesalahan dibungkus menjadi pesan "gagal terhubung".
+• Alamat gateway mengikuti platform: `http://localhost:3000` untuk web/desktop, `http://10.0.2.2:3000` untuk emulator Android, dan dapat ditimpa lewat `--dart-define=API_BASE_URL=...`.
+• `AuthService.authHeaders` menyediakan header Bearer untuk permintaan berikutnya, dan `isLiveSession` menandai apakah sesi berasal dari gateway atau dari mode luring.
+• Layar login menampilkan kolom **URL Gateway (Bun)** sebagai pengganti kolom Tenant ID, tombol isi cepat memakai tiga akun yang benar-benar tersemai, dan sakelar mode luring dimatikan secara bawaan. `dispose()` pada tiga pengendali teks diperbaiki (sebelumnya hanya merujuk metodenya tanpa memanggil).
+
+### 4. Hasil Verifikasi
+• `POST /api/auth/login` lewat gateway → `200` dengan token JWT, `role: admin`, dan `companyName: PT Srikaya Digital Solusindo`; kata sandi salah → `401 "Kombinasi surel atau kata sandi salah"`.
+• `GET /api/auth/me` dengan token hasil login → `200` beserta `companyName`.
+• `flutter analyze` bersih, `flutter test` 12/12 lolos (termasuk pengujian pemetaan balasan login, normalisasi peran, header Bearer, dan isolasi tenant).
+• Uji sementara langsung ke gateway dari sisi Flutter berhasil: sesi terbaca dengan peran `ADMIN`, ID perusahaan UUID, dan nama perusahaan terisi.
+• `npm --prefix apps/web run build` lolos (`tsc -b` + vite, 704 modul).

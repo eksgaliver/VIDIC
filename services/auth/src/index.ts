@@ -409,10 +409,23 @@ async function resolveSessionUser(payload: unknown): Promise<AuthUser | null> {
   return id === DEMO_USER.id ? DEMO_USER : null
 }
 
-function toPublicUser(user: AuthUser) {
+// Nama perusahaan ikut dikirim agar klien web dan mobile tidak perlu permintaan tambahan
+async function resolveCompanyName(companyId?: string | null): Promise<string | null> {
+  if (!companyId) return null
+
+  try {
+    const [row] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+    return row?.name ?? null
+  } catch {
+    return null
+  }
+}
+
+async function toPublicUser(user: AuthUser) {
   return {
     id: user.id,
     companyId: user.companyId ?? null,
+    companyName: await resolveCompanyName(user.companyId),
     name: user.name,
     email: user.email,
     role: user.role,
@@ -483,7 +496,7 @@ export const authService = new Elysia({ prefix: '/auth' })
     return {
       success: true,
       token,
-      user: toPublicUser(foundUser),
+      user: await toPublicUser(foundUser),
       message: 'Autentikasi berhasil'
     }
   }, {
@@ -510,7 +523,7 @@ export const authService = new Elysia({ prefix: '/auth' })
 
     return {
       success: true,
-      user: toPublicUser(current)
+      user: await toPublicUser(current)
     }
   })
   // Endpoint Perbarui Profil Akun
@@ -563,7 +576,7 @@ export const authService = new Elysia({ prefix: '/auth' })
 
       return {
         success: true,
-        user: toPublicUser(DEMO_USER),
+        user: await toPublicUser(DEMO_USER),
         message: 'Profil akun demo diperbarui untuk sesi berjalan'
       }
     }
@@ -576,7 +589,7 @@ export const authService = new Elysia({ prefix: '/auth' })
 
     return {
       success: true,
-      user: toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
+      user: await toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
       message: 'Profil berhasil diperbarui'
     }
   }, {
@@ -619,7 +632,7 @@ export const authService = new Elysia({ prefix: '/auth' })
 
         return {
           success: true,
-          user: toPublicUser(DEMO_USER),
+          user: await toPublicUser(DEMO_USER),
           upload,
           message: 'Foto profil berhasil diperbarui'
         }
@@ -635,7 +648,7 @@ export const authService = new Elysia({ prefix: '/auth' })
 
       return {
         success: true,
-        user: toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
+        user: await toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
         upload,
         message: 'Foto profil berhasil diperbarui'
       }
@@ -677,7 +690,7 @@ export const authService = new Elysia({ prefix: '/auth' })
 
       return {
         success: true,
-        user: toPublicUser(DEMO_USER),
+        user: await toPublicUser(DEMO_USER),
         message: 'Foto profil berhasil dihapus'
       }
     }
@@ -692,7 +705,7 @@ export const authService = new Elysia({ prefix: '/auth' })
 
     return {
       success: true,
-      user: toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
+      user: await toPublicUser({ ...updated, role: updated.role as AuthUser['role'] }),
       message: 'Foto profil berhasil dihapus'
     }
   })

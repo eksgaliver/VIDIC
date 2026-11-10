@@ -1,5 +1,6 @@
 import type { IconType } from 'react-icons'
 import {
+  HiOutlineClipboardCheck,
   HiOutlineClock,
   HiOutlineHome,
   HiOutlineOfficeBuilding,
@@ -10,6 +11,7 @@ import {
   HiOutlineViewGrid
 } from 'react-icons/hi'
 import {
+  ATTENDANCE_PATH,
   DASHBOARD_PATH,
   COMPANIES_PATH,
   DEPARTMENTS_PATH,
@@ -63,6 +65,13 @@ export const navigationConfig: NavigationItem[] = [
     title: 'Shift',
     path: SHIFTS_PATH,
     icon: HiOutlineClock,
+    section: 'workspace'
+  },
+  {
+    key: 'attendance',
+    title: 'Presensi',
+    path: ATTENDANCE_PATH,
+    icon: HiOutlineClipboardCheck,
     section: 'workspace'
   },
   {

@@ -11,6 +11,11 @@ import {
   shifts,
   users
 } from '../db'
+import {
+  getLocalDayOfWeek,
+  matchAttendanceLocation,
+  resolveLocalDate
+} from '../lib/geofence'
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/
 
@@ -20,40 +25,8 @@ function normalizeTime(value: string): string | null {
   return trimmed.length === 5 ? `${trimmed}:00` : trimmed
 }
 
-// Rumus Haversine untuk menghitung jarak antara koordinat pengguna dan pusat geofence
-function haversineDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3
-  const phi1 = (lat1 * Math.PI) / 180
-  const phi2 = (lat2 * Math.PI) / 180
-  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180
-  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180
-
-  const a =
-    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-
-  return R * c
-}
-
-// Algoritma Ray Casting untuk memverifikasi apakah koordinat berada di dalam poligon geofence
-function isInsidePolygon(point: [number, number], polygon: [number, number][]): boolean {
-  if (!polygon || polygon.length < 3) return false
-  const [x, y] = point
-  let inside = false
-
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i][0]
-    const yi = polygon[i][1]
-    const xj = polygon[j][0]
-    const yj = polygon[j][1]
-
-    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
-    if (intersect) inside = !inside
-  }
-
-  return inside
-}
+// Rumus Haversine & Ray Casting dipindahkan ke ../lib/geofence agar dipakai
+// bersama oleh verifikasi presensi shift dan modul absensi.
 
 interface LocationGeoSnapshot {
   id: string
@@ -673,7 +646,7 @@ const shiftBodySchema = {
   })
 }
 
-async function resolveShiftingUser(headers: Record<string, string | undefined>, jwtInstance: any) {
+export async function resolveShiftingUser(headers: Record<string, string | undefined>, jwtInstance: any) {
   const authHeader = headers['authorization']
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null
   try {
@@ -759,10 +732,10 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
       return { success: false, message: 'Shift tidak ditemukan.' }
     }
 
-    // Periksa jadwal harian shift untuk hari ini
-    const now = new Date()
-    const jsDay = now.getDay() // 0: Minggu, 1: Senin, ..., 6: Sabtu
-    const currentDayOfWeek = jsDay === 0 ? 7 : jsDay
+    // Periksa jadwal harian shift untuk hari ini pada zona waktu titik presensi
+    const timezone = shift.attendanceLocations?.[0]?.timezone || 'Asia/Jakarta'
+    const localDate = resolveLocalDate(new Date(), timezone)
+    const currentDayOfWeek = getLocalDayOfWeek(localDate)
     const daySchedule = shift.schedules?.find((s: any) => s.dayOfWeek === currentDayOfWeek)
 
     if (daySchedule?.isOff) {
@@ -781,38 +754,27 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
       return { success: false, message: 'Koordinat lintang dan bujur tidak valid.' }
     }
 
-    for (const loc of shift.attendanceLocations) {
-      if (loc.coordinatesType === 'polygon' && loc.polygonCoordinates && loc.polygonCoordinates.length >= 3) {
-        if (isInsidePolygon([userLat, userLng], loc.polygonCoordinates)) {
-          return {
-            success: true,
-            verified: true,
-            message: `Presensi valid di area polygon: ${loc.name} (${loc.city}) · Hari ${daySchedule?.dayName || 'Kerja'}`,
-            matchedLocation: loc,
-            todaySchedule: daySchedule || null
-          }
-        }
-      } else {
-        const centerLat = Number(loc.latitude)
-        const centerLng = Number(loc.longitude)
-        const distance = haversineDistanceMeters(userLat, userLng, centerLat, centerLng)
-        if (distance <= loc.radiusMeters) {
-          return {
-            success: true,
-            verified: true,
-            message: `Presensi valid di titik radius: ${loc.name} (${loc.city}) · Hari ${daySchedule?.dayName || 'Kerja'}`,
-            distanceMeters: Math.round(distance),
-            matchedLocation: loc,
-            todaySchedule: daySchedule || null
-          }
-        }
+    const match = matchAttendanceLocation(shift.attendanceLocations, userLat, userLng)
+
+    if (match.matched && match.location) {
+      const isPolygon = match.location.coordinatesType === 'polygon'
+      return {
+        success: true,
+        verified: true,
+        message: isPolygon
+          ? `Presensi valid di area polygon: ${match.location.name} (${match.location.city}) · Hari ${daySchedule?.dayName || 'Kerja'}`
+          : `Presensi valid di titik radius: ${match.location.name} (${match.location.city}) · Hari ${daySchedule?.dayName || 'Kerja'}`,
+        distanceMeters: match.distanceMeters ?? undefined,
+        matchedLocation: match.location,
+        todaySchedule: daySchedule || null
       }
     }
 
     return {
       success: true,
       verified: false,
-      message: 'Koordinat GPS Anda berada di luar seluruh radius / perimeter geofence yang diizinkan untuk shift ini.'
+      message: 'Koordinat GPS Anda berada di luar seluruh radius / perimeter geofence yang diizinkan untuk shift ini.',
+      distanceMeters: match.distanceMeters ?? undefined
     }
   }, {
     params: t.Object({ id: t.String() }),

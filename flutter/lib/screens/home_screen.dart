@@ -37,12 +37,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final session = _authService.currentSession;
     final userName = session?.name ?? 'Pengguna Uji Coba';
     final userRole = session?.role ?? 'STAFF';
-    final companyName = session?.companyName ?? 'PT Srikaya Mandiri';
-    final companyId = session?.companyId ?? 'cid-srikaya-01';
+    final companyName = session?.companyName ?? 'Perusahaan belum ditetapkan';
+    final rawCompanyId = session?.companyId ?? '';
+    final companyId = rawCompanyId.isEmpty
+        ? 'tanpa perusahaan'
+        : (rawCompanyId.length <= 8
+            ? rawCompanyId
+            : '${rawCompanyId.substring(0, 8)}...');
 
-    final isSrikaya = companyId == 'cid-srikaya-01';
-    final foreignTenantId = isSrikaya ? 'cid-nusantara-02' : 'cid-srikaya-01';
-    final foreignTenantName = isSrikaya ? 'PT Nusantara Sakti' : 'PT Srikaya Mandiri';
+    // Tenant pembanding untuk menguji aturan isolasi antar-perusahaan.
+    const foreignTenantId = 'cid-nusantara-02';
+    const foreignTenantName = 'PT Nusantara Sakti';
 
     return Scaffold(
       backgroundColor: AppTheme.slate50,
@@ -97,17 +102,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                             ),
-                            const Row(
+                            Row(
                               children: [
                                 Icon(
                                   Icons.fiber_manual_record_rounded,
                                   size: 10,
-                                  color: AppTheme.emeraldGreen,
+                                  color: _authService.isLiveSession
+                                      ? AppTheme.emeraldGreen
+                                      : AppTheme.slate400,
                                 ),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Text(
-                                  'Sesi Aktif',
-                                  style: TextStyle(
+                                  _authService.isLiveSession
+                                      ? 'Sesi Gateway'
+                                      : 'Sesi Luring',
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.white70,
                                   ),
@@ -328,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         // Tombol Tes 2: Akses Tenant Sendiri (Harus Berhasil)
                         OutlinedButton(
-                          onPressed: () => _runTenantIsolationAudit(companyId),
+                          onPressed: () => _runTenantIsolationAudit(rawCompanyId),
                           child: Wrap(
                             alignment: WrapAlignment.center,
                             crossAxisAlignment: WrapCrossAlignment.center,

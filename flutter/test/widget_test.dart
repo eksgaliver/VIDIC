@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:srikaya_auth/main.dart';
 import 'package:srikaya_auth/services/auth_service.dart';
@@ -33,6 +34,7 @@ void main() {
     expect(find.text('Masuk ke Sistem'), findsOneWidget);
     expect(find.text('Alamat Email'), findsOneWidget);
     expect(find.text('Kata Sandi'), findsOneWidget);
+    expect(find.text('URL Gateway (Bun)'), findsOneWidget);
     expect(find.text('Masuk Sekarang'), findsOneWidget);
   });
 
@@ -44,6 +46,13 @@ void main() {
     final loginBtn = find.text('Masuk ke Akun');
     await tester.ensureVisible(loginBtn);
     await tester.tap(loginBtn);
+    await tester.pumpAndSettle();
+
+    // Aktifkan mode luring supaya pengujian tidak menyentuh jaringan
+    final mockSwitch = find.byType(Switch);
+    await tester.ensureVisible(mockSwitch);
+    await tester.pumpAndSettle();
+    await tester.tap(mockSwitch);
     await tester.pumpAndSettle();
 
     // Ketuk tombol masuk (dengan nilai default admin@srikaya.id)
@@ -58,8 +67,8 @@ void main() {
 
     // Memverifikasi navigasi ke dasbor berhasil
     expect(find.text('Dasbor Srikaya'), findsOneWidget);
-    expect(find.text('Raihan Rivana (Super Admin)'), findsOneWidget);
-    expect(find.text('PT Srikaya Mandiri • cid-srikaya-01'), findsOneWidget);
+    expect(find.text('Admin'), findsWidgets);
+    expect(find.text('Mode Uji Mandiri • mock-01'), findsOneWidget);
   });
 
   testWidgets('Guest sandbox mode navigates directly to Home Dashboard', (
