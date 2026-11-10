@@ -1,0 +1,905 @@
+# ==============================================================================
+# Srikaya Platform &middot; Master Kubernetes Manifest (All-in-One Topology)
+# Runtime: Bun + ElysiaJS Microservices + PostgreSQL 16 + React 19 Client
+# Designed for high-clarity rendering in Kubernetes Visualizers (Lens, Octant, Monokle, etc.)
+# ==============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/part-of: srikaya-platform
+    environment: production
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: srikaya-config
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: configuration
+    app.kubernetes.io/part-of: srikaya-platform
+data:
+  APP_NAME: "Srikaya Enterprise"
+  NODE_ENV: "production"
+  GATEWAY_PORT: "3000"
+  AUTH_SERVICE_PORT: "3001"
+  STORAGE_SERVICE_PORT: "3002"
+  SHIFTING_SERVICE_PORT: "3003"
+  AUTH_SERVICE_URL: "http://auth-service:3001"
+  STORAGE_SERVICE_URL: "http://storage-service:3002"
+  SHIFTING_SERVICE_URL: "http://shifting-service:3003"
+  STORAGE_DIR: "/storage"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: srikaya-secret
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: credentials
+    app.kubernetes.io/part-of: srikaya-platform
+type: Opaque
+stringData:
+  DATABASE_URL: "postgres://postgres:srikaya_secure_pass_2026@postgres-service:5432/srikaya_auth"
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "srikaya_secure_pass_2026"
+  POSTGRES_DB: "srikaya_auth"
+  JWT_SECRET: "srikaya-enterprise-jwt-secret-key-2026"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: srikaya-media-pvc
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: media-storage
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: srikaya-postgres-pvc
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: database-storage
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: srikaya
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: srikaya
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: srikaya-platform
+    spec:
+      containers:
+        - name: postgresql
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: POSTGRES_DB
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: srikaya-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  selector:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: database
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: auth-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: srikaya
+      app.kubernetes.io/component: auth-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: srikaya
+        app.kubernetes.io/component: auth-service
+        app.kubernetes.io/part-of: srikaya-platform
+    spec:
+      containers:
+        - name: auth-service
+          image: srikaya/auth-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3001
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: AUTH_SERVICE_PORT
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: JWT_SECRET
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: NODE_ENV
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: auth-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3001
+  selector:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: auth-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shifting-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: shifting-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: srikaya
+      app.kubernetes.io/component: shifting-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: srikaya
+        app.kubernetes.io/component: shifting-service
+        app.kubernetes.io/part-of: srikaya-platform
+    spec:
+      containers:
+        - name: shifting-service
+          image: srikaya/shifting-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3003
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: SHIFTING_SERVICE_PORT
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: JWT_SECRET
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: NODE_ENV
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            tcpSocket:
+              port: 3003
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            tcpSocket:
+              port: 3003
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shifting-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: shifting-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3003
+      targetPort: 3003
+  selector:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: shifting-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: storage-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: srikaya
+      app.kubernetes.io/component: storage-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: srikaya
+        app.kubernetes.io/component: storage-service
+        app.kubernetes.io/part-of: srikaya-platform
+    spec:
+      containers:
+        - name: storage-service
+          image: srikaya/storage-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3002
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: STORAGE_SERVICE_PORT
+            - name: STORAGE_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: STORAGE_DIR
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: NODE_ENV
+          volumeMounts:
+            - name: media-storage
+              mountPath: /storage
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            tcpSocket:
+              port: 3002
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            tcpSocket:
+              port: 3002
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+      volumes:
+        - name: media-storage
+          persistentVolumeClaim:
+            claimName: srikaya-media-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storage-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: storage-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3002
+      targetPort: 3002
+  selector:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: storage-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: gateway-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: srikaya
+      app.kubernetes.io/component: gateway-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: srikaya
+        app.kubernetes.io/component: gateway-service
+        app.kubernetes.io/part-of: srikaya-platform
+    spec:
+      containers:
+        - name: gateway-service
+          image: srikaya/gateway-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: GATEWAY_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: GATEWAY_PORT
+            - name: AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: AUTH_SERVICE_URL
+            - name: SHIFTING_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: SHIFTING_SERVICE_URL
+            - name: STORAGE_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: STORAGE_SERVICE_URL
+            - name: STORAGE_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: STORAGE_DIR
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: NODE_ENV
+          volumeMounts:
+            - name: media-storage
+              mountPath: /storage
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: 800m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+      volumes:
+        - name: media-storage
+          persistentVolumeClaim:
+            claimName: srikaya-media-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: gateway-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+  selector:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: gateway-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-client
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: web-client
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: srikaya
+      app.kubernetes.io/component: web-client
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: srikaya
+        app.kubernetes.io/component: web-client
+        app.kubernetes.io/part-of: srikaya-platform
+    spec:
+      containers:
+        - name: web-client
+          image: srikaya/web-client:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-client
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: web-client
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  selector:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: web-client
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: srikaya-ingress
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: ingress-controller
+    app.kubernetes.io/part-of: srikaya-platform
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+spec:
+  rules:
+    - host: srikaya.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: 3000
+          - path: /storage
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-client
+                port:
+                  number: 80
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: 3000
+          - path: /storage
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-client
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-gateway-and-web
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: ["gateway-service", "web-client"]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-internal-services
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: ["auth-service", "shifting-service", "storage-service"]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: gateway-service
+      ports:
+        - protocol: TCP
+          port: 3001
+        - protocol: TCP
+          port: 3002
+        - protocol: TCP
+          port: 3003
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-postgres
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: database
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: ["auth-service", "shifting-service"]
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway-service-hpa
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: gateway-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: auth-service-hpa
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: auth-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: auth-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: shifting-service-hpa
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: shifting-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: shifting-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-client-hpa
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: web-client
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-client
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

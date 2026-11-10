@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-client
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: web-client
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: srikaya
+      app.kubernetes.io/component: web-client
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: srikaya
+        app.kubernetes.io/component: web-client
+        app.kubernetes.io/part-of: srikaya-platform
+    spec:
+      containers:
+        - name: web-client
+          image: srikaya/web-client:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-client
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: web-client
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  selector:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: web-client

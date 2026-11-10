@@ -112,3 +112,4 @@ if (import.meta.main) {
   await seedSecondCompany()
   process.exit(0)
 }
+

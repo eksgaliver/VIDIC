@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: srikaya-media-pvc
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: media-storage
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: srikaya-postgres-pvc
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: database-storage
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

@@ -611,7 +611,38 @@ Telah diimplementasikan arsitektur proteksi multi-tenant penuh di seluruh mikros
 
 ---
 
-## § 17. Panduan Perintah Operasional
+## § 17. Manifest Kubernetes & Visualisasi Topologi Arsitektur Sistem
+
+Telah dibuat paket manifest deklaratif Kubernetes (`k8s/`) yang merefleksikan seluruh arsitektur monorepo mikroservis dan relasi datanya secara presisi untuk diinspeksi pada **Kubernetes Visualizer** (Lens, Monokle, Octant, K9s, atau web visualizer):
+
+### 1. Rincian Sumber Daya Deklaratif (`k8s/`)
+• **Namespace (`00-namespace.yaml`)**:
+  - `srikaya-system` dengan label standar `app.kubernetes.io/part-of: srikaya-platform`.
+• **Konfigurasi & Rahasia (`01-configmap-secret.yaml`)**:
+  - `ConfigMap srikaya-config`: Konfigurasi port (3000, 3001, 3002, 3003), URL komunikasi internal, dan direktori penyimpanan bersama.
+  - `Secret srikaya-secret`: Kredensial PostgreSQL 16 dan kunci JWT HMAC-SHA256.
+• **Penyimpanan Persisten (`02-storage-pvc.yaml`)**:
+  - `PersistentVolumeClaim srikaya-media-pvc` (20Gi, ReadWriteMany) untuk sinkronisasi berkas media WebP antara `storage-service` dan `gateway-service`.
+  - `PersistentVolumeClaim srikaya-postgres-pvc` (10Gi, ReadWriteOnce) untuk persistensi data relasional database.
+• **Basis Data Stateful (`03-postgres.yaml`)**:
+  - `StatefulSet postgres` (PostgreSQL 16) dengan health probe `pg_isready` dan Service ClusterIP `postgres-service:5432`.
+• **Mikroservis Backend Bun & ElysiaJS (`04-auth-service.yaml`, `05-shifting-service.yaml`, `06-storage-service.yaml`, `07-gateway-service.yaml`)**:
+  - Setiap servis memiliki Deployment ber-replika 2, strategi *RollingUpdate*, alokasi sumber daya (*CPU/Memory requests & limits*), serta probe liveness/readiness.
+  - `gateway-service` bertindak sebagai reverse proxy dan aggregator mikroservis (Port 3000).
+• **Klien Web SPA (`08-web-client.yaml`)**:
+  - Deployment klien antarmuka React 19 (Port 80) ber-replika 2 dengan Service ClusterIP `web-client`.
+• **Gerbang Ingress (`09-ingress.yaml`)**:
+  - Router Ingress mengarahkan jalur `/api` dan `/storage` ke `gateway-service:3000`, serta jalur `/` ke `web-client:80`.
+• **Kebijakan Jaringan Zero-Trust (`10-network-policy.yaml`)**:
+  - Merender garis graf koneksi keamanan visual: Ingress hanya dapat menghubungi Gateway & Web Client; Gateway menghubungi Auth, Shifting, Storage; hanya Auth & Shifting yang diizinkan mengakses port 5432 PostgreSQL.
+• **Skalabilitas Otomatis (`11-hpa.yaml`)**:
+  - HorizontalPodAutoscaler (HPA) untuk Gateway, Auth, Shifting, dan Web Client berdasarkan metrik utilisasi CPU dan memori.
+• **Berkas Gabungan Siap Visualizer (`k8s/srikaya-all-in-one.yaml`)**:
+  - Berkas tunggal berisi 25 spesifikasi sumber daya lengkap untuk langsung diimpor atau di-drag-and-drop ke Kubernetes Visualizer.
+
+---
+
+## § 18. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):
@@ -626,7 +657,10 @@ bun run --cwd services/gateway src/index.ts    # Port 3000
 # 3. Menjalankan pengujian otomatis isolasi multi-tenant:
 bun run services/auth/src/scripts/testIsolation.ts
 
-# 4. Kompilasi & validasi tipe frontend:
+# 4. Menerapkan manifest Kubernetes ke klaster (atau periksa via visualizer):
+kubectl apply -f k8s/srikaya-all-in-one.yaml
+
+# 5. Kompilasi & validasi tipe frontend:
 npm --prefix apps/web run build
 ```
 

@@ -67,3 +67,4 @@ export function assertCompanyAccess(
 
   return { allowed: true, message: 'Akses diizinkan' }
 }
+

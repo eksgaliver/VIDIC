@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shifting-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: shifting-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: srikaya
+      app.kubernetes.io/component: shifting-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: srikaya
+        app.kubernetes.io/component: shifting-service
+        app.kubernetes.io/part-of: srikaya-platform
+    spec:
+      containers:
+        - name: shifting-service
+          image: srikaya/shifting-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3003
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: SHIFTING_SERVICE_PORT
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: srikaya-secret
+                  key: JWT_SECRET
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: srikaya-config
+                  key: NODE_ENV
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            tcpSocket:
+              port: 3003
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            tcpSocket:
+              port: 3003
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shifting-service
+  namespace: srikaya-system
+  labels:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: shifting-service
+    app.kubernetes.io/part-of: srikaya-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3003
+      targetPort: 3003
+  selector:
+    app.kubernetes.io/name: srikaya
+    app.kubernetes.io/component: shifting-service
