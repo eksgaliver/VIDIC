@@ -36,7 +36,14 @@ import {
   TextField,
 } from '@/components/base'
 import { errorText } from '@/utils/apiError'
-import type { Company, CompanyLocation, Employee, Shift, ShiftLocation } from '@/@types/organization'
+import type {
+  Company,
+  CompanyLocation,
+  Employee,
+  Shift,
+  ShiftDailySchedule,
+  ShiftLocation,
+} from '@/@types/organization'
 import {
   COMPANIES_PATH,
   EMPLOYEES_PATH,
@@ -48,6 +55,26 @@ export const shiftsRoute = createRoute({
   path: SHIFTS_PATH,
   component: ShiftsPage,
 })
+
+export const DAYS_OF_WEEK = [
+  { dayOfWeek: 1, dayName: 'Senin', shortName: 'Sen' },
+  { dayOfWeek: 2, dayName: 'Selasa', shortName: 'Sel' },
+  { dayOfWeek: 3, dayName: 'Rabu', shortName: 'Rab' },
+  { dayOfWeek: 4, dayName: 'Kamis', shortName: 'Kam' },
+  { dayOfWeek: 5, dayName: 'Jumat', shortName: 'Jum' },
+  { dayOfWeek: 6, dayName: 'Sabtu', shortName: 'Sab' },
+  { dayOfWeek: 7, dayName: 'Minggu', shortName: 'Min' },
+] as const
+
+export function createDefaultSchedules(defaultStart = '08:00', defaultEnd = '17:00'): ShiftDailySchedule[] {
+  return DAYS_OF_WEEK.map((d) => ({
+    dayOfWeek: d.dayOfWeek,
+    dayName: d.dayName,
+    startTime: d.dayOfWeek <= 5 ? defaultStart : null,
+    endTime: d.dayOfWeek <= 5 ? defaultEnd : null,
+    isOff: d.dayOfWeek > 5,
+  }))
+}
 
 const SHIFT_STATUSES = [
   { value: 'active', label: 'Aktif' },
@@ -85,6 +112,7 @@ export interface ShiftFormState {
   attendanceLocations: AttendancePointDraft[]
   status: string
   assignedEmployeeIds: string[]
+  schedules: ShiftDailySchedule[]
 }
 
 const INITIAL_FORM: ShiftFormState = {
@@ -97,17 +125,20 @@ const INITIAL_FORM: ShiftFormState = {
   attendanceLocations: [],
   status: 'active',
   assignedEmployeeIds: [],
+  schedules: createDefaultSchedules('08:00', '17:00'),
 }
 
-function displayTime(value: string) {
-  return value?.slice(0, 5) || '—'
+function displayTime(value: string | null | undefined) {
+  return value ? value.slice(0, 5) : '—'
 }
 
-function isOvernight(startTime: string, endTime: string) {
+function isOvernight(startTime: string | null | undefined, endTime: string | null | undefined) {
+  if (!startTime || !endTime) return false
   return endTime <= startTime
 }
 
-function calculateDuration(start: string, end: string): string {
+function calculateDuration(start: string | null | undefined, end: string | null | undefined): string {
+  if (!start || !end) return '—'
   const [sH, sM] = start.split(':').map(Number)
   const [eH, eM] = end.split(':').map(Number)
   if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return '—'
@@ -118,6 +149,45 @@ function calculateDuration(start: string, end: string): string {
   const hours = Math.floor(diffMinutes / 60)
   const mins = diffMinutes % 60
   return mins > 0 ? `${hours} jam ${mins} menit` : `${hours} jam`
+}
+
+function calculateDailyMinutes(start: string | null | undefined, end: string | null | undefined): number {
+  if (!start || !end) return 0
+  const [sH, sM] = start.split(':').map(Number)
+  const [eH, eM] = end.split(':').map(Number)
+  if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return 0
+  let diffMinutes = (eH * 60 + eM) - (sH * 60 + sM)
+  if (diffMinutes <= 0) diffMinutes += 24 * 60
+  return diffMinutes
+}
+
+function formatMinutesToHours(minutes: number): string {
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  if (hours === 0 && mins === 0) return '0 jam'
+  return mins > 0 ? `${hours} jam ${mins} mnt` : `${hours} jam`
+}
+
+function calculateWeeklySummary(schedules: ShiftDailySchedule[]) {
+  let totalMinutes = 0
+  let workingDaysCount = 0
+  let offDaysCount = 0
+
+  for (const s of schedules) {
+    if (s.isOff) {
+      offDaysCount++
+    } else {
+      workingDaysCount++
+      totalMinutes += calculateDailyMinutes(s.startTime, s.endTime)
+    }
+  }
+
+  return {
+    totalMinutes,
+    totalFormatted: formatMinutesToHours(totalMinutes),
+    workingDaysCount,
+    offDaysCount,
+  }
 }
 
 function createInitialPoint(baseLocation?: CompanyLocation, index = 1): AttendancePointDraft {
@@ -146,6 +216,248 @@ function createInitialPoint(baseLocation?: CompanyLocation, index = 1): Attendan
 
 function locationLine(location: ShiftLocation | CompanyLocation) {
   return `${location.name} · ${location.city}`
+}
+
+function renderDailyScheduleEditor(
+  form: ShiftFormState,
+  onUpdateDay: (dayOfWeek: number, patch: Partial<ShiftDailySchedule>) => void,
+  onApplyPreset: (type: 'standard5' | 'standard6' | 'all7' | 'syncHours') => void
+) {
+  const summary = calculateWeeklySummary(form.schedules)
+
+  return (
+    <div className="space-y-3 rounded-control border border-line bg-surface p-3.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-2.5">
+        <div>
+          <div className="flex items-center gap-2">
+            <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+              Jadwal Operasional Harian (Senin – Minggu)
+            </h5>
+            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-ink-2 border border-line">
+              7 Hari
+            </span>
+          </div>
+          <p className="mt-0.5 text-[11px] text-ink-3">
+            Atur jam kerja mandiri per hari atau tentukan hari libur operasional (Day Off).
+          </p>
+        </div>
+
+        {/* Toolbar Preset */}
+        <div className="flex flex-wrap items-center gap-1 text-[11px]">
+          <span className="text-ink-3 text-[10px] mr-1">Preset:</span>
+          <button
+            type="button"
+            onClick={() => onApplyPreset('standard5')}
+            className="rounded border border-line bg-surface-2 px-2 py-1 font-medium text-ink-2 hover:bg-surface-3 hover:text-ink transition-colors cursor-pointer"
+          >
+            Sen–Jum
+          </button>
+          <button
+            type="button"
+            onClick={() => onApplyPreset('standard6')}
+            className="rounded border border-line bg-surface-2 px-2 py-1 font-medium text-ink-2 hover:bg-surface-3 hover:text-ink transition-colors cursor-pointer"
+          >
+            Sen–Sab
+          </button>
+          <button
+            type="button"
+            onClick={() => onApplyPreset('all7')}
+            className="rounded border border-line bg-surface-2 px-2 py-1 font-medium text-ink-2 hover:bg-surface-3 hover:text-ink transition-colors cursor-pointer"
+          >
+            7 Hari
+          </button>
+          <button
+            type="button"
+            onClick={() => onApplyPreset('syncHours')}
+            title="Samakan jam kerja seluruh hari aktif dengan jam hari aktif pertama"
+            className="rounded border border-primary-line bg-primary-subtle px-2 py-1 font-medium text-primary hover:bg-primary/15 transition-colors cursor-pointer"
+          >
+            Samakan Jam
+          </button>
+        </div>
+      </div>
+
+      {/* Daftar 7 Hari */}
+      <div className="divide-y divide-line/60">
+        {DAYS_OF_WEEK.map((d) => {
+          const schedule = form.schedules.find((s) => s.dayOfWeek === d.dayOfWeek) || {
+            dayOfWeek: d.dayOfWeek,
+            dayName: d.dayName,
+            startTime: '08:00',
+            endTime: '17:00',
+            isOff: d.dayOfWeek > 5,
+          }
+          const isOff = schedule.isOff
+          const duration = !isOff ? calculateDuration(schedule.startTime, schedule.endTime) : 'Libur'
+          const overnight = !isOff && isOvernight(schedule.startTime, schedule.endTime)
+
+          return (
+            <div
+              key={d.dayOfWeek}
+              className={`flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between transition-colors ${
+                isOff ? 'opacity-70 bg-surface-2/30 px-2 rounded' : ''
+              }`}
+            >
+              {/* Kolom Hari & Status Badge */}
+              <div className="flex items-center gap-2 min-w-[130px]">
+                <span className="font-mono text-xs font-bold rounded bg-surface-2 px-1.5 py-0.5 border border-line text-ink">
+                  {d.shortName}
+                </span>
+                <span className="text-xs font-semibold text-ink">{d.dayName}</span>
+                {isOff ? (
+                  <span className="text-[10px] font-bold rounded bg-surface-2 text-ink-3 px-1.5 py-0.5 border border-line">
+                    Libur
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold rounded bg-success-subtle text-success px-1.5 py-0.5 border border-success-line">
+                    Kerja
+                  </span>
+                )}
+              </div>
+
+              {/* Kolom Kontrol: Toggle Masuk/Libur & Jam Kerja */}
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                {/* Switch Masuk/Libur */}
+                <div className="inline-flex rounded-control border border-line bg-surface-2 p-0.5 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateDay(d.dayOfWeek, { isOff: false })}
+                    className={`rounded px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+                      !isOff
+                        ? 'bg-white font-bold text-primary shadow-xs'
+                        : 'text-ink-2 hover:text-ink'
+                    }`}
+                  >
+                    Masuk
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateDay(d.dayOfWeek, { isOff: true })}
+                    className={`rounded px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+                      isOff
+                        ? 'bg-white font-bold text-error shadow-xs'
+                        : 'text-ink-2 hover:text-ink'
+                    }`}
+                  >
+                    Libur
+                  </button>
+                </div>
+
+                {!isOff ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="time"
+                      value={schedule.startTime || '08:00'}
+                      onChange={(e) =>
+                        onUpdateDay(d.dayOfWeek, { startTime: e.target.value })
+                      }
+                      className="rounded border border-line bg-surface px-2 py-1 text-xs font-mono font-medium text-ink focus:border-primary focus:outline-hidden"
+                    />
+                    <span className="text-ink-3 text-xs">—</span>
+                    <input
+                      type="time"
+                      value={schedule.endTime || '17:00'}
+                      onChange={(e) =>
+                        onUpdateDay(d.dayOfWeek, { endTime: e.target.value })
+                      }
+                      className="rounded border border-line bg-surface px-2 py-1 text-xs font-mono font-medium text-ink focus:border-primary focus:outline-hidden"
+                    />
+                    <span className="min-w-[80px] text-right text-[11px] font-medium text-ink-2 tabular">
+                      {duration}
+                    </span>
+                    {overnight ? (
+                      <span className="text-[10px] font-semibold text-warning" title="Melewati tengah malam">
+                        • Lintas Hari
+                      </span>
+                    ) : null}
+                  </div>
+                ) : (
+                  <span className="text-xs text-ink-3 italic py-1">
+                    Hari libur operasional (Day Off)
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Ringkasan Beban Kerja Mingguan */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-line bg-surface-2 px-3 py-2 text-xs">
+        <div className="flex items-center gap-1.5 text-ink-2">
+          <HiOutlineClock className="h-4 w-4 text-primary shrink-0" />
+          <span>
+            Total Jam Kerja Mingguan:{' '}
+            <strong className="text-ink">{summary.totalFormatted}</strong>
+          </span>
+        </div>
+        <div className="text-[11px] text-ink-3">
+          <span className="font-semibold text-success">{summary.workingDaysCount} hari aktif</span>
+          {' · '}
+          <span className="font-semibold text-ink-3">{summary.offDaysCount} hari libur</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function renderDailyScheduleSummary(schedules: ShiftDailySchedule[]) {
+  const summary = calculateWeeklySummary(schedules)
+
+  return (
+    <div className="rounded-control border border-line bg-surface p-3.5 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+          Rincian Jam Kerja Mingguan ({summary.workingDaysCount} Hari Aktif · {summary.offDaysCount} Libur)
+        </h5>
+        <span className="font-mono text-xs font-bold text-primary">
+          Total: {summary.totalFormatted} / minggu
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-7">
+        {DAYS_OF_WEEK.map((d) => {
+          const s = schedules.find((item) => item.dayOfWeek === d.dayOfWeek)
+          const isOff = s ? s.isOff : d.dayOfWeek > 5
+          const duration = !isOff ? calculateDuration(s?.startTime, s?.endTime) : 'Libur'
+
+          return (
+            <div
+              key={d.dayOfWeek}
+              className={`rounded border p-2 text-xs space-y-1 ${
+                isOff
+                  ? 'border-line/60 bg-surface-2/40 text-ink-3/70'
+                  : 'border-line bg-surface shadow-xs'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-ink">{d.dayName}</span>
+                <span
+                  className={`text-[9px] font-bold uppercase px-1 py-0.5 rounded ${
+                    isOff
+                      ? 'bg-surface-2 text-ink-3'
+                      : 'bg-primary-subtle text-primary border border-primary-line/40'
+                  }`}
+                >
+                  {isOff ? 'Libur' : 'Kerja'}
+                </span>
+              </div>
+              {!isOff ? (
+                <>
+                  <p className="font-mono text-[11px] text-ink font-medium">
+                    {displayTime(s?.startTime)} — {displayTime(s?.endTime)}
+                  </p>
+                  <p className="text-[10px] text-ink-3">{duration}</p>
+                </>
+              ) : (
+                <p className="text-[11px] text-ink-3 italic pt-1">Day Off</p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export function ShiftsPage() {
@@ -275,8 +587,91 @@ export function ShiftsPage() {
       attendanceLocations: [createInitialPoint(baseLoc, 1)],
       status: 'active',
       assignedEmployeeIds: [],
+      schedules: createDefaultSchedules('08:00', '17:00'),
     })
     setIsCreateOpen(true)
+  }
+
+  // Operasi Jadwal Harian
+  const handleUpdateSchedule = (
+    isEdit: boolean,
+    dayOfWeek: number,
+    patch: Partial<ShiftDailySchedule>
+  ) => {
+    const updater = isEdit ? setEditForm : setCreateForm
+    updater((prev) => {
+      const updated = prev.schedules.map((s) => {
+        if (s.dayOfWeek !== dayOfWeek) return s
+        const next = { ...s, ...patch }
+        if (patch.isOff === false && (!next.startTime || !next.endTime)) {
+          next.startTime = prev.startTime || '08:00'
+          next.endTime = prev.endTime || '17:00'
+        }
+        return next
+      })
+      const firstActive = updated.find((s) => !s.isOff)
+      return {
+        ...prev,
+        schedules: updated,
+        startTime: firstActive?.startTime || prev.startTime,
+        endTime: firstActive?.endTime || prev.endTime,
+      }
+    })
+  }
+
+  const applySchedulePreset = (
+    isEdit: boolean,
+    type: 'standard5' | 'standard6' | 'all7' | 'syncHours'
+  ) => {
+    const updater = isEdit ? setEditForm : setCreateForm
+    updater((prev) => {
+      let updated: ShiftDailySchedule[]
+      const baseStart =
+        prev.schedules.find((s) => !s.isOff)?.startTime || prev.startTime || '08:00'
+      const baseEnd =
+        prev.schedules.find((s) => !s.isOff)?.endTime || prev.endTime || '17:00'
+
+      if (type === 'standard5') {
+        updated = prev.schedules.map((s) => ({
+          ...s,
+          isOff: s.dayOfWeek > 5,
+          startTime: s.dayOfWeek <= 5 ? (s.startTime || baseStart) : null,
+          endTime: s.dayOfWeek <= 5 ? (s.endTime || baseEnd) : null,
+        }))
+      } else if (type === 'standard6') {
+        updated = prev.schedules.map((s) => ({
+          ...s,
+          isOff: s.dayOfWeek === 7,
+          startTime: s.dayOfWeek < 7 ? (s.startTime || baseStart) : null,
+          endTime: s.dayOfWeek < 7 ? (s.endTime || baseEnd) : null,
+        }))
+      } else if (type === 'all7') {
+        updated = prev.schedules.map((s) => ({
+          ...s,
+          isOff: false,
+          startTime: s.startTime || baseStart,
+          endTime: s.endTime || baseEnd,
+        }))
+      } else {
+        // syncHours
+        updated = prev.schedules.map((s) => {
+          if (s.isOff) return s
+          return {
+            ...s,
+            startTime: baseStart,
+            endTime: baseEnd,
+          }
+        })
+      }
+
+      const firstActive = updated.find((s) => !s.isOff)
+      return {
+        ...prev,
+        schedules: updated,
+        startTime: firstActive?.startTime || prev.startTime,
+        endTime: firstActive?.endTime || prev.endTime,
+      }
+    })
   }
 
   // Operasi Titik Presensi pada Formulir Buat
@@ -338,9 +733,20 @@ export function ShiftsPage() {
         setErrorMsg('Pilih kantor acuan operasional.')
         return
       }
-      if (createForm.startTime === createForm.endTime) {
-        setErrorMsg('Jam mulai dan jam selesai tidak boleh sama.')
+      const activeDays = createForm.schedules.filter((s) => !s.isOff)
+      if (activeDays.length === 0) {
+        setErrorMsg('Tentukan minimal satu hari kerja aktif dalam sepekan.')
         return
+      }
+      for (const day of activeDays) {
+        if (!day.startTime || !day.endTime) {
+          setErrorMsg(`Jam kerja untuk hari ${day.dayName} wajib diisi.`)
+          return
+        }
+        if (day.startTime === day.endTime) {
+          setErrorMsg(`Jam mulai dan jam selesai untuk hari ${day.dayName} tidak boleh sama.`)
+          return
+        }
       }
       setCreateStep(2)
       return
@@ -385,6 +791,13 @@ export function ShiftsPage() {
         startTime: createForm.startTime,
         endTime: createForm.endTime,
         workLocationId: createForm.workLocationId,
+        schedules: createForm.schedules.map((s) => ({
+          dayOfWeek: s.dayOfWeek,
+          dayName: s.dayName,
+          startTime: s.isOff ? null : s.startTime,
+          endTime: s.isOff ? null : s.endTime,
+          isOff: s.isOff,
+        })),
         attendanceLocations: createForm.attendanceLocations.map((loc) => ({
           name: loc.name.trim(),
           address: loc.address.trim(),
@@ -451,6 +864,29 @@ export function ShiftsPage() {
       locationId: loc.id,
     }))
 
+    const existingSchedules = shift.schedules ?? []
+    const mappedSchedules: ShiftDailySchedule[] = DAYS_OF_WEEK.map((d) => {
+      const match = existingSchedules.find((s) => s.dayOfWeek === d.dayOfWeek)
+      if (match) {
+        return {
+          id: match.id,
+          shiftId: match.shiftId,
+          dayOfWeek: d.dayOfWeek,
+          dayName: d.dayName,
+          startTime: match.startTime ? displayTime(match.startTime) : null,
+          endTime: match.endTime ? displayTime(match.endTime) : null,
+          isOff: match.isOff,
+        }
+      }
+      return {
+        dayOfWeek: d.dayOfWeek,
+        dayName: d.dayName,
+        startTime: d.dayOfWeek <= 5 ? displayTime(shift.startTime) : null,
+        endTime: d.dayOfWeek <= 5 ? displayTime(shift.endTime) : null,
+        isOff: d.dayOfWeek > 5,
+      }
+    })
+
     setEditForm({
       name: shift.name,
       code: shift.code,
@@ -462,6 +898,7 @@ export function ShiftsPage() {
         mappedPoints.length > 0 ? mappedPoints : [createInitialPoint(baseLoc, 1)],
       status: shift.status,
       assignedEmployeeIds: shift.assignedEmployees?.map((emp) => emp.id) ?? [],
+      schedules: mappedSchedules,
     })
   }
 
@@ -525,9 +962,20 @@ export function ShiftsPage() {
         setErrorMsg('Pilih kantor acuan operasional.')
         return
       }
-      if (editForm.startTime === editForm.endTime) {
-        setErrorMsg('Jam mulai dan jam selesai tidak boleh sama.')
+      const activeDays = editForm.schedules.filter((s) => !s.isOff)
+      if (activeDays.length === 0) {
+        setErrorMsg('Tentukan minimal satu hari kerja aktif dalam sepekan.')
         return
+      }
+      for (const day of activeDays) {
+        if (!day.startTime || !day.endTime) {
+          setErrorMsg(`Jam kerja untuk hari ${day.dayName} wajib diisi.`)
+          return
+        }
+        if (day.startTime === day.endTime) {
+          setErrorMsg(`Jam mulai dan jam selesai untuk hari ${day.dayName} tidak boleh sama.`)
+          return
+        }
       }
       setEditStep(2)
       return
@@ -573,6 +1021,13 @@ export function ShiftsPage() {
         startTime: editForm.startTime,
         endTime: editForm.endTime,
         workLocationId: editForm.workLocationId,
+        schedules: editForm.schedules.map((s) => ({
+          dayOfWeek: s.dayOfWeek,
+          dayName: s.dayName,
+          startTime: s.isOff ? null : s.startTime,
+          endTime: s.isOff ? null : s.endTime,
+          isOff: s.isOff,
+        })),
         attendanceLocations: editForm.attendanceLocations.map((loc) => ({
           name: loc.name.trim(),
           address: loc.address.trim(),
@@ -799,7 +1254,51 @@ export function ShiftsPage() {
                             </span>
                           </div>
                           {isOvernight(shift.startTime, shift.endTime) ? (
-                            <p className="mt-1 text-[11px] font-medium text-amber-600">Melewati tengah malam</p>
+                            <p className="mt-0.5 text-[11px] font-medium text-amber-600">Melewati tengah malam</p>
+                          ) : null}
+
+                          {/* Chips Jadwal Harian (Sen - Min) */}
+                          {shift.schedules && shift.schedules.length > 0 ? (
+                            <div className="mt-2">
+                              <div className="flex flex-wrap items-center gap-1">
+                                {DAYS_OF_WEEK.map((d) => {
+                                  const daySched = shift.schedules?.find((s) => s.dayOfWeek === d.dayOfWeek)
+                                  const isOff = daySched ? daySched.isOff : d.dayOfWeek > 5
+                                  const title = isOff
+                                    ? `${d.dayName}: Libur (Day Off)`
+                                    : `${d.dayName}: ${displayTime(daySched?.startTime)} — ${displayTime(daySched?.endTime)}`
+                                  return (
+                                    <span
+                                      key={d.dayOfWeek}
+                                      title={title}
+                                      className={`inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                        isOff
+                                          ? 'bg-surface-2 text-ink-3/50 line-through decoration-ink-3/40'
+                                          : 'bg-primary-subtle text-primary border border-primary-line/40'
+                                      }`}
+                                    >
+                                      {d.shortName}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                              {(() => {
+                                const activeScheds = (shift.schedules || []).filter((s) => !s.isOff)
+                                const hasVaryingHours = activeScheds.some(
+                                  (s) =>
+                                    displayTime(s.startTime) !== displayTime(activeScheds[0]?.startTime) ||
+                                    displayTime(s.endTime) !== displayTime(activeScheds[0]?.endTime)
+                                )
+                                if (hasVaryingHours) {
+                                  return (
+                                    <p className="mt-1 text-[10px] text-ink-3 font-medium">
+                                      • Jam berbeda per hari
+                                    </p>
+                                  )
+                                }
+                                return null
+                              })()}
+                            </div>
                           ) : null}
                         </td>
                         <td className="px-4 py-3.5 align-top 2xl:py-4">
@@ -993,39 +1492,12 @@ export function ShiftsPage() {
                   />
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <TextField
-                    label="Jam mulai kerja"
-                    type="time"
-                    value={createForm.startTime}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, startTime: event.target.value }))
-                    }
-                    required
-                  />
-                  <TextField
-                    label="Jam selesai kerja"
-                    type="time"
-                    value={createForm.endTime}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, endTime: event.target.value }))
-                    }
-                    required
-                  />
-                </div>
-
-                {/* Banner Durasi & Deteksi Overnight */}
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line bg-surface-2 px-3 py-2 text-xs">
-                  <div className="flex items-center gap-1.5 text-ink-2">
-                    <HiOutlineClock className="h-4 w-4 text-primary" />
-                    <span>Durasi shift: <strong className="text-ink">{calculateDuration(createForm.startTime, createForm.endTime)}</strong></span>
-                  </div>
-                  {isOvernight(createForm.startTime, createForm.endTime) ? (
-                    <span className="font-semibold text-warning text-[11px]">
-                      • Shift Lintas Hari (Melewati tengah malam)
-                    </span>
-                  ) : null}
-                </div>
+                {/* Editor Jadwal Kerja Harian (7 Hari) */}
+                {renderDailyScheduleEditor(
+                  createForm,
+                  (dayOfWeek, patch) => handleUpdateSchedule(false, dayOfWeek, patch),
+                  (type) => applySchedulePreset(false, type)
+                )}
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <SelectField
@@ -1421,6 +1893,9 @@ export function ShiftsPage() {
                   </div>
                 </div>
 
+                {/* Ringkasan Jadwal Harian */}
+                {renderDailyScheduleSummary(createForm.schedules)}
+
                 {/* Ringkasan Titik Geofence Presensi */}
                 <div className="rounded-control border border-line bg-surface p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
@@ -1591,39 +2066,12 @@ export function ShiftsPage() {
                   />
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <TextField
-                    label="Jam mulai kerja"
-                    type="time"
-                    value={editForm.startTime}
-                    onChange={(event) =>
-                      setEditForm((current) => ({ ...current, startTime: event.target.value }))
-                    }
-                    required
-                  />
-                  <TextField
-                    label="Jam selesai kerja"
-                    type="time"
-                    value={editForm.endTime}
-                    onChange={(event) =>
-                      setEditForm((current) => ({ ...current, endTime: event.target.value }))
-                    }
-                    required
-                  />
-                </div>
-
-                {/* Banner Durasi & Deteksi Overnight */}
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line bg-surface-2 px-3 py-2 text-xs">
-                  <div className="flex items-center gap-1.5 text-ink-2">
-                    <HiOutlineClock className="h-4 w-4 text-primary" />
-                    <span>Durasi shift: <strong className="text-ink">{calculateDuration(editForm.startTime, editForm.endTime)}</strong></span>
-                  </div>
-                  {isOvernight(editForm.startTime, editForm.endTime) ? (
-                    <span className="font-semibold text-warning text-[11px]">
-                      • Shift Lintas Hari (Melewati tengah malam)
-                    </span>
-                  ) : null}
-                </div>
+                {/* Editor Jadwal Kerja Harian (7 Hari) */}
+                {renderDailyScheduleEditor(
+                  editForm,
+                  (dayOfWeek, patch) => handleUpdateSchedule(true, dayOfWeek, patch),
+                  (type) => applySchedulePreset(true, type)
+                )}
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <SelectField
@@ -2016,6 +2464,9 @@ export function ShiftsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Ringkasan Jadwal Harian */}
+                {renderDailyScheduleSummary(editForm.schedules)}
 
                 {/* Ringkasan Titik Geofence Presensi */}
                 <div className="rounded-control border border-line bg-surface p-3.5 space-y-2.5">

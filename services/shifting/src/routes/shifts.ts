@@ -6,6 +6,7 @@ import {
   departments,
   db,
   shiftAttendanceLocations,
+  shiftSchedules,
   shifts,
   users
 } from '../db'
@@ -82,6 +83,25 @@ export interface ShiftAttendancePointInput {
   locationId?: string
 }
 
+export interface ShiftScheduleInput {
+  id?: string
+  dayOfWeek: number // 1: Senin, 2: Selasa, 3: Rabu, 4: Kamis, 5: Jumat, 6: Sabtu, 7: Minggu
+  dayName: string
+  startTime?: string | null
+  endTime?: string | null
+  isOff: boolean
+}
+
+export const STANDARD_DAYS = [
+  { dayOfWeek: 1, dayName: 'Senin', defaultOff: false },
+  { dayOfWeek: 2, dayName: 'Selasa', defaultOff: false },
+  { dayOfWeek: 3, dayName: 'Rabu', defaultOff: false },
+  { dayOfWeek: 4, dayName: 'Kamis', defaultOff: false },
+  { dayOfWeek: 5, dayName: 'Jumat', defaultOff: false },
+  { dayOfWeek: 6, dayName: 'Sabtu', defaultOff: true },
+  { dayOfWeek: 7, dayName: 'Minggu', defaultOff: true },
+] as const
+
 interface ShiftInput {
   companyId: string
   name: string
@@ -92,11 +112,20 @@ interface ShiftInput {
   workLocationId: string
   attendanceLocationIds?: string[]
   attendanceLocations?: ShiftAttendancePointInput[]
+  schedules?: ShiftScheduleInput[]
   status?: string
   employeeId?: string
   position?: string
   supervisorId?: string
   assignedEmployeeIds?: string[]
+}
+
+export interface ValidatedSchedule {
+  dayOfWeek: number
+  dayName: string
+  startTime: string | null
+  endTime: string | null
+  isOff: boolean
 }
 
 type ValidationResult =
@@ -111,6 +140,7 @@ type ValidationResult =
       workLocationId: string
       attendanceLocationIds: string[]
       locations: LocationGeoSnapshot[]
+      schedules: ValidatedSchedule[]
       status: string
       employeeId: string | null
       position: string | null
@@ -271,17 +301,89 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     }
   }
 
+  const validatedSchedules: ValidatedSchedule[] = []
+  if (Array.isArray(input.schedules) && input.schedules.length > 0) {
+    for (const std of STANDARD_DAYS) {
+      const match = input.schedules.find((s) => s.dayOfWeek === std.dayOfWeek)
+      if (match) {
+        const isOff = Boolean(match.isOff)
+        if (isOff) {
+          validatedSchedules.push({
+            dayOfWeek: std.dayOfWeek,
+            dayName: std.dayName,
+            startTime: null,
+            endTime: null,
+            isOff: true
+          })
+        } else {
+          const sTime = normalizeTime(match.startTime || startTime)
+          const eTime = normalizeTime(match.endTime || endTime)
+          if (!sTime || !eTime) {
+            return { ok: false, status: 400, message: `Jam kerja hari ${std.dayName} harus berformat HH:mm.` }
+          }
+          if (sTime === eTime) {
+            return { ok: false, status: 400, message: `Jam mulai dan jam selesai hari ${std.dayName} tidak boleh sama.` }
+          }
+          validatedSchedules.push({
+            dayOfWeek: std.dayOfWeek,
+            dayName: std.dayName,
+            startTime: sTime,
+            endTime: eTime,
+            isOff: false
+          })
+        }
+      } else {
+        if (std.defaultOff) {
+          validatedSchedules.push({
+            dayOfWeek: std.dayOfWeek,
+            dayName: std.dayName,
+            startTime: null,
+            endTime: null,
+            isOff: true
+          })
+        } else {
+          validatedSchedules.push({
+            dayOfWeek: std.dayOfWeek,
+            dayName: std.dayName,
+            startTime,
+            endTime,
+            isOff: false
+          })
+        }
+      }
+    }
+  } else {
+    for (const std of STANDARD_DAYS) {
+      validatedSchedules.push({
+        dayOfWeek: std.dayOfWeek,
+        dayName: std.dayName,
+        startTime: std.defaultOff ? null : startTime,
+        endTime: std.defaultOff ? null : endTime,
+        isOff: std.defaultOff
+      })
+    }
+  }
+
+  if (validatedSchedules.every((s) => s.isOff)) {
+    return { ok: false, status: 400, message: 'Shift harus memiliki minimal satu hari kerja aktif dalam sepekan.' }
+  }
+
+  const firstActiveDay = validatedSchedules.find((s) => !s.isOff)
+  const representativeStartTime = firstActiveDay?.startTime || startTime
+  const representativeEndTime = firstActiveDay?.endTime || endTime
+
   return {
     ok: true,
     companyId,
     name,
     code,
     description: input.description?.trim() || null,
-    startTime,
-    endTime,
+    startTime: representativeStartTime,
+    endTime: representativeEndTime,
     workLocationId: workLocation.id,
     attendanceLocationIds,
     locations: locations as LocationGeoSnapshot[],
+    schedules: validatedSchedules,
     status: input.status === 'inactive' ? 'inactive' : 'active',
     employeeId,
     position,
@@ -343,7 +445,7 @@ async function attachAttendance<T extends { id: string }>(rows: T[]) {
 
   const shiftIds = rows.map((row) => row.id)
 
-  const [attendance, assignedUsers] = await Promise.all([
+  const [attendance, assignedUsers, schedulesList] = await Promise.all([
     db
       .select({
         shiftId: shiftAttendanceLocations.shiftId,
@@ -375,7 +477,21 @@ async function attachAttendance<T extends { id: string }>(rows: T[]) {
       })
       .from(users)
       .where(inArray(users.shiftId, shiftIds))
-      .orderBy(users.name)
+      .orderBy(users.name),
+
+    db
+      .select({
+        id: shiftSchedules.id,
+        shiftId: shiftSchedules.shiftId,
+        dayOfWeek: shiftSchedules.dayOfWeek,
+        dayName: shiftSchedules.dayName,
+        startTime: shiftSchedules.startTime,
+        endTime: shiftSchedules.endTime,
+        isOff: shiftSchedules.isOff
+      })
+      .from(shiftSchedules)
+      .where(inArray(shiftSchedules.shiftId, shiftIds))
+      .orderBy(shiftSchedules.dayOfWeek)
   ])
 
   const groupedAttendance = new Map<string, typeof attendance>()
@@ -392,6 +508,13 @@ async function attachAttendance<T extends { id: string }>(rows: T[]) {
       list.push(user)
       groupedUsers.set(user.shiftId, list)
     }
+  }
+
+  const groupedSchedules = new Map<string, typeof schedulesList>()
+  for (const schedule of schedulesList) {
+    const list = groupedSchedules.get(schedule.shiftId) ?? []
+    list.push(schedule)
+    groupedSchedules.set(schedule.shiftId, list)
   }
 
   return rows.map((row) => {
@@ -421,6 +544,7 @@ async function attachAttendance<T extends { id: string }>(rows: T[]) {
       ...shift,
       assignedCount: assigned.length,
       assignedEmployees: assigned,
+      schedules: groupedSchedules.get(row.id) ?? [],
       employee: (row as any).employeeId && employeeName
         ? {
             id: (row as any).employeeId,
@@ -485,6 +609,15 @@ const attendancePointSchema = t.Object({
   locationId: t.Optional(t.String())
 })
 
+const shiftScheduleSchema = t.Object({
+  id: t.Optional(t.String()),
+  dayOfWeek: t.Number({ minimum: 1, maximum: 7 }),
+  dayName: t.String(),
+  startTime: t.Optional(t.Nullable(t.String())),
+  endTime: t.Optional(t.Nullable(t.String())),
+  isOff: t.Boolean()
+})
+
 const shiftBodySchema = {
   body: t.Object({
     companyId: t.String(),
@@ -496,6 +629,7 @@ const shiftBodySchema = {
     workLocationId: t.String(),
     attendanceLocationIds: t.Optional(t.Array(t.String())),
     attendanceLocations: t.Optional(t.Array(attendancePointSchema)),
+    schedules: t.Optional(t.Array(shiftScheduleSchema)),
     status: t.Optional(t.String()),
     employeeId: t.Optional(t.String()),
     position: t.Optional(t.String()),
@@ -539,6 +673,20 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
       return { success: false, message: 'Shift tidak ditemukan.' }
     }
 
+    // Periksa jadwal harian shift untuk hari ini
+    const now = new Date()
+    const jsDay = now.getDay() // 0: Minggu, 1: Senin, ..., 6: Sabtu
+    const currentDayOfWeek = jsDay === 0 ? 7 : jsDay
+    const daySchedule = shift.schedules?.find((s: any) => s.dayOfWeek === currentDayOfWeek)
+
+    if (daySchedule?.isOff) {
+      return {
+        success: true,
+        verified: false,
+        message: `Hari ini (${daySchedule.dayName}) adalah hari libur (Day Off) yang terjadwal untuk shift ini.`
+      }
+    }
+
     const userLat = Number(body.latitude)
     const userLng = Number(body.longitude)
 
@@ -553,8 +701,9 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
           return {
             success: true,
             verified: true,
-            message: `Presensi valid di area polygon: ${loc.name} (${loc.city})`,
-            matchedLocation: loc
+            message: `Presensi valid di area polygon: ${loc.name} (${loc.city}) · Hari ${daySchedule?.dayName || 'Kerja'}`,
+            matchedLocation: loc,
+            todaySchedule: daySchedule || null
           }
         }
       } else {
@@ -565,9 +714,10 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
           return {
             success: true,
             verified: true,
-            message: `Presensi valid di titik radius: ${loc.name} (${loc.city})`,
+            message: `Presensi valid di titik radius: ${loc.name} (${loc.city}) · Hari ${daySchedule?.dayName || 'Kerja'}`,
             distanceMeters: Math.round(distance),
-            matchedLocation: loc
+            matchedLocation: loc,
+            todaySchedule: daySchedule || null
           }
         }
       }
@@ -627,6 +777,19 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
           timezone: loc.timezone
         }))
       )
+
+      if (validated.schedules && validated.schedules.length > 0) {
+        await tx.insert(shiftSchedules).values(
+          validated.schedules.map((s) => ({
+            shiftId: shift.id,
+            dayOfWeek: s.dayOfWeek,
+            dayName: s.dayName,
+            startTime: s.isOff ? null : s.startTime,
+            endTime: s.isOff ? null : s.endTime,
+            isOff: s.isOff
+          }))
+        )
+      }
 
       if (validated.assignedEmployeeIds && validated.assignedEmployeeIds.length > 0) {
         await tx
@@ -689,6 +852,19 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
           timezone: loc.timezone
         }))
       )
+
+      if (validated.schedules && validated.schedules.length > 0) {
+        await tx.insert(shiftSchedules).values(
+          validated.schedules.map((s) => ({
+            shiftId: shift.id,
+            dayOfWeek: s.dayOfWeek,
+            dayName: s.dayName,
+            startTime: s.isOff ? null : s.startTime,
+            endTime: s.isOff ? null : s.endTime,
+            isOff: s.isOff
+          }))
+        )
+      }
 
       if (validated.assignedEmployeeIds && validated.assignedEmployeeIds.length > 0) {
         await tx
@@ -767,6 +943,23 @@ export const shiftRoutes = new Elysia({ prefix: '/shifts' })
           timezone: loc.timezone
         }))
       )
+
+      await tx
+        .delete(shiftSchedules)
+        .where(eq(shiftSchedules.shiftId, params.id))
+
+      if (validated.schedules && validated.schedules.length > 0) {
+        await tx.insert(shiftSchedules).values(
+          validated.schedules.map((s) => ({
+            shiftId: params.id,
+            dayOfWeek: s.dayOfWeek,
+            dayName: s.dayName,
+            startTime: s.isOff ? null : s.startTime,
+            endTime: s.isOff ? null : s.endTime,
+            isOff: s.isOff
+          }))
+        )
+      }
 
       if (validated.assignedEmployeeIds !== undefined) {
         await tx

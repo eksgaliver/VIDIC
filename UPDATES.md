@@ -354,7 +354,68 @@ Untuk mendukung tata kelola administrasi kepegawaian Indonesia dan korespondensi
 
 ---
 
-## § 9. Panduan Perintah Operasional
+## § 10. Konfigurasi Jadwal Shift Berbasis Hari (Day-by-Day Shift Schedules)
+
+Untuk mengakomodasi fleksibilitas operasional perusahaan di mana jam kerja bervariasi antar-hari dalam sepekan (misalnya hari Senin–Kamis pukul 08:00–17:00, Jumat pulang lebih awal pukul 08:00–16:30, Sabtu setengah hari atau libur, dan Minggu libur):
+
+### 1. Skema Database Relasional `shift_schedules`
+• **Tabel PostgreSQL**:
+  ```sql
+  CREATE TABLE IF NOT EXISTS "shift_schedules" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "shift_id" uuid NOT NULL REFERENCES "shifts"("id") ON DELETE CASCADE,
+    "day_of_week" integer NOT NULL, -- 1: Senin, 2: Selasa, 3: Rabu, 4: Kamis, 5: Jumat, 6: Sabtu, 7: Minggu
+    "day_name" varchar(20) NOT NULL,
+    "start_time" time,              -- Nullable saat is_off = true
+    "end_time" time,                -- Nullable saat is_off = true
+    "is_off" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS "idx_shift_schedules_shift_id" ON "shift_schedules" ("shift_id");
+  CREATE UNIQUE INDEX IF NOT EXISTS "uq_shift_schedules_shift_day" ON "shift_schedules" ("shift_id", "day_of_week");
+  ```
+• **Kompatibilitas Mundur (*Backward Compatibility*)**:
+  Kolom `startTime` dan `endTime` pada tabel induk `shifts` tetap dipertahankan dan otomatis disinkronisasi ke jam kerja hari aktif pertama (misal hari Senin). Hal ini memastikan referensi ringkas pada profil staf, badge karyawan, dan tabel lama tetap bekerja tanpa *breaking changes*.
+
+### 2. Mikroservis Shifting (`services/shifting`)
+• **Validasi Input Jadwal Harian (`validateShiftInput`)**:
+  - Memeriksa array `schedules` 7 hari (Senin s/d Minggu).
+  - Untuk hari aktif (`isOff: false`), memvalidasi format jam `HH:mm` dan memastikan jam mulai tidak sama dengan jam selesai.
+  - Untuk hari libur (`isOff: true`), jam mulai dan selesai di-reset menjadi `null`.
+  - Memastikan minimal ada 1 hari kerja aktif dalam sepekan.
+• **Penyimpanan Transaksional**:
+  - `POST /shifts`: Menyimpan entitas shift induk, titik geofence absensi, dan 7 baris jadwal harian ke `shift_schedules` dalam 1 transaksi DB ACID.
+  - `PUT /shifts/:id`: Memperbarui induk shift, merefresh titik geofence, menghapus jadwal lama, dan menyisipkan jadwal harian terbaru.
+• **Relasi Baca (`attachAttendance`)**:
+  - Melakukan query paralel ke `shift_schedules` yang diurutkan berdasarkan `day_of_week ASC` dan mengaitkannya ke respons shift sebagai array `schedules`.
+• **Verifikasi Absensi Berbasis Hari (`POST /shifts/:id/verify-attendance`)**:
+  - Mendeteksi hari saat absensi dilakukan (`new Date().getDay()`).
+  - Jika hari tersebut ditandai sebagai hari libur operasional (`isOff: true`), endpoint mengembalikan `verified: false` dengan pesan informatif: `Hari ini (<Nama Hari>) adalah hari libur (Day Off) yang terjadwal untuk shift ini.`
+  - Jika hari aktif, sistem memverifikasi geofence pengguna (point radius / poligon) dan menyertakan jadwal spesifik hari berjalan pada atribut `todaySchedule`.
+
+### 3. Antarmuka Pengguna Frontend Web (`apps/web/src/routes/shifts.tsx`)
+• **Langkah 1 Wizard (Jadwal Operasional Harian)**:
+  - Komponen matriks editor jadwal 7 hari (Senin s/d Minggu) dengan status badge `Kerja` atau `Libur`.
+  - Tombol sakelar (*switch*) mandiri: `Masuk` / `Libur` per hari.
+  - Input jam mulai dan jam selesai per hari dengan kalkulator durasi instan (misal `9 jam`, `8 jam 30 mnt`) serta deteksi shift lintas hari (*overnight*).
+  - Toolbar preset otomatis:
+    - `Sen–Jum`: Mengatur Senin s/d Jumat masuk, Sabtu & Minggu libur.
+    - `Sen–Sab`: Mengatur Senin s/d Sabtu masuk, Minggu libur.
+    - `7 Hari`: Mengatur seluruh 7 hari masuk kerja.
+    - `Samakan Jam`: Menyalin jam kerja hari aktif pertama ke seluruh hari kerja aktif.
+  - Indikator metrik mingguan: menampilkan total jam kerja mingguan dan perbandingan hari aktif vs hari libur.
+• **Langkah 3 Wizard (Rekapitulasi)**:
+  - Kartu ringkasan jadwal kerja 7 hari menampilkan rincian jam kerja, durasi per hari, status libur, dan total akumulasi jam kerja mingguan sebelum tombol simpan ditekan.
+• **Tabel Master Shift**:
+  - Kolom "Jam kerja" dilengkapi deretan chip hari (`Sen`, `Sel`, `Rab`, `Kam`, `Jum`, `Sab`, `Min`).
+  - Hari kerja aktif disorot dengan warna primer dan jam operasionalnya saat dihover.
+  - Hari libur ditampilkan coret (*strikethrough*) dengan gaya visual muted.
+  - Dilengkapi label `• Jam berbeda per hari` jika shift memiliki jam operasional yang bervariasi antar-hari.
+
+---
+
+## § 11. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):

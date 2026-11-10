@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -72,7 +73,28 @@ export const shiftAttendanceLocations = pgTable('shift_attendance_locations', {
   index('idx_shift_attendance_city').on(table.city)
 ])
 
+// Jadwal shift harian (Senin - Minggu). Membedakan jam kerja (start & end time)
+// per hari dalam 1 minggu atau menentukan hari libur operasional (isOff = true).
+export const shiftSchedules = pgTable('shift_schedules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  shiftId: uuid('shift_id')
+    .notNull()
+    .references(() => shifts.id, { onDelete: 'cascade' }),
+  dayOfWeek: integer('day_of_week').notNull(), // 1 = Senin, 2 = Selasa, 3 = Rabu, 4 = Kamis, 5 = Jumat, 6 = Sabtu, 7 = Minggu
+  dayName: varchar('day_name', { length: 20 }).notNull(),
+  startTime: time('start_time'),
+  endTime: time('end_time'),
+  isOff: boolean('is_off').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_shift_schedules_shift_id').on(table.shiftId),
+  uniqueIndex('uq_shift_schedules_shift_day').on(table.shiftId, table.dayOfWeek)
+])
+
 export type Shift = typeof shifts.$inferSelect
 export type NewShift = typeof shifts.$inferInsert
 export type ShiftAttendanceLocation = typeof shiftAttendanceLocations.$inferSelect
 export type NewShiftAttendanceLocation = typeof shiftAttendanceLocations.$inferInsert
+export type ShiftSchedule = typeof shiftSchedules.$inferSelect
+export type NewShiftSchedule = typeof shiftSchedules.$inferInsert

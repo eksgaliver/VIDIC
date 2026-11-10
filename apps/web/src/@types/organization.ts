@@ -159,6 +159,16 @@ export interface ShiftLocation {
   timezone: string
 }
 
+export interface ShiftDailySchedule {
+  id?: string
+  shiftId?: string
+  dayOfWeek: number // 1: Senin, 2: Selasa, 3: Rabu, 4: Kamis, 5: Jumat, 6: Sabtu, 7: Minggu
+  dayName: string
+  startTime: string | null
+  endTime: string | null
+  isOff: boolean
+}
+
 export interface Shift {
   id: string
   companyId: string
@@ -180,6 +190,7 @@ export interface Shift {
     position?: string | null
     status: string
   }[]
+  schedules?: ShiftDailySchedule[]
   employee?: { id: string; name: string; email: string } | null
   department?: Pick<Department, 'id' | 'name' | 'code'> | null
   supervisor?: { id: string; name: string; email: string } | null
