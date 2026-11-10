@@ -2,9 +2,8 @@ import * as React from 'react'
 import {
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
-  HiOutlineRefresh,
 } from 'react-icons/hi'
-import { Badge, Panel, PanelHeader } from '@/components/base'
+import { Panel, PanelHeader } from '@/components/base'
 
 export interface HolidayItem {
   date: string // "YYYY-MM-DD"
@@ -93,27 +92,20 @@ export function HolidayCalendar2026() {
 
   // Data Hari Libur
   const [holidays, setHolidays] = React.useState<HolidayItem[]>(FALLBACK_HOLIDAYS_2026)
-  const [isLoading, setIsLoading] = React.useState<boolean>(false)
-  const [isLiveConnected, setIsLiveConnected] = React.useState<boolean>(true)
 
   // Sinkronisasi data API
   const fetchHolidayData = React.useCallback(async () => {
-    setIsLoading(true)
     try {
       const response = await fetch('https://tanggalmerah.upset.dev/api/holidays?year=2026')
       if (!response.ok) throw new Error(`HTTP error ${response.status}`)
       const json = await response.json()
       if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
         setHolidays(json.data as HolidayItem[])
-        setIsLiveConnected(true)
       } else {
         setHolidays(FALLBACK_HOLIDAYS_2026)
       }
     } catch {
       setHolidays(FALLBACK_HOLIDAYS_2026)
-      setIsLiveConnected(false)
-    } finally {
-      setIsLoading(false)
     }
   }, [])
 
@@ -216,26 +208,6 @@ export function HolidayCalendar2026() {
       <PanelHeader
         title="Kalender 2026"
         description="Hari libur nasional & cuti bersama resmi RI."
-        meta={
-          <div className="flex items-center gap-1.5 text-xs text-ink-3">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                isLiveConnected ? 'bg-emerald-500' : 'bg-ink-4'
-              }`}
-              title={isLiveConnected ? 'Terhubung API tanggalmerah.upset.dev' : 'Data Cadangan'}
-            />
-            <span className="font-medium text-ink-2">{isLiveConnected ? 'Live' : 'Offline'}</span>
-            <button
-              type="button"
-              onClick={fetchHolidayData}
-              disabled={isLoading}
-              title="Sinkronkan ulang"
-              className="ml-1 p-0.5 text-ink-3 hover:text-ink transition-colors cursor-pointer"
-            >
-              <HiOutlineRefresh className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-primary' : ''}`} />
-            </button>
-          </div>
-        }
       />
 
       <div className="p-4 sm:p-5 space-y-4">

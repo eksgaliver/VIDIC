@@ -163,7 +163,6 @@ export function AppLayout() {
           </span>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            <GatewayStatus />
             <ThemeToggle />
           </div>
         </header>
@@ -517,46 +516,6 @@ function ThemeToggle() {
       aria-label={isDark ? 'Gunakan tema terang' : 'Gunakan tema gelap'}
     >
       {isDark ? <HiOutlineSun className="h-[18px] w-[18px] 2xl:h-5 2xl:w-5" /> : <HiOutlineMoon className="h-[18px] w-[18px] 2xl:h-5 2xl:w-5" />}
-    </button>
-  )
-}
-
-type GatewayState = 'checking' | 'online' | 'offline'
-
-function GatewayStatus() {
-  const [state, setState] = React.useState<GatewayState>('checking')
-
-  const check = React.useCallback(async () => {
-    setState('checking')
-    try {
-      const res = await api.health.get()
-      setState(res.error ? 'offline' : 'online')
-    } catch {
-      setState('offline')
-    }
-  }, [])
-
-  React.useEffect(() => {
-    check()
-  }, [check])
-
-  const label =
-    state === 'checking' ? 'Memeriksa gateway' : state === 'online' ? 'Gateway terhubung' : 'Gateway tidak terjangkau'
-
-  return (
-    <button
-      onClick={check}
-      className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-2 transition-colors hover:bg-surface-2 button-press-feedback sm:px-2.5 2xl:text-xs"
-      title={`Status: ${label} (Klik untuk periksa ulang)`}
-      aria-label={label}
-    >
-      <span
-        className={cn(
-          'h-1.5 w-1.5 shrink-0 rounded-full',
-          state === 'online' ? 'bg-success' : state === 'offline' ? 'bg-error' : 'bg-ink-3 animate-pulse'
-        )}
-      />
-      <span className="hidden xs:inline">{label}</span>
     </button>
   )
 }

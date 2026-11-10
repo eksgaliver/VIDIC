@@ -68,11 +68,6 @@ function DashboardPage() {
       <PageHeader
         title="Dasbor"
         description={`${user?.name ?? 'Operator'} · peran ${user?.role ?? 'anggota'}. Ringkasan di bawah dihitung langsung dari data organisasi yang tersimpan.`}
-        actions={
-          <Button tone="neutral" onClick={load} disabled={isLoading}>
-            Muat ulang
-          </Button>
-        }
       />
 
       {errorMsg && (

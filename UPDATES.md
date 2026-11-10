@@ -525,6 +525,14 @@ Halaman utama Dasbor (`apps/web/src/routes/dashboard.tsx`) kini telah dilengkapi
   - Baris informasi dinamis menampilkan status tanggal yang diklik (`Hari Kerja Efektif` atau nama hari libur nasional/cuti bersama).
   - Ringkasan libur bulan aktif ditampilkan secara ringkas di bagian bawah panel kalender.
 
+### 3. Pembersihan Status Chrome & Tombol Refresh (*Modern Aesthetic Polish*)
+• **Header Aplikasi (`apps/web/src/layouts/AppLayout.tsx`)**:
+  - Menghilangkan tombol/badge status konektivitas `Gateway terhubung` di sebelah ikon tema, memberikan tampilan bilah navigasi atas yang tenang dan bersih.
+• **Halaman Dasbor (`apps/web/src/routes/dashboard.tsx`)**:
+  - Menghilangkan tombol manual `Muat ulang` pada `PageHeader` dasbor; pembaruan data berjalan otomatis saat transisi halaman tanpa friksi manual.
+• **Panel Kalender (`apps/web/src/components/dashboard/HolidayCalendar2026.tsx`)**:
+  - Menghilangkan badge `● Live` dan ikon tombol refresh pada header kalender, menjaga tampilan tetap minimalis dan fokus pada konten jadwal kerja.
+
 ---
 
 ## § 15. Panduan Perintah Operasional
