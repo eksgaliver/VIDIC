@@ -511,19 +511,19 @@ Halaman utama Dasbor (`apps/web/src/routes/dashboard.tsx`) kini telah dilengkapi
 • **High Availability & Fallback**: Dilengkapi dengan dataset bawaan lengkap 25 hari libur resmi 2026 (SKB 3 Menteri) sebagai *fallback cache* sehingga kalender tetap berfungsi 100% cepat dan akurat saat luring (*offline*).
 • **Indikator Status Sambungan**: Menampilkan badge live connection `API Terhubung ✓` beserta tombol segarkan data (`HiOutlineRefresh`).
 
-### 2. Fitur Kalender & Penandaan Hari Libur (*Visual Marking*)
-• **Grid Matriks 7 Hari**:
-  - Penandaan hari libur nasional (`type: 'holiday'`) dengan aksen merah/rose tegas (`bg-rose-500/10 text-rose-700 border-rose-500/30`) dan badge judul hari libur.
-  - Penandaan cuti bersama (`type: 'leave'`) dengan aksen amber/oranye (`bg-amber-500/10 text-amber-700 border-amber-500/30`).
-  - Penandaan tanggal hari ini (`today`) dengan ring primer dan tag indikator `Hari ini`.
-  - Hari Minggu ditandai dengan tipografi merah/rose reguler.
-• **Navigasi Cepat 12 Bulan 2026**:
-  - Tombol bulan sebelumnya (`←`) dan bulan berikutnya (`→`).
-  - Tombol cepat loncat ke "Hari Ini".
-  - *Month Pills Selector* (Jan s/d Des 2026) dengan penghitung jumlah tanggal merah di setiap bulan secara instan.
-• **Panel Inspeksi Tanggal & Filter Hari Libur**:
-  - Saat kotak tanggal diklik, panel rincian secara dinamis menampilkan status resmi: `Libur Nasional Resmi ✓`, `Cuti Bersama Resmi Pemerintah ✓`, `Akhir Pekan`, atau `Hari Kerja Efektif ✓`.
-  - Panel daftar hari libur yang dapat difilter berdasarkan: `Bulan Ini`, `Semua Libur 2026`, `Libur Nasional`, atau `Cuti Bersama`, lengkap dengan pencarian nama libur instan.
+### 2. Desain Minimalis & Penandaan Hari Libur (*Minimalist Architecture*)
+• **Desain Bersih & Elegan (*Anti-Slop*)**:
+  - Mengeliminasi elemen berlebih (*visual clutter*), seperti kartu statistik redundan dan kolom pencarian panjang, menjadi widget kalender ringkas yang proporsional.
+  - Ditempatkan secara natural di bilah samping dasbor (*sidebar panel*) mendampingi ringkasan cakupan organisasi.
+• **Grid Matriks 7 Hari Ringkas**:
+  - Penandaan hari libur nasional (`type: 'holiday'`) dengan dot merah `●` di bawah angka tanggal dan aksen teks rose.
+  - Penandaan cuti bersama (`type: 'leave'`) dengan dot amber `●` dan aksen teks amber.
+  - Penandaan tanggal hari ini (`today`) dengan border primer dan latar lembut.
+  - Tanggal yang dipilih disorot dengan styling kontras tegas (`bg-ink text-surface font-bold`).
+• **Navigasi & Rincian Tanggal Satu Baris**:
+  - Navigasi bulan ringkas (`<` Bulan Tahun `>`) dengan tombol cepat "Hari Ini".
+  - Baris informasi dinamis menampilkan status tanggal yang diklik (`Hari Kerja Efektif` atau nama hari libur nasional/cuti bersama).
+  - Ringkasan libur bulan aktif ditampilkan secara ringkas di bagian bawah panel kalender.
 
 ---
 
