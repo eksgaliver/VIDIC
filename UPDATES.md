@@ -662,5 +662,40 @@ kubectl apply -f k8s/srikaya-all-in-one.yaml
 
 # 5. Kompilasi & validasi tipe frontend:
 npm --prefix apps/web run build
+
+# 6. Menjalankan pengujian aplikasi mobile Flutter:
+cd flutter ; flutter test -r expanded
 ```
+
+---
+
+## § 19. Aplikasi Mobile Flutter Independen untuk Pengujian (Login & Welcome)
+
+Telah dibangun modul aplikasi Flutter mandiri pada direktori [`flutter/`](file:///c:/project/flutter) yang terisolasi khusus untuk pengujian antarmuka mobile, alur masuk pengguna (*login*), dan sambutan (*welcome onboarding*):
+
+### 1. Struktur & Komponen Mandiri (`flutter/lib`)
+• **Layar Sambutan (`lib/screens/welcome_screen.dart`)**:
+  - Menampilkan branding resmi Srikaya Platform dengan tema Material 3 modern berskema warna slate-900 dan aksen emerald.
+  - Kartu pengenalan fitur utama: Isolasi Multi-Tenant, Manajemen Shift Kerja, dan Bebas Dependensi.
+  - Tombol aksi navigasi: `Masuk ke Akun →` serta `Mulai Cepat (Mode Tamu / Sandbox)`.
+• **Layar Autentikasi (`lib/screens/login_screen.dart`)**:
+  - Pilihan cepat kredensial uji coba (*quick autofill chips*): Admin Srikaya, HRD Nusantara, dan Staff Srikaya.
+  - Validasi formulir email, password (dengan toggle visibilitas), dan Tenant ID.
+  - Sakelar *Mode Pengujian Independen* (Mock Mode): dapat dijalankan 100% mandiri tanpa backend, atau dimatikan untuk mengirim permintaan langsung ke API Gateway (`http://localhost:3000/api/auth/login`).
+• **Dasbor Sambutan Pengguna (`lib/screens/home_screen.dart`)**:
+  - Menampilkan sesi aktif, nama pengguna, peran (*ADMIN/HRD/STAFF/GUEST*), dan ID Perusahaan (*CID*).
+  - Simulasi interaktif pencatatan presensi masuk shift harian.
+  - Alat uji validasi isolasi multi-tenant dengan simulasi penolakan akses lintas-organisasi.
+• **Layanan & Tema (`lib/services/auth_service.dart`, `lib/theme/app_theme.dart`)**:
+  - Arsitektur singleton autentikasi dengan simulasi latensi dan penanganan error terstruktur.
+  - Desain responsif bebas dari resiko *RenderFlex overflow* pada berbagai resolusi layar ponsel.
+
+### 2. Hasil Verifikasi Pengujian Otomatis (`flutter/test/widget_test.dart`)
+• 4/4 pengujian widget lolos 100% via `flutter test -r expanded`:
+  1. `✓ Welcome screen renders properly with branding and CTAs`
+  2. `✓ Navigates to Login screen on tapping Masuk ke Akun`
+  3. `✓ Performs mock authentication and enters Home Dashboard`
+  4. `✓ Guest sandbox mode navigates directly to Home Dashboard`
+• `flutter analyze` tervalidasi bersih tanpa peringatan (*0 issues found*).
+
 
