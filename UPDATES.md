@@ -475,7 +475,34 @@ Untuk memastikan seluruh data kepegawaian memenuhi standar kelengkapan administr
 
 ---
 
-## § 13. Panduan Perintah Operasional
+## § 13. Pembaruan Penugasan Karyawan Shift: Search Form & Kartu Status Interaktif
+
+Untuk meningkatkan kemudahan dan fleksibilitas manajer HR dalam mengelola alokasi shift karyawan (*frictionless UX*), antarmuka penugasan karyawan pada dialog **Ubah Master Shift** (dan dialog **Buat Shift**) telah diperbarui menjadi selektor interaktif modern:
+
+### 1. Form Pencarian & Filter Cepat (*Search & Filter Pills*)
+• **Input Pencarian**: Menyediakan input teks pencarian cepat berbasis nama karyawan, surel, jabatan, kode/nama departemen, maupun nama shift saat ini dengan tombol pembersih instan (`✕`).
+• **Pill Kategori Real-Time**:
+  - `Semua (N)`: Menampilkan seluruh karyawan aktif.
+  - `Shift Ini (N)`: Menampilkan karyawan yang sedang ditugaskan pada shift yang sedang diedit.
+  - `Shift Lain (N)`: Menampilkan karyawan yang saat ini terdaftar pada master shift lain.
+  - `Tanpa Shift (N)`: Menampilkan karyawan yang belum memiliki penugasan shift apapun.
+• **Aksi Massal (*Batch Toggle*)**: Tombol cepat untuk `Pilih Semua Hasil` atau `Lepas Semua Hasil` dari karyawan yang sedang tampil pada filter/pencarian aktif.
+• **Indikator Live Counter**: Badge indikator hidup yang menyajikan jumlah karyawan yang dipilih berbanding total karyawan perusahaan.
+
+### 2. Kartu Interaktif Berstatus Hijau & Transisi Shift Real-Time
+• **Visualisasi Aktif Hijau**:
+  - Saat kartu karyawan diklik/dipilih, seluruh kartu bertransformasi dengan styling hijau cerah (`border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40 shadow-xs`).
+  - Avatar inisial berubah menjadi warna emerald tebal dengan indikator centang hijau `✓`.
+• **Status Transisi Shift Otomatis**:
+  - **Pindah Shift**: Jika karyawan sebelumnya telah bertugas di shift lain (misal "Shift Reguler"), status otomatis menampilkan badge transisi: `Pindah: ~Shift Reguler~ → Shift Ini ✓`.
+  - **Tetap di Shift Ini**: Jika karyawan memang sudah berada di shift ini sejak awal: `Tetap ditugaskan di shift ini ✓`.
+  - **Baru Ditugaskan**: Jika karyawan belum memiliki shift sebelumnya: `Ditugaskan ke shift ini ✓`.
+  - **Akan Dilepas**: Jika karyawan yang sebelumnya berada di shift ini di-uncheck: `○ Akan dilepas dari shift ini` (badge peringatan amber halus).
+  - **Shift Lain / Tanpa Shift**: Saat kartu tidak dipilih, badge menampilkan shift aktif mereka saat ini secara informatif.
+
+---
+
+## § 14. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):

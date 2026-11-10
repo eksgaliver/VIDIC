@@ -9,8 +9,10 @@ import {
   HiOutlineMap,
   HiOutlinePencil,
   HiOutlinePlus,
+  HiOutlineSearch,
   HiOutlineTrash,
   HiOutlineUserGroup,
+  HiOutlineX,
 } from 'react-icons/hi'
 import { authenticatedRoute } from './_authenticated'
 import { api } from '@/lib/api'
@@ -475,6 +477,359 @@ function renderDailyScheduleSummary(schedules: ShiftDailySchedule[]) {
   )
 }
 
+function initials(name: string) {
+  return (
+    name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'KR'
+  )
+}
+
+interface EmployeeShiftSelectorProps {
+  employees: Employee[]
+  shifts: Shift[]
+  currentShiftId?: string | null
+  currentShiftName?: string
+  assignedIds: string[]
+  onToggle: (employeeId: string, assigned: boolean) => void
+  onBatchToggle: (employeeIds: string[], assign: boolean) => void
+  title?: string
+  subtitle?: string
+}
+
+export function EmployeeShiftSelector({
+  employees,
+  shifts,
+  currentShiftId,
+  currentShiftName,
+  assignedIds,
+  onToggle,
+  onBatchToggle,
+  title = 'Karyawan yang ditugaskan pada shift ini',
+  subtitle = 'Klik kartu karyawan untuk menugaskan atau memindahkan ke shift ini.',
+}: EmployeeShiftSelectorProps) {
+  const [searchTerm, setSearchTerm] = React.useState('')
+  const [filterTab, setFilterTab] = React.useState<'all' | 'assigned' | 'other' | 'none'>('all')
+
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+
+  // Statistik penugasan karyawan
+  const stats = React.useMemo(() => {
+    let assigned = 0
+    let other = 0
+    let none = 0
+
+    for (const emp of employees) {
+      const isAssigned = assignedIds.includes(emp.id)
+      if (isAssigned) {
+        assigned++
+      } else {
+        const empShift = emp.shift || shifts.find((s) => s.id === emp.shiftId)
+        if (empShift && empShift.id !== currentShiftId) {
+          other++
+        } else {
+          none++
+        }
+      }
+    }
+
+    return { total: employees.length, assigned, other, none }
+  }, [employees, assignedIds, shifts, currentShiftId])
+
+  // Penyaringan daftar karyawan sesuai tab & teks pencarian
+  const filteredEmployees = React.useMemo(() => {
+    return employees.filter((emp) => {
+      const isAssigned = assignedIds.includes(emp.id)
+      const empShift = emp.shift || shifts.find((s) => s.id === emp.shiftId)
+      const hasOtherShift = empShift && empShift.id !== currentShiftId
+
+      if (filterTab === 'assigned' && !isAssigned) return false
+      if (filterTab === 'other' && (isAssigned || !hasOtherShift)) return false
+      if (filterTab === 'none' && (isAssigned || hasOtherShift)) return false
+
+      if (!normalizedSearch) return true
+
+      const nameMatch = emp.name.toLowerCase().includes(normalizedSearch)
+      const emailMatch = emp.email.toLowerCase().includes(normalizedSearch)
+      const positionMatch = (emp.position || '').toLowerCase().includes(normalizedSearch)
+      const departmentMatch = (emp.department?.name || emp.department?.code || '')
+        .toLowerCase()
+        .includes(normalizedSearch)
+      const shiftMatch = (empShift?.name || empShift?.code || '')
+        .toLowerCase()
+        .includes(normalizedSearch)
+
+      return nameMatch || emailMatch || positionMatch || departmentMatch || shiftMatch
+    })
+  }, [employees, assignedIds, shifts, currentShiftId, filterTab, normalizedSearch])
+
+  const visibleEmployeeIds = React.useMemo(
+    () => filteredEmployees.map((e) => e.id),
+    [filteredEmployees]
+  )
+
+  const allVisibleAssigned =
+    visibleEmployeeIds.length > 0 &&
+    visibleEmployeeIds.every((id) => assignedIds.includes(id))
+
+  const handleSelectAllVisible = () => {
+    onBatchToggle(visibleEmployeeIds, true)
+  }
+
+  const handleDeselectAllVisible = () => {
+    onBatchToggle(visibleEmployeeIds, false)
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-line bg-surface-2/40 p-3 sm:p-4">
+      {/* Header, Indikator & Tombol Aksi Cepat */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-2.5">
+        <div>
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-ink sm:text-sm">{title}</h4>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {assignedIds.length} dari {employees.length} Ditugaskan
+            </span>
+          </div>
+          <p className="mt-0.5 text-[11px] text-ink-3">{subtitle}</p>
+        </div>
+
+        {/* Batch Select / Deselect */}
+        <div className="flex items-center gap-1.5">
+          {allVisibleAssigned ? (
+            <button
+              type="button"
+              onClick={handleDeselectAllVisible}
+              className="rounded-control border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors cursor-pointer"
+            >
+              Lepas Semua Hasil
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSelectAllVisible}
+              className="rounded-control border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400 transition-colors cursor-pointer"
+            >
+              Pilih Semua Hasil
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Form Pencarian & Tombol Filter Tab */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <HiOutlineSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Cari nama karyawan, jabatan, departemen, atau surel..."
+            className="w-full rounded-control border border-line bg-surface py-1.5 pl-9 pr-8 text-xs text-ink placeholder:text-ink-3 focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
+          />
+          {searchTerm ? (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-3 hover:text-ink transition-colors cursor-pointer"
+              title="Hapus pencarian"
+            >
+              <HiOutlineX className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+
+        {/* Filter Pills */}
+        <div className="flex flex-wrap items-center gap-1 text-[11px]">
+          <button
+            type="button"
+            onClick={() => setFilterTab('all')}
+            className={`rounded-control px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+              filterTab === 'all'
+                ? 'bg-ink text-surface font-semibold shadow-xs'
+                : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'
+            }`}
+          >
+            Semua ({stats.total})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('assigned')}
+            className={`rounded-control px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+              filterTab === 'assigned'
+                ? 'bg-emerald-600 text-white font-semibold shadow-xs'
+                : 'bg-surface border border-line text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+            }`}
+          >
+            Shift Ini ({stats.assigned})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('other')}
+            className={`rounded-control px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+              filterTab === 'other'
+                ? 'bg-ink text-surface font-semibold shadow-xs'
+                : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'
+            }`}
+          >
+            Shift Lain ({stats.other})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('none')}
+            className={`rounded-control px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+              filterTab === 'none'
+                ? 'bg-ink text-surface font-semibold shadow-xs'
+                : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'
+            }`}
+          >
+            Tanpa Shift ({stats.none})
+          </button>
+        </div>
+      </div>
+
+      {/* Grid Kartu Karyawan Interaktif */}
+      {filteredEmployees.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-line bg-surface p-6 text-center">
+          <p className="text-xs font-medium text-ink-2">
+            Tidak ada karyawan yang cocok dengan kriteria pencarian & filter.
+          </p>
+          {searchTerm || filterTab !== 'all' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('')
+                setFilterTab('all')
+              }}
+              className="mt-2 text-xs font-semibold text-primary underline-offset-4 hover:underline cursor-pointer"
+            >
+              Reset pencarian & filter
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="grid max-h-72 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+          {filteredEmployees.map((emp) => {
+            const isAssigned = assignedIds.includes(emp.id)
+            const empShift = emp.shift || shifts.find((s) => s.id === emp.shiftId)
+            const wasOriginallyInThisShift =
+              currentShiftId &&
+              (emp.shiftId === currentShiftId || empShift?.id === currentShiftId)
+            const hasOtherShift = empShift && empShift.id !== currentShiftId
+
+            return (
+              <div
+                key={emp.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onToggle(emp.id, !isAssigned)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onToggle(emp.id, !isAssigned)
+                  }
+                }}
+                className={`group relative flex flex-col justify-between rounded-xl border p-3 transition-all duration-150 cursor-pointer text-left select-none ${
+                  isAssigned
+                    ? 'border-emerald-500 bg-emerald-500/10 dark:bg-emerald-950/30 dark:border-emerald-500 ring-1 ring-emerald-500/40 shadow-xs'
+                    : 'border-line bg-surface hover:border-line-strong hover:bg-surface-2/60'
+                }`}
+              >
+                {/* Bagian Atas: Avatar, Identitas, & Indikator Centang */}
+                <div className="flex items-start gap-2.5">
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                      isAssigned
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-surface-3 text-ink-2 group-hover:bg-primary-subtle group-hover:text-primary'
+                    }`}
+                  >
+                    {initials(emp.name)}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-1.5">
+                      <p className="truncate text-xs font-semibold text-ink group-hover:text-primary transition-colors">
+                        {emp.name}
+                      </p>
+                      {/* Checkbox Indikator Visual */}
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
+                          isAssigned
+                            ? 'bg-emerald-600 text-white'
+                            : 'border border-line-strong bg-surface text-transparent group-hover:border-primary'
+                        }`}
+                      >
+                        ✓
+                      </span>
+                    </div>
+
+                    <p className="truncate text-[11px] text-ink-3">{emp.email}</p>
+
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] text-ink-2 font-medium">
+                        {emp.position || 'Staf Operasional'}
+                      </span>
+                      {emp.department ? (
+                        <span className="inline-flex items-center rounded bg-surface-3 px-1.5 py-0.2 text-[10px] font-medium text-ink-2">
+                          {emp.department.code}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bagian Bawah: Status Shift Real-Time Terubah */}
+                <div className="mt-2.5 border-t border-line/40 pt-2">
+                  {isAssigned ? (
+                    <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white">
+                        ✓
+                      </span>
+                      {hasOtherShift ? (
+                        <span className="truncate">
+                          Pindah: <span className="line-through opacity-75">{empShift.name}</span> →{' '}
+                          <strong className="font-semibold text-emerald-800 dark:text-emerald-200">
+                            {currentShiftName || 'Shift Ini'}
+                          </strong>
+                        </span>
+                      ) : wasOriginallyInThisShift ? (
+                        <span>Tetap ditugaskan di shift ini</span>
+                      ) : (
+                        <span>Ditugaskan ke shift ini</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-[11px] text-ink-3">
+                      <span className="h-1.5 w-1.5 rounded-full bg-ink-4 shrink-0" />
+                      {wasOriginallyInThisShift ? (
+                        <span className="text-amber-600 dark:text-amber-400 font-medium truncate">
+                          ○ Akan dilepas dari shift ini
+                        </span>
+                      ) : hasOtherShift ? (
+                        <span className="truncate">
+                          Saat ini: <span className="font-medium text-ink-2">{empShift.name}</span>
+                        </span>
+                      ) : (
+                        <span>Belum memiliki shift penugasan</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ShiftsPage() {
   const [companies, setCompanies] = React.useState<Company[]>([])
   const [selectedCompanyId, setSelectedCompanyId] = React.useState('')
@@ -736,6 +1091,23 @@ export function ShiftsPage() {
     }))
   }
 
+  const handleBatchToggleCreateEmployees = (employeeIds: string[], assign: boolean) => {
+    setCreateForm((current) => {
+      const idSet = new Set(current.assignedEmployeeIds)
+      for (const id of employeeIds) {
+        if (assign) {
+          idSet.add(id)
+        } else {
+          idSet.delete(id)
+        }
+      }
+      return {
+        ...current,
+        assignedEmployeeIds: Array.from(idSet),
+      }
+    })
+  }
+
   // Navigasi Langkah Formulir Buat
   const handleNextCreateStep = () => {
     setErrorMsg(null)
@@ -957,6 +1329,23 @@ export function ShiftsPage() {
         ? [...new Set([...current.assignedEmployeeIds, employeeId])]
         : current.assignedEmployeeIds.filter((id) => id !== employeeId),
     }))
+  }
+
+  const handleBatchToggleEditEmployees = (employeeIds: string[], assign: boolean) => {
+    setEditForm((current) => {
+      const idSet = new Set(current.assignedEmployeeIds)
+      for (const id of employeeIds) {
+        if (assign) {
+          idSet.add(id)
+        } else {
+          idSet.delete(id)
+        }
+      }
+      return {
+        ...current,
+        assignedEmployeeIds: Array.from(idSet),
+      }
+    })
   }
 
   // Navigasi Langkah Formulir Ubah
@@ -1509,28 +1898,18 @@ export function ShiftsPage() {
                 />
 
                 {activeEmployees.length > 0 ? (
-                  <div className="space-y-2 border-t border-line/60 pt-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-ink">
-                        Tugaskan ke karyawan aktif (opsional)
-                      </p>
-                      <span className="text-[11px] text-ink-3">
-                        {createForm.assignedEmployeeIds.length} karyawan dipilih
-                      </span>
-                    </div>
-                    <div className="grid max-h-40 gap-2 overflow-y-auto rounded-control border border-line bg-surface p-2.5 sm:grid-cols-2">
-                      {activeEmployees.map((employee) => (
-                        <CheckboxField
-                          key={employee.id}
-                          label={employee.name}
-                          checked={createForm.assignedEmployeeIds.includes(employee.id)}
-                          onChange={(event) =>
-                            toggleCreateEmployee(employee.id, event.target.checked)
-                          }
-                          hint={`${employee.position || 'Staf'} ${employee.department ? `· ${employee.department.name}` : ''}`}
-                        />
-                      ))}
-                    </div>
+                  <div className="border-t border-line/60 pt-3">
+                    <EmployeeShiftSelector
+                      employees={activeEmployees}
+                      shifts={shifts}
+                      currentShiftId={null}
+                      currentShiftName={createForm.name || 'Shift Baru'}
+                      assignedIds={createForm.assignedEmployeeIds}
+                      onToggle={toggleCreateEmployee}
+                      onBatchToggle={handleBatchToggleCreateEmployees}
+                      title="Tugaskan ke karyawan aktif (opsional)"
+                      subtitle="Klik kartu karyawan untuk menugaskan langsung ke shift baru ini."
+                    />
                   </div>
                 ) : null}
               </div>
@@ -2079,28 +2458,18 @@ export function ShiftsPage() {
                 />
 
                 {activeEmployees.length > 0 ? (
-                  <div className="space-y-2 border-t border-line/60 pt-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-ink">
-                        Karyawan yang ditugaskan pada shift ini
-                      </p>
-                      <span className="text-[11px] text-ink-3">
-                        {editForm.assignedEmployeeIds.length} karyawan dipilih
-                      </span>
-                    </div>
-                    <div className="grid max-h-40 gap-2 overflow-y-auto rounded-control border border-line bg-surface p-2.5 sm:grid-cols-2">
-                      {activeEmployees.map((employee) => (
-                        <CheckboxField
-                          key={employee.id}
-                          label={employee.name}
-                          checked={editForm.assignedEmployeeIds.includes(employee.id)}
-                          onChange={(event) =>
-                            toggleEditEmployee(employee.id, event.target.checked)
-                          }
-                          hint={`${employee.position || 'Staf'} ${employee.department ? `· ${employee.department.name}` : ''}`}
-                        />
-                      ))}
-                    </div>
+                  <div className="border-t border-line/60 pt-3">
+                    <EmployeeShiftSelector
+                      employees={activeEmployees}
+                      shifts={shifts}
+                      currentShiftId={editItem?.id}
+                      currentShiftName={editForm.name || editItem?.name}
+                      assignedIds={editForm.assignedEmployeeIds}
+                      onToggle={toggleEditEmployee}
+                      onBatchToggle={handleBatchToggleEditEmployees}
+                      title="Karyawan yang ditugaskan pada shift ini"
+                      subtitle="Klik kartu karyawan untuk menugaskan atau memindahkan. Kartu hijau menandakan karyawan aktif ditugaskan ke shift ini."
+                    />
                   </div>
                 ) : null}
               </div>
