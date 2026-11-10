@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
@@ -14,8 +15,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController(text: 'admin@srikaya.id');
   final _passwordController = TextEditingController(text: DemoAccount.password);
-  final _gatewayController =
-      TextEditingController(text: AuthService().gatewayBaseUrl);
+  final _gatewayController = TextEditingController(
+    text: AuthService().gatewayBaseUrl,
+  );
 
   bool _obscurePassword = true;
   bool _isMockMode = false;
@@ -30,7 +32,10 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _applyQuickCredentials({required String email, required String password}) {
+  void _applyQuickCredentials({
+    required String email,
+    required String password,
+  }) {
     setState(() {
       _emailController.text = email;
       _passwordController.text = password;
@@ -185,7 +190,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               decoration: BoxDecoration(
                                 color: AppTheme.redLight,
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFFECACA)),
+                                border: Border.all(
+                                  color: const Color(0xFFFECACA),
+                                ),
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,7 +361,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'Mode Pengujian Independen',
@@ -404,8 +412,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : const Row(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'welcome_screen.dart';
@@ -42,8 +43,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final companyId = rawCompanyId.isEmpty
         ? 'tanpa perusahaan'
         : (rawCompanyId.length <= 8
-            ? rawCompanyId
-            : '${rawCompanyId.substring(0, 8)}...');
+              ? rawCompanyId
+              : '${rawCompanyId.substring(0, 8)}...');
 
     // Tenant pembanding untuk menguji aturan isolasi antar-perusahaan.
     const foreignTenantId = 'cid-nusantara-02';
@@ -316,7 +317,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         // Tombol Tes 1: Coba Akses Perusahaan Lain (Harus Ditolak)
                         OutlinedButton(
-                          onPressed: () => _runTenantIsolationAudit(foreignTenantId),
+                          onPressed: () =>
+                              _runTenantIsolationAudit(foreignTenantId),
                           child: Wrap(
                             alignment: WrapAlignment.center,
                             crossAxisAlignment: WrapCrossAlignment.center,
@@ -337,7 +339,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         // Tombol Tes 2: Akses Tenant Sendiri (Harus Berhasil)
                         OutlinedButton(
-                          onPressed: () => _runTenantIsolationAudit(rawCompanyId),
+                          onPressed: () =>
+                              _runTenantIsolationAudit(rawCompanyId),
                           child: Wrap(
                             alignment: WrapAlignment.center,
                             crossAxisAlignment: WrapCrossAlignment.center,
@@ -386,7 +389,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         _tenantTestResult!['allowed'] == true
@@ -395,7 +399,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
-                                          color: _tenantTestResult!['allowed'] == true
+                                          color:
+                                              _tenantTestResult!['allowed'] ==
+                                                  true
                                               ? AppTheme.emeraldGreen
                                               : AppTheme.redError,
                                         ),
@@ -405,7 +411,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                         _tenantTestResult!['message'] as String,
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: _tenantTestResult!['allowed'] == true
+                                          color:
+                                              _tenantTestResult!['allowed'] ==
+                                                  true
                                               ? const Color(0xFF065F46)
                                               : const Color(0xFF991B1B),
                                         ),
