@@ -550,11 +550,12 @@ export function ShiftsPage() {
       if (employeesRes.error) {
         setEmployees([])
       } else {
-        setEmployees(
-          Array.isArray(employeesRes.data)
-            ? (employeesRes.data as unknown as Employee[])
+        const empList = Array.isArray(employeesRes.data)
+          ? employeesRes.data
+          : Array.isArray((employeesRes.data as any)?.data)
+            ? (employeesRes.data as any).data
             : []
-        )
+        setEmployees(empList as Employee[])
       }
 
       if (shiftsRes.error) {
@@ -563,9 +564,12 @@ export function ShiftsPage() {
         return
       }
 
-      setShifts(
-        Array.isArray(shiftsRes.data) ? (shiftsRes.data as unknown as Shift[]) : []
-      )
+      const shiftList = Array.isArray(shiftsRes.data)
+        ? shiftsRes.data
+        : Array.isArray((shiftsRes.data as any)?.data)
+          ? (shiftsRes.data as any).data
+          : []
+      setShifts(shiftList as Shift[])
     } catch {
       setShifts([])
       setErrorMsg('Gagal memuat data shift dari layanan shifting.')

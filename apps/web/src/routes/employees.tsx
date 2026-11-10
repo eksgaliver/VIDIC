@@ -141,20 +141,31 @@ export function EmployeesPage() {
         setErrorMsg(errorText(employeesRes, 'Gagal memuat data karyawan.'))
         setEmployees([])
       } else {
-        setEmployees(
-          Array.isArray(employeesRes.data) ? (employeesRes.data as unknown as Employee[]) : []
-        )
+        const empList = Array.isArray(employeesRes.data)
+          ? employeesRes.data
+          : Array.isArray((employeesRes.data as any)?.data)
+            ? (employeesRes.data as any).data
+            : []
+        setEmployees(empList as Employee[])
       }
 
-      if (!shiftsRes.error && Array.isArray(shiftsRes.data)) {
-        setShifts(shiftsRes.data as unknown as Shift[])
+      if (!shiftsRes.error) {
+        const shiftList = Array.isArray(shiftsRes.data)
+          ? shiftsRes.data
+          : Array.isArray((shiftsRes.data as any)?.data)
+            ? (shiftsRes.data as any).data
+            : []
+        setShifts(shiftList as Shift[])
       } else {
         setShifts([])
       }
 
-      setDepartments(
-        Array.isArray(departmentsRes.data) ? (departmentsRes.data as unknown as Department[]) : []
-      )
+      const depList = Array.isArray(departmentsRes.data)
+        ? departmentsRes.data
+        : Array.isArray((departmentsRes.data as any)?.data)
+          ? (departmentsRes.data as any).data
+          : []
+      setDepartments(depList as Department[])
     } catch {
       setEmployees([])
       setShifts([])
