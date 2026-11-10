@@ -76,6 +76,21 @@ export function createDefaultSchedules(defaultStart = '08:00', defaultEnd = '17:
   }))
 }
 
+export function generateAutoShiftCode(name: string): string {
+  const cleaned = name.trim().toUpperCase().replace(/[^A-Z0-9\s]/g, '')
+  if (!cleaned) return 'SHF'
+  const words = cleaned.split(/\s+/).filter(Boolean)
+  if (words.length === 1) {
+    return `SHF-${words[0].slice(0, 8)}`
+  }
+  if (words[0] === 'SHIFT' && words.length > 1) {
+    const remainder = words.slice(1).join('')
+    return `SHF-${remainder.slice(0, 8)}`
+  }
+  const acronym = words.map((w) => w[0]).join('')
+  return `SHF-${acronym.slice(0, 6)}`
+}
+
 const SHIFT_STATUSES = [
   { value: 'active', label: 'Aktif' },
   { value: 'inactive', label: 'Nonaktif' },
@@ -108,7 +123,7 @@ export interface ShiftFormState {
   description: string
   startTime: string
   endTime: string
-  workLocationId: string
+  workLocationId?: string
   attendanceLocations: AttendancePointDraft[]
   status: string
   assignedEmployeeIds: string[]
@@ -725,14 +740,6 @@ export function ShiftsPage() {
         setErrorMsg('Nama shift wajib diisi minimal 2 karakter.')
         return
       }
-      if (!createForm.code.trim()) {
-        setErrorMsg('Kode shift wajib diisi.')
-        return
-      }
-      if (!createForm.workLocationId) {
-        setErrorMsg('Pilih kantor acuan operasional.')
-        return
-      }
       const activeDays = createForm.schedules.filter((s) => !s.isOff)
       if (activeDays.length === 0) {
         setErrorMsg('Tentukan minimal satu hari kerja aktif dalam sepekan.')
@@ -782,15 +789,17 @@ export function ShiftsPage() {
     setIsSubmitting(true)
     setErrorMsg(null)
 
+    const autoCode = createForm.code.trim() || generateAutoShiftCode(createForm.name)
+
     try {
       const res = await api.shifting.shifts.post({
         companyId: selectedCompanyId,
         name: createForm.name.trim(),
-        code: createForm.code.trim().toUpperCase(),
+        code: autoCode.toUpperCase(),
         description: createForm.description.trim() || undefined,
         startTime: createForm.startTime,
         endTime: createForm.endTime,
-        workLocationId: createForm.workLocationId,
+        workLocationId: createForm.workLocationId || undefined,
         schedules: createForm.schedules.map((s) => ({
           dayOfWeek: s.dayOfWeek,
           dayName: s.dayName,
@@ -893,7 +902,7 @@ export function ShiftsPage() {
       description: shift.description ?? '',
       startTime: displayTime(shift.startTime),
       endTime: displayTime(shift.endTime),
-      workLocationId: shift.workLocationId,
+      workLocationId: shift.workLocationId || '',
       attendanceLocations:
         mappedPoints.length > 0 ? mappedPoints : [createInitialPoint(baseLoc, 1)],
       status: shift.status,
@@ -954,14 +963,6 @@ export function ShiftsPage() {
         setErrorMsg('Nama shift wajib diisi minimal 2 karakter.')
         return
       }
-      if (!editForm.code.trim()) {
-        setErrorMsg('Kode shift wajib diisi.')
-        return
-      }
-      if (!editForm.workLocationId) {
-        setErrorMsg('Pilih kantor acuan operasional.')
-        return
-      }
       const activeDays = editForm.schedules.filter((s) => !s.isOff)
       if (activeDays.length === 0) {
         setErrorMsg('Tentukan minimal satu hari kerja aktif dalam sepekan.')
@@ -1012,15 +1013,17 @@ export function ShiftsPage() {
     setIsSubmitting(true)
     setErrorMsg(null)
 
+    const autoCode = editForm.code.trim() || generateAutoShiftCode(editForm.name)
+
     try {
       const res = await api.shifting.shifts({ id: editItem.id }).put({
         companyId: selectedCompanyId,
         name: editForm.name.trim(),
-        code: editForm.code.trim().toUpperCase(),
+        code: autoCode.toUpperCase(),
         description: editForm.description.trim() || undefined,
         startTime: editForm.startTime,
         endTime: editForm.endTime,
-        workLocationId: editForm.workLocationId,
+        workLocationId: editForm.workLocationId || undefined,
         schedules: editForm.schedules.map((s) => ({
           dayOfWeek: s.dayOfWeek,
           dayName: s.dayName,
@@ -1088,8 +1091,8 @@ export function ShiftsPage() {
     }
   }
 
-  // Shift dapat dibuat secara mandiri tanpa harus ada karyawan terlebih dahulu
-  const canCreate = Boolean(selectedCompanyId) && locations.length > 0
+  // Shift dapat dibuat secara mandiri tanpa harus ada karyawan atau kantor acuan terlebih dahulu
+  const canCreate = Boolean(selectedCompanyId)
 
   return (
     <div className="space-y-6">
@@ -1124,7 +1127,7 @@ export function ShiftsPage() {
         <Panel>
           <EmptyState
             title="Belum ada badan usaha"
-            description="Shift membutuhkan entitas perusahaan dan lokasi kerja. Daftarkan perusahaan terlebih dahulu."
+            description="Shift membutuhkan entitas perusahaan. Daftarkan perusahaan terlebih dahulu."
             action={
               <Link to={COMPANIES_PATH} className="inline-flex">
                 <Button tone="primary" icon={<HiOutlineArrowRight className="h-4 w-4" />}>
@@ -1163,20 +1166,7 @@ export function ShiftsPage() {
             ) : null}
           </div>
 
-          {locations.length === 0 && !isLoading ? (
-            <Notice tone="info" title="Lokasi kantor belum tersedia">
-              Shift membutuhkan minimal satu lokasi kantor dan titik geofence absensi.{' '}
-              <Link
-                to={COMPANIES_PATH}
-                className="font-semibold text-primary underline-offset-4 hover:underline"
-              >
-                Atur lokasi kantor perusahaan
-              </Link>
-              .
-            </Notice>
-          ) : null}
-
-          {activeEmployees.length === 0 && !isLoading && locations.length > 0 ? (
+          {activeEmployees.length === 0 && !isLoading ? (
             <Notice tone="info" title="Master Shift Mandiri">
               Perusahaan ini belum memiliki karyawan. Anda dapat membuat master shift terlebih dahulu agar langsung siap dipilih saat pendaftaran karyawan.{' '}
               <Link
@@ -1225,7 +1215,7 @@ export function ShiftsPage() {
                     <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">
                       <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Nama & Kode Shift</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Jam kerja</th>
-                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Lokasi kerja utama</th>
+                      <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Area operasional</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Titik absensi (Geofence)</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Karyawan bertugas</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Status</th>
@@ -1305,9 +1295,11 @@ export function ShiftsPage() {
                           <div className="flex items-start gap-2">
                             <HiOutlineLocationMarker className="mt-0.5 h-4 w-4 shrink-0 text-ink-3" />
                             <div>
-                              <p className="font-medium text-ink">{shift.workLocation?.name || 'Kantor Operasional'}</p>
+                              <p className="font-medium text-ink">
+                                {shift.workLocation?.name || shift.attendanceLocations[0]?.city || 'Operasional Perusahaan'}
+                              </p>
                               <p className="text-xs text-ink-3">
-                                {shift.workLocation?.city || 'Kantor Acuan'}
+                                {shift.workLocation?.city || (shift.attendanceLocations.length > 0 ? `${shift.attendanceLocations.length} titik presensi` : 'Geofence mandiri')}
                               </p>
                             </div>
                           </div>
@@ -1405,7 +1397,7 @@ export function ShiftsPage() {
           title="Buat Master Shift & Titik Geofence Absensi"
           description={`Langkah ${createStep} dari 3 · ${
             createStep === 1
-              ? 'Informasi Jadwal & Kantor Acuan'
+              ? 'Informasi & Jadwal Kerja'
               : createStep === 2
                 ? 'Peta & Penandaan Titik Absensi Geofence'
                 : 'Rekapitulasi & Konfirmasi Shift'
@@ -1470,26 +1462,30 @@ export function ShiftsPage() {
                   Tentukan identitas shift dan jam kerja operasional. Shift ini dapat langsung dibuat sebelum karyawan didaftarkan.
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
                   <TextField
                     label="Nama master shift"
                     value={createForm.name}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, name: event.target.value }))
-                    }
-                    placeholder="Misal: Shift Pagi Operasional, Shift Malam Gudang"
+                    onChange={(event) => {
+                      const newName = event.target.value
+                      setCreateForm((current) => ({
+                        ...current,
+                        name: newName,
+                        code: generateAutoShiftCode(newName),
+                      }))
+                    }}
+                    placeholder="Misal: Shift Pagi, Shift Siang, Shift Malam, Shift Reguler"
                     required
                   />
-                  <TextField
-                    label="Kode shift"
-                    value={createForm.code}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
-                    }
-                    placeholder="PAGI, SIANG, MALAM, REG"
-                    required
-                    mono
-                  />
+                  {createForm.name.trim() ? (
+                    <div className="flex items-center gap-1.5 text-xs text-ink-3">
+                      <span>Kode shift:</span>
+                      <span className="font-mono font-bold text-ink rounded bg-surface-2 px-1.5 py-0.5 border border-line text-[11px]">
+                        {createForm.code || generateAutoShiftCode(createForm.name)}
+                      </span>
+                      <span className="text-[11px] text-ink-3">· Dibuat otomatis</span>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Editor Jadwal Kerja Harian (7 Hari) */}
@@ -1498,41 +1494,6 @@ export function ShiftsPage() {
                   (dayOfWeek, patch) => handleUpdateSchedule(false, dayOfWeek, patch),
                   (type) => applySchedulePreset(false, type)
                 )}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <SelectField
-                    label="Kantor acuan operasional"
-                    value={createForm.workLocationId}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, workLocationId: event.target.value }))
-                    }
-                    required
-                    hint="Unit kantor wilayah tempat shift ini berafiliasi."
-                  >
-                    <option value="" disabled>
-                      Pilih unit kantor
-                    </option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {locationLine(location)}
-                      </option>
-                    ))}
-                  </SelectField>
-
-                  <SelectField
-                    label="Status shift"
-                    value={createForm.status}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({ ...current, status: event.target.value }))
-                    }
-                  >
-                    {SHIFT_STATUSES.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </SelectField>
-                </div>
 
                 <TextField
                   label="Keterangan / Catatan operasional (opsional)"
@@ -1879,16 +1840,13 @@ export function ShiftsPage() {
 
                   <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
                     <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
-                      Unit Kantor & Karyawan
+                      Penugasan & Geofence
                     </h5>
                     <p className="text-xs text-ink-2">
-                      Kantor Acuan:{' '}
-                      <strong className="text-ink">
-                        {locations.find((l) => l.id === createForm.workLocationId)?.name || 'Kantor Operasional'}
-                      </strong>
+                      Karyawan Ditugaskan: <strong className="text-ink">{createForm.assignedEmployeeIds.length} orang</strong>
                     </p>
                     <p className="text-xs text-ink-2">
-                      Karyawan Ditugaskan: <strong className="text-ink">{createForm.assignedEmployeeIds.length} orang</strong>
+                      Cakupan Titik Presensi: <strong className="text-ink">{createForm.attendanceLocations.length} titik geofence</strong>
                     </p>
                   </div>
                 </div>
@@ -1981,7 +1939,7 @@ export function ShiftsPage() {
           title={`Ubah Master Shift — ${editItem?.name ?? ''}`}
           description={`Langkah ${editStep} dari 3 · ${
             editStep === 1
-              ? 'Informasi Jadwal & Kantor Acuan'
+              ? 'Informasi & Jadwal Kerja'
               : editStep === 2
                 ? 'Peta & Penandaan Titik Absensi Geofence'
                 : 'Rekapitulasi & Konfirmasi Perubahan'
@@ -2047,50 +2005,28 @@ export function ShiftsPage() {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <TextField
-                    label="Nama master shift"
-                    value={editForm.name}
-                    onChange={(event) =>
-                      setEditForm((current) => ({ ...current, name: event.target.value }))
-                    }
-                    required
-                  />
-                  <TextField
-                    label="Kode shift"
-                    value={editForm.code}
-                    onChange={(event) =>
-                      setEditForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
-                    }
-                    required
-                    mono
-                  />
-                </div>
-
-                {/* Editor Jadwal Kerja Harian (7 Hari) */}
-                {renderDailyScheduleEditor(
-                  editForm,
-                  (dayOfWeek, patch) => handleUpdateSchedule(true, dayOfWeek, patch),
-                  (type) => applySchedulePreset(true, type)
-                )}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <SelectField
-                    label="Kantor acuan operasional"
-                    value={editForm.workLocationId}
-                    onChange={(event) =>
-                      setEditForm((current) => ({ ...current, workLocationId: event.target.value }))
-                    }
-                    required
-                  >
-                    <option value="" disabled>
-                      Pilih unit kantor
-                    </option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {locationLine(location)}
-                      </option>
-                    ))}
-                  </SelectField>
+                  <div className="space-y-1.5">
+                    <TextField
+                      label="Nama master shift"
+                      value={editForm.name}
+                      onChange={(event) => {
+                        const newName = event.target.value
+                        setEditForm((current) => ({
+                          ...current,
+                          name: newName,
+                          code: current.code || generateAutoShiftCode(newName),
+                        }))
+                      }}
+                      required
+                    />
+                    <div className="flex items-center gap-1.5 text-xs text-ink-3">
+                      <span>Kode shift:</span>
+                      <span className="font-mono font-bold text-ink rounded bg-surface-2 px-1.5 py-0.5 border border-line text-[11px]">
+                        {editForm.code || generateAutoShiftCode(editForm.name)}
+                      </span>
+                      <span className="text-[11px] text-ink-3">· Otomatis</span>
+                    </div>
+                  </div>
 
                   <SelectField
                     label="Status shift"
@@ -2106,6 +2042,13 @@ export function ShiftsPage() {
                     ))}
                   </SelectField>
                 </div>
+
+                {/* Editor Jadwal Kerja Harian (7 Hari) */}
+                {renderDailyScheduleEditor(
+                  editForm,
+                  (dayOfWeek, patch) => handleUpdateSchedule(true, dayOfWeek, patch),
+                  (type) => applySchedulePreset(true, type)
+                )}
 
                 <TextField
                   label="Keterangan / Catatan operasional (opsional)"
@@ -2451,16 +2394,13 @@ export function ShiftsPage() {
 
                   <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
                     <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
-                      Unit Kantor & Karyawan
+                      Penugasan & Geofence
                     </h5>
                     <p className="text-xs text-ink-2">
-                      Kantor Acuan:{' '}
-                      <strong className="text-ink">
-                        {locations.find((l) => l.id === editForm.workLocationId)?.name || 'Kantor Operasional'}
-                      </strong>
+                      Karyawan Ditugaskan: <strong className="text-ink">{editForm.assignedEmployeeIds.length} orang</strong>
                     </p>
                     <p className="text-xs text-ink-2">
-                      Karyawan Ditugaskan: <strong className="text-ink">{editForm.assignedEmployeeIds.length} orang</strong>
+                      Cakupan Titik Presensi: <strong className="text-ink">{editForm.attendanceLocations.length} titik geofence</strong>
                     </p>
                   </div>
                 </div>

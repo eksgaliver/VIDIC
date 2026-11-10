@@ -415,7 +415,41 @@ Untuk mengakomodasi fleksibilitas operasional perusahaan di mana jam kerja berva
 
 ---
 
-## § 11. Panduan Perintah Operasional
+## § 11. Otomatisasi Kode Shift & Eliminasi Input Redundan (Streamlined Shift Creation)
+
+Untuk memangkas friksi dan mempercepat pembuatan master shift (*anti-slop*), sistem disederhanakan dengan mengeliminasi ketergantungan manual terhadap kantor acuan dan mengotomatiskan pembuatan kode shift:
+
+### 1. Eliminasi Ketergantungan Kolom `work_location_id`
+• **Database PostgreSQL & Drizzle Schema**:
+  - Kolom `shifts.work_location_id` diubah menjadi *nullable* dengan referensi `ON DELETE SET NULL`.
+  - Shift tidak lagi terkunci secara kaku pada satu kantor acuan tertentu karena titik absensi presensi sesungguhnya ditentukan langsung pada peta interaktif Leaflet di Langkah 2 (*shift_attendance_locations*).
+• **Mikroservis Shifting (`services/shifting/src/routes/shifts.ts`)**:
+  - `workLocationId` bersifat opsional pada payload HTTP `POST /shifts` dan `PUT /shifts/:id`.
+  - Jika tidak disertakan, sistem secara cerdas menghubungkannya ke lokasi utama perusahaan jika tersedia, atau membiarkannya `null`.
+  - Query daftar shift (`listShiftRows`) menggunakan `LEFT JOIN company_locations` sehingga shift tanpa kantor acuan tetap tampil konsisten.
+
+### 2. Otomatisasi Kode Shift (`generateAutoShiftCode`)
+• **Algoritma Pembuat Kode**:
+  - Nama satu kata (misal `Operasional`) → `SHF-OPERASIO`.
+  - Nama multi-kata berawalan Shift (misal `Shift Pagi`) → `SHF-PAGI`, `Shift Malam Gudang` → `SHF-MALAMGU`.
+  - Nama umum majemuk (misal `Reguler Full Time`) → `SHF-RFT`.
+• Kode shift digenerate secara instan saat pengguna mengetik nama master shift pada frontend dan divalidasi dengan fallback otomatis pada backend.
+
+### 3. Pembersihan Antarmuka (*Frictionless Wizard Form*)
+• **Langkah 1 Dialog Buat Shift**:
+  - Menghapus input manual `Kode shift` dan pemilih dropdown `Kantor acuan operasional`.
+  - Pengguna hanya memasukkan `Nama master shift` (kode terbuat otomatis dan ditampilkan sebagai badge indikator), `Jadwal Jam Kerja Harian (7 Hari)`, dan catatan/karyawan opsional.
+  - Menghilangkan dropdown `Status shift` pada dialog buat baru (otomatis berstatus `active`).
+• **Langkah 3 Dialog Wizard**:
+  - Kartu ringkasan disesuaikan menjadi `Penugasan & Geofence` yang menyajikan jumlah karyawan bertugas dan total titik geofence presensi tanpa atribut kantor acuan yang redundan.
+• **Tabel Master Shift**:
+  - Kolom diubah menjadi `Area operasional` dengan penyajian cerdas berbasis nama kantor acuan, kota geofence presensi, atau entitas operasional perusahaan.
+• **Aksesibilitas Pembuatan**:
+  - Tombol "Buat Shift" dapat langsung diakses segera setelah entitas perusahaan dipilih (`canCreate = Boolean(selectedCompanyId)`), tanpa harus menunggu unit kantor terdaftar.
+
+---
+
+## § 12. Panduan Perintah Operasional
 
 ```powershell
 # 1. Menjalankan seluruh ekosistem (AUTH, SHIFTING, STORAGE, GATEWAY, CLIENT):

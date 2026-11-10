@@ -180,7 +180,7 @@ export interface Shift {
   supervisorId?: string | null
   startTime: string
   endTime: string
-  workLocationId: string
+  workLocationId?: string | null
   status: string
   assignedCount: number
   assignedEmployees: {
@@ -194,7 +194,7 @@ export interface Shift {
   employee?: { id: string; name: string; email: string } | null
   department?: Pick<Department, 'id' | 'name' | 'code'> | null
   supervisor?: { id: string; name: string; email: string } | null
-  workLocation: ShiftLocation
+  workLocation?: ShiftLocation | null
   attendanceLocations: ShiftLocation[]
   createdAt?: string | Date
   updatedAt?: string | Date

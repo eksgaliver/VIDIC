@@ -92,6 +92,21 @@ export interface ShiftScheduleInput {
   isOff: boolean
 }
 
+export function generateAutoShiftCode(name: string): string {
+  const cleaned = name.trim().toUpperCase().replace(/[^A-Z0-9\s]/g, '')
+  if (!cleaned) return `SHF-${Date.now().toString().slice(-4)}`
+  const words = cleaned.split(/\s+/).filter(Boolean)
+  if (words.length === 1) {
+    return `SHF-${words[0].slice(0, 8)}`
+  }
+  if (words[0] === 'SHIFT' && words.length > 1) {
+    const remainder = words.slice(1).join('')
+    return `SHF-${remainder.slice(0, 8)}`
+  }
+  const acronym = words.map((w) => w[0]).join('')
+  return `SHF-${acronym.slice(0, 6)}`
+}
+
 export const STANDARD_DAYS = [
   { dayOfWeek: 1, dayName: 'Senin', defaultOff: false },
   { dayOfWeek: 2, dayName: 'Selasa', defaultOff: false },
@@ -105,11 +120,11 @@ export const STANDARD_DAYS = [
 interface ShiftInput {
   companyId: string
   name: string
-  code: string
+  code?: string
   description?: string
   startTime: string
   endTime: string
-  workLocationId: string
+  workLocationId?: string | null
   attendanceLocationIds?: string[]
   attendanceLocations?: ShiftAttendancePointInput[]
   schedules?: ShiftScheduleInput[]
@@ -137,7 +152,7 @@ type ValidationResult =
       description: string | null
       startTime: string
       endTime: string
-      workLocationId: string
+      workLocationId: string | null
       attendanceLocationIds: string[]
       locations: LocationGeoSnapshot[]
       schedules: ValidatedSchedule[]
@@ -155,10 +170,7 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     return { ok: false, status: 400, message: 'Nama shift minimal 2 karakter.' }
   }
 
-  const code = input.code?.trim().toUpperCase()
-  if (!code || code.length < 1) {
-    return { ok: false, status: 400, message: 'Kode shift wajib diisi.' }
-  }
+  const code = (input.code?.trim() || generateAutoShiftCode(name)).toUpperCase()
 
   const startTime = normalizeTime(input.startTime)
   const endTime = normalizeTime(input.endTime)
@@ -169,27 +181,47 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     return { ok: false, status: 400, message: 'Jam mulai dan jam selesai tidak boleh sama.' }
   }
 
-  const [workLocation] = await db
-    .select({
-      id: companyLocations.id,
-      companyId: companyLocations.companyId,
-      city: companyLocations.city,
-      status: companyLocations.status
-    })
-    .from(companyLocations)
-    .where(eq(companyLocations.id, input.workLocationId))
-    .limit(1)
-
-  if (!workLocation) {
-    return { ok: false, status: 400, message: 'Lokasi kerja tidak ditemukan.' }
+  const companyId = input.companyId
+  if (!companyId) {
+    return { ok: false, status: 400, message: 'ID perusahaan wajib disertakan.' }
   }
 
-  const companyId = input.companyId || workLocation.companyId
-  if (workLocation.companyId !== companyId) {
-    return { ok: false, status: 400, message: 'Lokasi kerja tidak sesuai dengan perusahaan yang dipilih.' }
+  let workLocationId: string | null = null
+  let defaultCity = 'Kota Operasional'
+
+  if (input.workLocationId?.trim()) {
+    const [workLocation] = await db
+      .select({
+        id: companyLocations.id,
+        companyId: companyLocations.companyId,
+        city: companyLocations.city,
+        status: companyLocations.status
+      })
+      .from(companyLocations)
+      .where(eq(companyLocations.id, input.workLocationId.trim()))
+      .limit(1)
+
+    if (workLocation && workLocation.companyId === companyId && workLocation.status === 'active') {
+      workLocationId = workLocation.id
+      defaultCity = workLocation.city
+    }
   }
-  if (workLocation.status !== 'active') {
-    return { ok: false, status: 400, message: 'Lokasi kerja sedang nonaktif.' }
+
+  // Jika workLocationId tidak dipilih secara eksplisit, ambil lokasi utama perusahaan jika tersedia
+  if (!workLocationId) {
+    const [primaryLoc] = await db
+      .select({
+        id: companyLocations.id,
+        city: companyLocations.city
+      })
+      .from(companyLocations)
+      .where(and(eq(companyLocations.companyId, companyId), eq(companyLocations.status, 'active')))
+      .limit(1)
+
+    if (primaryLoc) {
+      workLocationId = primaryLoc.id
+      defaultCity = primaryLoc.city
+    }
   }
 
   let locations: LocationGeoSnapshot[] = []
@@ -212,11 +244,11 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
       const poly = Array.isArray(p.polygonCoordinates) ? p.polygonCoordinates : null
 
       locations.push({
-        id: p.locationId || workLocation.id,
+        id: p.locationId || workLocationId || 'attendance-point',
         companyId,
         name: locName,
         address: p.address?.trim() || 'Alamat Titik Presensi',
-        city: p.city?.trim() || workLocation.city || 'Kota Operasional',
+        city: p.city?.trim() || defaultCity,
         province: p.province?.trim() || null,
         latitude: lat,
         longitude: lng,
@@ -228,7 +260,7 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     }
     attendanceLocationIds = locations.map((l) => l.id)
   } else {
-    // Fallback ke attendanceLocationIds
+    // Fallback ke attendanceLocationIds jika ada
     const rawIds = [...new Set((input.attendanceLocationIds || []).filter(Boolean))]
     if (rawIds.length < 1) {
       return { ok: false, status: 400, message: 'Tandai minimal satu titik lokasi absensi pada peta.' }
@@ -380,7 +412,7 @@ async function validateShiftInput(input: ShiftInput): Promise<ValidationResult> 
     description: input.description?.trim() || null,
     startTime: representativeStartTime,
     endTime: representativeEndTime,
-    workLocationId: workLocation.id,
+    workLocationId: workLocationId || null,
     attendanceLocationIds,
     locations: locations as LocationGeoSnapshot[],
     schedules: validatedSchedules,
@@ -434,7 +466,7 @@ async function listShiftRows(companyId?: string, shiftId?: string) {
     .from(shifts)
     .leftJoin(users, eq(shifts.employeeId, users.id))
     .leftJoin(departments, eq(users.departmentId, departments.id))
-    .innerJoin(companyLocations, eq(shifts.workLocationId, companyLocations.id))
+    .leftJoin(companyLocations, eq(shifts.workLocationId, companyLocations.id))
     .leftJoin(supervisor, eq(shifts.supervisorId, supervisor.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(shifts.createdAt))
@@ -558,18 +590,20 @@ async function attachAttendance<T extends { id: string }>(rows: T[]) {
       supervisor: (row as any).supervisorId && supervisorName
         ? { id: (row as any).supervisorId, name: supervisorName, email: supervisorEmail }
         : null,
-      workLocation: {
-        id: (row as any).workLocationId,
-        name: workLocationName,
-        address: workLocationAddress,
-        city: workLocationCity,
-        province: workLocationProvince,
-        latitude: workLocationLatitude,
-        longitude: workLocationLongitude,
-        radiusMeters: workLocationRadiusMeters,
-        coordinatesType: workLocationCoordinatesType,
-        timezone: workLocationTimezone
-      },
+      workLocation: (row as any).workLocationId && workLocationName
+        ? {
+            id: (row as any).workLocationId,
+            name: workLocationName,
+            address: workLocationAddress,
+            city: workLocationCity,
+            province: workLocationProvince,
+            latitude: workLocationLatitude,
+            longitude: workLocationLongitude,
+            radiusMeters: workLocationRadiusMeters,
+            coordinatesType: workLocationCoordinatesType,
+            timezone: workLocationTimezone
+          }
+        : null,
       attendanceLocations: (groupedAttendance.get(row.id) ?? []).map((location) => ({
         id: location.locationId || location.id,
         attendanceLocationId: location.id,
@@ -622,11 +656,11 @@ const shiftBodySchema = {
   body: t.Object({
     companyId: t.String(),
     name: t.String({ minLength: 2, maxLength: 150 }),
-    code: t.String({ minLength: 1, maxLength: 50 }),
+    code: t.Optional(t.String({ maxLength: 50 })),
     description: t.Optional(t.String()),
     startTime: t.String({ minLength: 5, maxLength: 8 }),
     endTime: t.String({ minLength: 5, maxLength: 8 }),
-    workLocationId: t.String(),
+    workLocationId: t.Optional(t.Nullable(t.String())),
     attendanceLocationIds: t.Optional(t.Array(t.String())),
     attendanceLocations: t.Optional(t.Array(attendancePointSchema)),
     schedules: t.Optional(t.Array(shiftScheduleSchema)),

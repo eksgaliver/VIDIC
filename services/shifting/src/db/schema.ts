@@ -27,8 +27,7 @@ export const shifts = pgTable('shifts', {
   startTime: time('start_time').notNull(),
   endTime: time('end_time').notNull(),
   workLocationId: uuid('work_location_id')
-    .notNull()
-    .references(() => companyLocations.id, { onDelete: 'restrict' }),
+    .references(() => companyLocations.id, { onDelete: 'set null' }),
   employeeId: uuid('employee_id')
     .references(() => users.id, { onDelete: 'set null' }),
   position: varchar('position', { length: 150 }),
