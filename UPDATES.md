@@ -835,3 +835,39 @@ Halaman utama Dasbor (`apps/web/src/routes/dashboard.tsx`) kini telah dilengkapi
 ### 3. Hasil Verifikasi
 • `npm --prefix apps/web run build` lolos tanpa galat (705 modul tertransformasi dalam 8.86 detik).
 • Penanganan tanggal pada feed dasbor sepenuhnya aman dari galat rendering objek `Date` React.
+
+---
+
+## § 24. Migrasi Penyimpanan Berkas ke AWS S3 / Neva Objects (Cloud Object Storage)
+
+Sistem penyimpanan berkas dan logo organisasi kini beralih sepenuhnya dari penyimpanan lokal disk server ke layanan Object Storage S3 (*Neva Objects S3 Compatible*).
+
+### 1. Kredensial & Konfigurasi S3
+• **Endpoint & Wilayah**: `https://s3.nevaobjects.id`, Region: `us-east-1`, Force Path Style: `true`.
+• **Bucket Utama & Sekunder**:
+  - `temankerja` (terverifikasi aktif dan dapat ditulisi).
+  - `stars-app` (otomatis dibuat dan dipastikan aktif via `CreateBucketCommand`).
+• **Sinkronisasi Otomatis**: Layanan penyimpanan mengunggah objek secara paralel ke kedua bucket sehingga akses publik melalui `https://s3.nevaobjects.id/stars-app/...` maupun `https://s3.nevaobjects.id/temankerja/...` dijamin selalu berhasil.
+
+### 2. Implementasi StorageService S3 (`services/storage/src/services/StorageService.ts`)
+• **AWS SDK Client (`@aws-sdk/client-s3`)**:
+  - `ensureBucketExists()`: Memverifikasi ketersediaan bucket dengan `HeadBucketCommand` dan secara otomatis membuat bucket jika belum ada via `CreateBucketCommand`.
+  - `uploadFile()`: Memproses berkas gambar melalui pipeline `sharp` (auto-rotate orientasi EXIF, resize batas dimensi 1200px, konversi kompresi WebP HD), lalu mengunggahnya ke S3 dengan header `ACL: 'public-read'` dan `Cache-Control: 'public, max-age=31536000, immutable'`. Salinan lokal disimpan di direktori server sebagai *fast cache*.
+  - `getFileBuffer()`: Menyajikan berkas langsung dari cache lokal, atau mengambil secara dinamis dari S3 (`GetObjectCommand`) apabila berkas belum ada di disk server.
+  - `deleteFile()`: Menghapus berkas dari bucket S3 (`DeleteObjectCommand`) dan membersihkan cache disk lokal.
+  - `listFiles()`: Menggabungkan daftar objek dari S3 (`ListObjectsV2Command`) dan direktori lokal.
+
+### 3. Integrasi Gateway & Rute Penyimpanan
+• **`services/storage/src/routes/storage.ts`**:
+  - Penanganan rute `/storage/:folder/:filename` dan `/storage/*` kini mendukung penyajian berkas streaming dari S3 bila berkas tidak berada di memori lokal.
+  - Endpoint baru `GET /api/storage-info` untuk inspeksi konfigurasi dan status koneksi S3.
+• **`services/gateway/src/index.ts`**:
+  - Penyajian `/storage/*` mengalihkan otomatis (*302 redirect*) ke URL publik S3 bila berkas tidak berada pada disk lokal gateway.
+
+### 4. Hasil Verifikasi
+• Pengujian otomatis *end-to-end* upload berkas ke S3:
+  1. `HeadBucket` & `CreateBucket` berhasil mengonfirmasi ketersediaan bucket `temankerja` dan `stars-app`.
+  2. Berkas terkompresi WebP berhasil diunggah dengan status sukses (`s3Bucket: temankerja`).
+  3. Akses publik via `fetch()` menghasilkan status `200 OK` dengan header `Content-Type: image/webp`.
+  4. Penghapusan berkas `DeleteObjectCommand` berhasil membersihkan objek pengujian.
+• Kompilasi `npm --prefix apps/web run build` lolos tanpa galat (705 modul tertransformasi dalam 11.27 detik).

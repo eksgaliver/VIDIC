@@ -7,8 +7,9 @@
     "start": "bun src/index.ts"
   },
   "dependencies": {
-    "elysia": "^1.2.25",
+    "@aws-sdk/client-s3": "^3.1166.0",
     "@elysiajs/cors": "^1.2.0",
+    "elysia": "^1.2.25",
     "sharp": "^0.35.5"
   },
   "devDependencies": {
@@ -16,4 +17,3 @@
     "typescript": "^5.8.2"
   }
 }
-

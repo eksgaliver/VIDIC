@@ -75,14 +75,22 @@ export const createStorageRoutes = (storage: StorageService = defaultStorageServ
     .get('/storage/:folder/:filename', async ({ params, set }) => {
       const file = storage.getFile(params.folder, params.filename)
 
-      if (!(await file.exists())) {
-        set.status = 404
-        return { success: false, message: 'Berkas tidak ditemukan pada server penyimpanan.' }
+      if (await file.exists()) {
+        set.headers['Content-Type'] = file.type || 'application/octet-stream'
+        set.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return file
       }
 
-      set.headers['Content-Type'] = file.type || 'application/octet-stream'
-      set.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
-      return file
+      // Ambil dari S3 bila tidak di cache lokal
+      const s3File = await storage.getFileBuffer(params.folder, params.filename)
+      if (s3File) {
+        set.headers['Content-Type'] = s3File.contentType
+        set.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return new Response(new Uint8Array(s3File.buffer))
+      }
+
+      set.status = 404
+      return { success: false, message: 'Berkas tidak ditemukan pada server penyimpanan.' }
     })
 
     // 4. Akses Universal Statis /storage/*
@@ -97,9 +105,25 @@ export const createStorageRoutes = (storage: StorageService = defaultStorageServ
           set.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
           return file
         }
+
+        const s3File = await storage.getFileBuffer(folder, filename)
+        if (s3File) {
+          set.headers['Content-Type'] = s3File.contentType
+          set.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+          return new Response(new Uint8Array(s3File.buffer))
+        }
       }
       set.status = 404
       return { success: false, message: 'Berkas tidak ditemukan' }
+    })
+
+    // 5. Informasi Status Penyimpanan S3
+    .get('/storage-info', () => {
+      return {
+        success: true,
+        provider: 'AWS S3 / Neva Objects',
+        info: storage.getS3Info()
+      }
     })
 
 export const storageRoutes = createStorageRoutes()

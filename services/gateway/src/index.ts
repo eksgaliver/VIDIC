@@ -23,13 +23,19 @@ export const gateway = new Elysia()
   .get('/storage/*', async ({ params, set }) => {
     const filePath = resolve(STORAGE_DIR, params['*'])
     const file = Bun.file(filePath)
-    if (!(await file.exists())) {
-      set.status = 404
-      return { success: false, message: 'Berkas tidak ditemukan' }
+    if (await file.exists()) {
+      set.headers['Content-Type'] = file.type || 'image/webp'
+      set.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+      return file
     }
-    set.headers['Content-Type'] = file.type || 'image/webp'
-    set.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
-    return file
+
+    // Arahkan ke URL S3 publik jika tidak ada di disk lokal
+    const s3Base = (
+      process.env.AWS_URL ||
+      `${(process.env.AWS_ENDPOINT || 'https://s3.nevaobjects.id').replace(/\/+$/, '')}/${process.env.AWS_BUCKET || 'temankerja'}`
+    ).replace(/\/+$/, '')
+    const targetUrl = `${s3Base}/${params['*']}`
+    return Response.redirect(targetUrl, 302)
   })
   .group('/api', (app) =>
     app
