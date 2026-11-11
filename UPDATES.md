@@ -864,7 +864,15 @@ Sistem penyimpanan berkas dan logo organisasi kini beralih sepenuhnya dari penyi
 • **`services/gateway/src/index.ts`**:
   - Penyajian `/storage/*` mengalihkan otomatis (*302 redirect*) ke URL publik S3 bila berkas tidak berada pada disk lokal gateway.
 
-### 4. Hasil Verifikasi
+### 4. Hasil Verifikasi & Migrasi Seluruh Aset
+• **Migrasi & Sinkronisasi Seluruh Aset Lokal (`services/storage/src/scripts/sync_s3.ts`)**:
+  - Seluruh berkas gambar dan logo dari penyimpanan disk lokal (`storage/avatars/` dan `storage/logos/`) telah disinkronkan dan diunggah ke kedua bucket S3 (`temankerja` dan `stars-app`).
+  - `avatars/avatar-1794208706900-b621d2b6.webp` (20.5 KB) → `✓ Berhasil disinkronkan (Status 200 OK)`.
+  - `avatars/avatar-1794279097226-15a8837c.webp` (17.5 KB) → `✓ Berhasil disinkronkan (Status 200 OK)`.
+  - `logos/logos-1794216772553-8d7258af.webp` (5.8 KB) → `✓ Berhasil disinkronkan (Status 200 OK)`.
+• **Pembaruan Basis Data Otomatis**:
+  - Kolom `logo_url` pada entitas perusahaan `PT Srikaya Digital Solusindo` telah dimigrasikan dari path lokal `/api/storage/...` menjadi tautan S3 langsung:
+    `https://s3.nevaobjects.id/stars-app/logos/logos-1794216772553-8d7258af.webp`.
 • Pengujian otomatis *end-to-end* upload berkas ke S3:
   1. `HeadBucket` & `CreateBucket` berhasil mengonfirmasi ketersediaan bucket `temankerja` dan `stars-app`.
   2. Berkas terkompresi WebP berhasil diunggah dengan status sukses (`s3Bucket: temankerja`).
