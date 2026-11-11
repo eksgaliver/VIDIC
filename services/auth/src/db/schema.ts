@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, varchar, numeric, integer, boolean, index, jsonb, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, uuid, varchar, numeric, integer, boolean, index, jsonb, date, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
 // 1. Tabel Perusahaan (Companies)
@@ -307,6 +307,230 @@ export const postComments = pgTable('post_comments', {
   index('idx_post_comments_post_id').on(table.postId)
 ])
 
+// 10. Tabel Periode Evaluasi KPI (KPI Periods)
+export const kpiPeriods = pgTable('kpi_periods', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 150 }).notNull(),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  graceEndDate: date('grace_end_date'),
+  status: varchar('status', { length: 30 }).default('active').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_kpi_periods_company').on(table.companyId, table.status)
+])
+
+// 11. Tabel Indikator KPI Divisi (Department KPI Items)
+export const departmentKpiItems = pgTable('department_kpi_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  departmentId: uuid('department_id')
+    .notNull()
+    .references(() => departments.id, { onDelete: 'cascade' }),
+  periodId: uuid('period_id')
+    .notNull()
+    .references(() => kpiPeriods.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  category: varchar('category', { length: 50 }).default('operational').notNull(),
+  description: text('description'),
+  measurementUnit: varchar('measurement_unit', { length: 50 }).notNull(),
+  targetValue: numeric('target_value', { precision: 12, scale: 2 }).notNull(),
+  weight: numeric('weight', { precision: 5, scale: 2 }).notNull(),
+  targetPosition: varchar('target_position', { length: 100 }),
+  isActive: boolean('is_active').default(true).notNull(),
+  sortOrder: integer('sort_order').default(0).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_dept_kpi_items').on(table.departmentId, table.periodId)
+])
+
+// 12. Tabel Lembar Evaluasi KPI Karyawan (Employee KPI Assessments)
+export const employeeKpiAssessments = pgTable('employee_kpi_assessments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  departmentId: uuid('department_id')
+    .notNull()
+    .references(() => departments.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  periodId: uuid('period_id')
+    .notNull()
+    .references(() => kpiPeriods.id, { onDelete: 'cascade' }),
+  evaluatorId: uuid('evaluator_id')
+    .references(() => users.id, { onDelete: 'set null' }),
+  totalWeight: numeric('total_weight', { precision: 5, scale: 2 }).default('100.00').notNull(),
+  finalScore: numeric('final_score', { precision: 5, scale: 2 }).default('0.00').notNull(),
+  grade: varchar('grade', { length: 10 }),
+  status: varchar('status', { length: 30 }).default('active').notNull(),
+  notesFromEvaluator: text('notes_from_evaluator'),
+  employeeFeedback: text('employee_feedback'),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_emp_kpi_assessments').on(table.departmentId, table.periodId, table.employeeId)
+])
+
+// 13. Tabel Butir Penilaian KPI Karyawan (Employee KPI Assessment Items)
+export const employeeKpiAssessmentItems = pgTable('employee_kpi_assessment_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  assessmentId: uuid('assessment_id')
+    .notNull()
+    .references(() => employeeKpiAssessments.id, { onDelete: 'cascade' }),
+  departmentKpiItemId: uuid('department_kpi_item_id')
+    .references(() => departmentKpiItems.id, { onDelete: 'set null' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  category: varchar('category', { length: 50 }).default('operational').notNull(),
+  description: text('description'),
+  measurementUnit: varchar('measurement_unit', { length: 50 }).notNull(),
+  targetValue: numeric('target_value', { precision: 12, scale: 2 }).notNull(),
+  actualValue: numeric('actual_value', { precision: 12, scale: 2 }).default('0.00').notNull(),
+  weight: numeric('weight', { precision: 5, scale: 2 }).notNull(),
+  achievementPercentage: numeric('achievement_percentage', { precision: 7, scale: 2 }).default('0.00').notNull(),
+  weightedScore: numeric('weighted_score', { precision: 7, scale: 2 }).default('0.00').notNull(),
+  sortOrder: integer('sort_order').default(0).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_emp_kpi_assessment_items').on(table.assessmentId)
+])
+
+// 14. Tabel Tugas / Bukti Kerja Mandiri Karyawan (Employee KPI Tasks)
+export const employeeKpiTasks = pgTable('employee_kpi_tasks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  assessmentItemId: uuid('assessment_item_id')
+    .notNull()
+    .references(() => employeeKpiAssessmentItems.id, { onDelete: 'cascade' }),
+  assessmentId: uuid('assessment_id')
+    .notNull()
+    .references(() => employeeKpiAssessments.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  departmentId: uuid('department_id')
+    .notNull()
+    .references(() => departments.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  progressValue: numeric('progress_value', { precision: 12, scale: 2 }).notNull(),
+  completedDate: date('completed_date').notNull(),
+  evidenceUrl: text('evidence_url'),
+  notes: text('notes'),
+  status: varchar('status', { length: 30 }).default('pending_review').notNull(),
+  reviewedBy: uuid('reviewed_by')
+    .references(() => users.id, { onDelete: 'set null' }),
+  reviewNotes: text('review_notes'),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+}, (table) => [
+  index('idx_kpi_tasks_status').on(table.departmentId, table.status),
+  index('idx_kpi_tasks_emp').on(table.employeeId, table.completedDate)
+])
+
+// Relasi Skema KPI
+export const kpiPeriodsRelations = relations(kpiPeriods, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [kpiPeriods.companyId],
+    references: [companies.id]
+  }),
+  departmentItems: many(departmentKpiItems),
+  assessments: many(employeeKpiAssessments)
+}))
+
+export const departmentKpiItemsRelations = relations(departmentKpiItems, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [departmentKpiItems.companyId],
+    references: [companies.id]
+  }),
+  department: one(departments, {
+    fields: [departmentKpiItems.departmentId],
+    references: [departments.id]
+  }),
+  period: one(kpiPeriods, {
+    fields: [departmentKpiItems.periodId],
+    references: [kpiPeriods.id]
+  }),
+  assessmentItems: many(employeeKpiAssessmentItems)
+}))
+
+export const employeeKpiAssessmentsRelations = relations(employeeKpiAssessments, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [employeeKpiAssessments.companyId],
+    references: [companies.id]
+  }),
+  department: one(departments, {
+    fields: [employeeKpiAssessments.departmentId],
+    references: [departments.id]
+  }),
+  employee: one(users, {
+    fields: [employeeKpiAssessments.employeeId],
+    references: [users.id]
+  }),
+  evaluator: one(users, {
+    fields: [employeeKpiAssessments.evaluatorId],
+    references: [users.id]
+  }),
+  period: one(kpiPeriods, {
+    fields: [employeeKpiAssessments.periodId],
+    references: [kpiPeriods.id]
+  }),
+  items: many(employeeKpiAssessmentItems),
+  tasks: many(employeeKpiTasks)
+}))
+
+export const employeeKpiAssessmentItemsRelations = relations(employeeKpiAssessmentItems, ({ one, many }) => ({
+  assessment: one(employeeKpiAssessments, {
+    fields: [employeeKpiAssessmentItems.assessmentId],
+    references: [employeeKpiAssessments.id]
+  }),
+  departmentKpiItem: one(departmentKpiItems, {
+    fields: [employeeKpiAssessmentItems.departmentKpiItemId],
+    references: [departmentKpiItems.id]
+  }),
+  tasks: many(employeeKpiTasks)
+}))
+
+export const employeeKpiTasksRelations = relations(employeeKpiTasks, ({ one }) => ({
+  assessmentItem: one(employeeKpiAssessmentItems, {
+    fields: [employeeKpiTasks.assessmentItemId],
+    references: [employeeKpiAssessmentItems.id]
+  }),
+  assessment: one(employeeKpiAssessments, {
+    fields: [employeeKpiTasks.assessmentId],
+    references: [employeeKpiAssessments.id]
+  }),
+  employee: one(users, {
+    fields: [employeeKpiTasks.employeeId],
+    references: [users.id]
+  }),
+  company: one(companies, {
+    fields: [employeeKpiTasks.companyId],
+    references: [companies.id]
+  }),
+  department: one(departments, {
+    fields: [employeeKpiTasks.departmentId],
+    references: [departments.id]
+  }),
+  reviewer: one(users, {
+    fields: [employeeKpiTasks.reviewedBy],
+    references: [users.id]
+  })
+}))
+
 // Inferensi Tipe TypeScript
 export type Company = typeof companies.$inferSelect
 export type NewCompany = typeof companies.$inferInsert
@@ -326,4 +550,14 @@ export type Post = typeof posts.$inferSelect
 export type NewPost = typeof posts.$inferInsert
 export type PostComment = typeof postComments.$inferSelect
 export type NewPostComment = typeof postComments.$inferInsert
+export type KpiPeriod = typeof kpiPeriods.$inferSelect
+export type NewKpiPeriod = typeof kpiPeriods.$inferInsert
+export type DepartmentKpiItem = typeof departmentKpiItems.$inferSelect
+export type NewDepartmentKpiItem = typeof departmentKpiItems.$inferInsert
+export type EmployeeKpiAssessment = typeof employeeKpiAssessments.$inferSelect
+export type NewEmployeeKpiAssessment = typeof employeeKpiAssessments.$inferInsert
+export type EmployeeKpiAssessmentItem = typeof employeeKpiAssessmentItems.$inferSelect
+export type NewEmployeeKpiAssessmentItem = typeof employeeKpiAssessmentItems.$inferInsert
+export type EmployeeKpiTask = typeof employeeKpiTasks.$inferSelect
+export type NewEmployeeKpiTask = typeof employeeKpiTasks.$inferInsert
 

@@ -879,3 +879,37 @@ Sistem penyimpanan berkas dan logo organisasi kini beralih sepenuhnya dari penyi
   3. Akses publik via `fetch()` menghasilkan status `200 OK` dengan header `Content-Type: image/webp`.
   4. Penghapusan berkas `DeleteObjectCommand` berhasil membersihkan objek pengujian.
 • Kompilasi `npm --prefix apps/web run build` lolos tanpa galat (705 modul tertransformasi dalam 11.27 detik).
+
+---
+
+## § 25. Sistem Manajemen KPI Karyawan & Evaluasi Kinerja Dinamis per Divisi
+
+Sistem Key Performance Indicator (KPI) telah dibangun secara penuh dari skema basis data PostgreSQL, relasi Drizzle ORM, endpoint REST API ElysiaJS, integrasi penyimpanan bukti tugas ke AWS S3, hingga antarmuka modern dua dasbor (*Dual-Dashboard*) untuk Admin/Pimpinan dan Karyawan.
+
+### 1. Model Data & Skema Basis Data (`services/auth/src/db/schema.ts` & `migrate_kpi.ts`)
+Sistem menggunakan 5 tabel relasional terindeks dengan kaskade integritas referensial:
+• **`kpi_periods`**: Mengelola siklus evaluasi (nama periode, tanggal mulai, tanggal selesai, batas waktu toleransi/grace period, dan status aktif/arsip).
+• **`department_kpi_items`**: Menampung butir sasaran KPI yang dikelompokkan per departemen/divisi (kategori operasional, target nilai kuantitatif, satuan ukuran, bobot persentase total 100%, target jabatan, panduan penilaian, dan status aktif).
+• **`employee_kpi_assessments`**: Lembar evaluasi individual karyawan per periode (skor akhir terbobot, predikat grade A/B/C/D, total bobot, catatan evaluasi pimpinan, dan umpan balik).
+• **`employee_kpi_assessment_items`**: Butir indikator spesifik pada lembar evaluasi karyawan dengan pelacakan realisasi riil (`actual_value`), capaian persentase (`achievement_percentage`), dan skor terbobot (`weighted_score`).
+• **`employee_kpi_tasks`**: Riwayat pengajuan tugas mandiri karyawan (*task submission*) lengkap dengan lampiran dokumen bukti kerja yang tersimpan di S3, nilai progres, tanggal selesai, serta status verifikasi (`pending_review`, `approved`, `rejected`).
+
+### 2. Layanan Backend & REST API (`services/auth/src/routes/kpi.ts`)
+• **`GET /api/kpi/periods` & `POST /api/kpi/periods` & `PUT /api/kpi/periods/:id`**: Manajemen periode evaluasi dinamis (perpanjangan tenggat waktu, grace period, dan status).
+• **`GET /api/kpi/summary`**: Ringkasan dasbor admin terstruktur per divisi lengkap dengan daftar indikator, status keseimbangan bobot (100%), daftar karyawan, nilai realisasi, serta hitungan antrean tugas.
+• **`GET /api/kpi/my-score`**: Lembar capaian pribadi karyawan yang otomatis menginisialisasi butir sasaran dari divisi bila belum terdaftar.
+• **`POST /api/kpi/items` & `PUT /api/kpi/items/:id` & `DELETE /api/kpi/items/:id`**: Pengeditan dinamis indikator divisi oleh admin yang otomatis menyinkronkan butir penilaian karyawan dan menghitung ulang skor akhir.
+• **`POST /api/kpi/items/auto-balance`**: Penyeimbang bobot otomatis agar seluruh indikator aktif divisi berjumlah genap 100.00%.
+• **`POST /api/kpi/tasks`**: Pengajuan tugas kerja mandiri oleh karyawan dengan unggah bukti lampiran dokumen ke cloud S3.
+• **`GET /api/kpi/tasks/queue`**: Antrean tugas menunggu verifikasi pimpinan divisi dan HR.
+• **`POST /api/kpi/tasks/:id/review`**: Persetujuan (*approve*) atau penolakan (*reject*) tugas yang otomatis mengagregasi nilai progres riil dan menghitung ulang skor terbobot serta predikat grade karyawan.
+• **`PUT /api/kpi/assessments/item/:id`**: Penyesuaian nilai capaian mandiri secara langsung oleh pimpinan penilai.
+
+### 3. Antarmuka Pengguna Frontend Modern (`apps/web/src/routes/kpi.tsx`)
+• **Dual Dashboard (Sakelar Peran)**:
+  - **Dasbor Admin**: Menampilkan kartu statistik metrik perusahaan, pemilih periode fleksibel, filter divisi, matriks indikator berbobot 100%, daftar karyawan dengan accordion rincian capaian, tombol `Auto-Balance 100%`, dan antrean verifikasi bukti tugas.
+  - **Dasbor Karyawan**: Lembar capaian pribadi dengan visual progress bar, banner penghitung waktu masa tenggang (*grace period*), rincian target vs realisasi, skor terbobot, riwayat tugas mandiri, serta formulir pengajuan tugas (*+ Submit Task*) dengan unggahan berkas ke S3.
+• **Kepatuhan Desain & Tipografi**:
+  - Nol emoji, sepenuhnya menggunakan simbol tipografi Unicode (`✓`, `✕`, `•`, `·`, `→`, `—`).
+  - Navigasi baru "KPI Kinerja" terdaftar pada bilah sisi navigasi (`HiOutlineChartBar`).
+  - Seluruh modul tertransformasi dan terkompilasi bersih (`npm --prefix apps/web run build` lolos tanpa galat dalam 10.77 detik).

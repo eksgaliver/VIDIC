@@ -10,6 +10,7 @@ import { employeeRoutes } from './routes/employees'
 import { uploadRoutes } from './routes/upload'
 import { postRoutes } from './routes/posts'
 import { subUserRoutes } from './routes/subusers'
+import { kpiRoutes } from './routes/kpi'
 import { handleAvatarUpload, deleteStoredAvatar } from './handlers/uploadHandler'
 
 export { companyRoutes } from './routes/companies'
@@ -18,6 +19,7 @@ export { employeeRoutes } from './routes/employees'
 export { uploadRoutes } from './routes/upload'
 export { postRoutes } from './routes/posts'
 export { subUserRoutes } from './routes/subusers'
+export { kpiRoutes } from './routes/kpi'
 
 interface AuthUser {
   id: string
@@ -923,6 +925,7 @@ export const authApp = new Elysia()
   .use(uploadRoutes)
   .use(postRoutes)
   .use(subUserRoutes)
+  .use(kpiRoutes)
 
 // Jalankan server jika dieksekusi langsung
 if (import.meta.main) {

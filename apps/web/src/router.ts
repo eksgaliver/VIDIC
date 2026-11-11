@@ -9,6 +9,7 @@ import { departmentsRoute } from './routes/departments'
 import { employeesRoute } from './routes/employees'
 import { shiftsRoute } from './routes/shifts'
 import { attendanceRoute } from './routes/attendance'
+import { kpiRoute } from './routes/kpi'
 import { postsRoute } from './routes/posts'
 import { subUsersRoute } from './routes/sub-users'
 import { profileRoute } from './routes/profile'
@@ -34,6 +35,7 @@ const routeTree = rootRoute.addChildren([
     employeesRoute,
     shiftsRoute,
     attendanceRoute,
+    kpiRoute,
     postsRoute,
     subUsersRoute,
     profileRoute

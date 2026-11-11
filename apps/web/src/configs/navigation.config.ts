@@ -1,5 +1,6 @@
 import type { IconType } from 'react-icons'
 import {
+  HiOutlineChartBar,
   HiOutlineClipboardCheck,
   HiOutlineClock,
   HiOutlineHome,
@@ -16,6 +17,7 @@ import {
   COMPANIES_PATH,
   DEPARTMENTS_PATH,
   EMPLOYEES_PATH,
+  KPI_PATH,
   POSTS_PATH,
   PROFILE_PATH,
   SHIFTS_PATH,
@@ -72,6 +74,13 @@ export const navigationConfig: NavigationItem[] = [
     title: 'Presensi',
     path: ATTENDANCE_PATH,
     icon: HiOutlineClipboardCheck,
+    section: 'workspace'
+  },
+  {
+    key: 'kpi',
+    title: 'KPI Kinerja',
+    path: KPI_PATH,
+    icon: HiOutlineChartBar,
     section: 'workspace'
   },
   {
