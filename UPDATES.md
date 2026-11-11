@@ -778,3 +778,31 @@ Layanan auth sudah menjadi satu-satunya sumber kebenaran kredensial. Bagian ini 
 • `flutter analyze` bersih, `flutter test` 12/12 lolos (termasuk pengujian pemetaan balasan login, normalisasi peran, header Bearer, dan isolasi tenant).
 • Uji sementara langsung ke gateway dari sisi Flutter berhasil: sesi terbaca dengan peran `ADMIN`, ID perusahaan UUID, dan nama perusahaan terisi.
 • `npm --prefix apps/web run build` lolos (`tsc -b` + vite, 704 modul).
+
+---
+
+## § 22. Perbaikan Runtime Crash React: Sanitasi Objek Tanggal pada Komponen Tampilan
+
+### 1. Masalah & Akar Penyebab
+• **Gejala**: Halaman web memicu galat React runtime:
+  `Objects are not valid as a React child (found: [object Date]). If you meant to render a collection of children, use an array instead.`
+• **Akar Masalah 1 (`apps/web/src/utils/attendance.ts`)**:
+  Fungsi pembantu tampilan `formatDateLabel`, `formatDayName`, dan `monthLabel` sebelumnya mengevaluasi ekspresi `${value}T12:00:00Z`. Apabila `value` berupa objek `Date` asli (dari driver basis data atau serialisasi RPC), konversi string menghasilkan string tanggal tak valid yang memicu `Number.isNaN(date.getTime()) === true`. Jalur fallback sebelumnya menjalankan `return value`, yang mengembalikan objek `Date` mentah secara langsung ke pohon JSX pada `ClockInCard`, `AttendanceRecapTable`, dan `HrOverrideDialog`.
+• **Akar Masalah 2 (`services/shifting/src/routes/attendance.ts`)**:
+  Driver `postgres.js` mem-parsing kolom PostgreSQL `DATE` (OID 1082) dan `TIMESTAMP` (OID 1114/1184) menjadi objek `Date` JavaScript secara bawaan. Tanpa serialisasi eksplisit di handler layanan shifting, nilai `attendanceDate` berisiko dikirim sebagai instance `Date`.
+
+### 2. Solusi & Normalisasi Tipe
+• **`apps/web/src/utils/attendance.ts`**:
+  - `formatDateLabel(value?: string | Date | null)`: Memeriksa `value instanceof Date`, parsing string ISO/format `YYYY-MM-DD`, dan selalu mengembalikan string terformat berbahasa Indonesia (`Rab, 11 Nov 2026`) atau tanda pisah `—`. Nilai balik tidak pernah berupa objek `Date`.
+  - `formatDayName(value?: string | Date | null)`: Menangani `Date` maupun string secara defensif dan selalu mengembalikan string nama hari atau `—`.
+  - `monthLabel(month?: string | Date | null)`: Menangani `Date` maupun string `YYYY-MM` secara defensif dan selalu mengembalikan nama bulan serta tahun.
+• **`apps/web/src/components/dashboard/HolidayCalendar2026.tsx`**:
+  - `formatShortDate(dateStr?: string | Date | null)`: Menerima masukan bertipe `string | Date | null | undefined`, menangani `Date` langsung atau memecah format tanggal tanpa risiko TypeError, dan mengembalikan string terformat aman.
+• **`apps/web/src/routes/attendance.tsx`**:
+  - `monthOptions(selected?: string | Date | null)`: Mengonversi masukan tanggal ke format `YYYY-MM` sebelum menghitung rentang 12 bulan pilihan.
+• **`services/shifting/src/routes/attendance.ts`**:
+  - Menambahkan pembantu `toIsoDateString` dan `toIsoTimestampString` pada pemetaan baris presensi (`listAttendanceRows`), memastikan data yang mengalir keluar dari gateway selalu bertipe teks string standar ISO (`YYYY-MM-DD` dan ISO 8601).
+
+### 3. Hasil Verifikasi
+• `npm --prefix apps/web run build` (`tsc -b && vite build`) lolos tanpa galat (704 modul tertransformasi, 0 tipe bermasalah).
+• Pohon komponen React pada dasbor (`<ClockInCard />` dan `<HolidayCalendar2026 />`) serta rute `/attendance` aman dari rendering objek `Date` langsung.

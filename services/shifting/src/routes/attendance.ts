@@ -139,6 +139,18 @@ interface AttendanceFilters {
   statusId?: string
 }
 
+function toIsoDateString(value: unknown): string {
+  if (!value) return ''
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  return String(value).slice(0, 10)
+}
+
+function toIsoTimestampString(value: unknown): string | null {
+  if (!value) return null
+  if (value instanceof Date) return value.toISOString()
+  return String(value)
+}
+
 async function listAttendanceRows(filters: AttendanceFilters) {
   const conditions: SQL[] = [eq(attendances.companyId, filters.companyId)]
   if (filters.start) conditions.push(gte(attendances.attendanceDate, filters.start))
@@ -189,17 +201,17 @@ async function listAttendanceRows(filters: AttendanceFilters) {
   return rows.map((row) => ({
     id: row.id,
     companyId: row.companyId,
-    attendanceDate: row.attendanceDate,
-    checkInAt: row.checkInAt,
-    checkOutAt: row.checkOutAt,
+    attendanceDate: toIsoDateString(row.attendanceDate),
+    checkInAt: toIsoTimestampString(row.checkInAt),
+    checkOutAt: toIsoTimestampString(row.checkOutAt),
     checkInDistanceMeters: row.checkInDistanceMeters,
     lateMinutes: row.lateMinutes,
     workMinutes: row.workMinutes,
     source: row.source,
     note: row.note,
     timezone: row.timezone,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: toIsoTimestampString(row.createdAt),
+    updatedAt: toIsoTimestampString(row.updatedAt),
     employee: {
       id: row.employeeId,
       name: row.employeeName,

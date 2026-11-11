@@ -486,9 +486,11 @@ function SummaryTile({
 }
 
 /** Opsi bulan: dua belas bulan terakhir di sekitar bulan yang sedang dipilih. */
-function monthOptions(selected: string): string[] {
-  const base = new Date(`${selected}-01T12:00:00Z`)
-  if (Number.isNaN(base.getTime())) return [selected]
+function monthOptions(selected?: string | Date | null): string[] {
+  if (!selected) return []
+  const selStr = selected instanceof Date ? selected.toISOString().slice(0, 7) : String(selected)
+  const base = new Date(`${selStr}-01T12:00:00Z`)
+  if (Number.isNaN(base.getTime())) return [selStr]
 
   const options: string[] = []
   for (let offset = 6; offset >= -6; offset -= 1) {

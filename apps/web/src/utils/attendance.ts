@@ -47,10 +47,24 @@ export function formatClock(
   return `${hour}:${minute}`
 }
 
-/** Tanggal kerja 'YYYY-MM-DD' menjadi label pendek berbahasa Indonesia. */
-export function formatDateLabel(value: string): string {
-  const date = new Date(`${value}T12:00:00Z`)
-  if (Number.isNaN(date.getTime())) return value
+/** Tanggal kerja 'YYYY-MM-DD' atau Date menjadi label pendek berbahasa Indonesia. */
+export function formatDateLabel(value?: string | Date | null): string {
+  if (!value) return '—'
+  let date: Date
+  if (value instanceof Date) {
+    date = value
+  } else if (typeof value === 'string') {
+    const trimmed = value.trim()
+    date = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+      ? new Date(`${trimmed}T12:00:00Z`)
+      : new Date(trimmed)
+  } else {
+    return '—'
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === 'string' ? value : '—'
+  }
 
   return new Intl.DateTimeFormat('id-ID', {
     timeZone: 'UTC',
@@ -61,9 +75,24 @@ export function formatDateLabel(value: string): string {
   }).format(date)
 }
 
-export function formatDayName(value: string): string {
-  const date = new Date(`${value}T12:00:00Z`)
-  if (Number.isNaN(date.getTime())) return value
+export function formatDayName(value?: string | Date | null): string {
+  if (!value) return '—'
+  let date: Date
+  if (value instanceof Date) {
+    date = value
+  } else if (typeof value === 'string') {
+    const trimmed = value.trim()
+    date = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+      ? new Date(`${trimmed}T12:00:00Z`)
+      : new Date(trimmed)
+  } else {
+    return '—'
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === 'string' ? value : '—'
+  }
+
   return new Intl.DateTimeFormat('id-ID', { timeZone: 'UTC', weekday: 'long' }).format(date)
 }
 
@@ -93,9 +122,24 @@ export function currentLocalMonth(timezone = 'Asia/Jakarta'): string {
   return `${year}-${month}`
 }
 
-export function monthLabel(month: string): string {
-  const date = new Date(`${month}-01T12:00:00Z`)
-  if (Number.isNaN(date.getTime())) return month
+export function monthLabel(month?: string | Date | null): string {
+  if (!month) return '—'
+  let date: Date
+  if (month instanceof Date) {
+    date = month
+  } else if (typeof month === 'string') {
+    const trimmed = month.trim()
+    date = /^\d{4}-\d{2}$/.test(trimmed)
+      ? new Date(`${trimmed}-01T12:00:00Z`)
+      : new Date(trimmed)
+  } else {
+    return '—'
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return typeof month === 'string' ? month : '—'
+  }
+
   return new Intl.DateTimeFormat('id-ID', {
     timeZone: 'UTC',
     month: 'long',

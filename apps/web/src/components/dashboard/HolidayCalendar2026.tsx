@@ -58,10 +58,25 @@ const MONTH_NAMES = [
 
 const DAY_LABELS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'] as const
 
-function formatShortDate(dateStr: string) {
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const d = new Date(year, month - 1, day)
-  if (Number.isNaN(d.getTime())) return dateStr
+function formatShortDate(dateStr?: string | Date | null): string {
+  if (!dateStr) return '—'
+  let d: Date
+  if (dateStr instanceof Date) {
+    d = dateStr
+  } else if (typeof dateStr === 'string') {
+    const parts = dateStr.split('-').map(Number)
+    if (parts.length === 3 && parts.every((n) => !Number.isNaN(n))) {
+      d = new Date(parts[0], parts[1] - 1, parts[2])
+    } else {
+      d = new Date(dateStr)
+    }
+  } else {
+    return '—'
+  }
+
+  if (Number.isNaN(d.getTime())) {
+    return typeof dateStr === 'string' ? dateStr : '—'
+  }
 
   return new Intl.DateTimeFormat('id-ID', {
     weekday: 'short',
