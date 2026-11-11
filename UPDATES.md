@@ -806,3 +806,32 @@ Layanan auth sudah menjadi satu-satunya sumber kebenaran kredensial. Bagian ini 
 ### 3. Hasil Verifikasi
 • `npm --prefix apps/web run build` (`tsc -b && vite build`) lolos tanpa galat (704 modul tertransformasi, 0 tipe bermasalah).
 • Pohon komponen React pada dasbor (`<ClockInCard />` dan `<HolidayCalendar2026 />`) serta rute `/attendance` aman dari rendering objek `Date` langsung.
+
+---
+
+## § 23. Integrasi Feed Postingan & Pengumuman ke Halaman Dasbor
+
+Halaman utama Dasbor (`apps/web/src/routes/dashboard.tsx`) kini telah dilengkapi dengan modul tampilan **Kabar & Pengumuman** (`DashboardPostsFeed.tsx`), membawa linimasa komunikasi internal bergaya X dan Instagram langsung ke halaman utama kerja pengguna.
+
+### 1. Komponen Baru: `DashboardPostsFeed.tsx` (`apps/web/src/components/dashboard/`)
+• **Struktur Kartu Bergaya Media Sosial Modern**:
+  - **Banner Pengumuman Prioritas**: Ditandai dengan banner kuning emas amber `★ Pengumuman Prioritas · Disematkan Manajemen` untuk edaran penting yang disematkan oleh pimpinan.
+  - **Informasi Penulis Lengkap**: Avatar visual (foto profil atau inisial tebal), nama pengirim, badge terverifikasi centang biru `✓` untuk manajemen/HR, jabatan serta divisi departemen, dan penanda waktu relatif dinamis (*relative time*).
+  - **Kategori Berita**: Filter instan berdasarkan kategori pil (*pills*): `Semua`, `Pengumuman Resmi`, `Berita Internal`, dan `Operasional & Shift`.
+  - **Pratinjau Media Gambar**: Grid gambar lampiran adaptif (1, 2, atau 3 kolom) dengan fitur pembesaran gambar penuh (*zoom in modal dialog* via `Dialog`).
+  - **Interaksi Sosial Cepat**:
+    - Tombol Suka / Hati (`♥` / `♡`) dengan pembaruan instan (*optimistic UI*) dan penghitung langsung.
+    - Indikator hitungan komentar dengan tautan jangkar langsung ke thread diskusi di `/posts#post-{id}`.
+    - Tombol bagikan tautan instan ke papan klip (*clipboard*) dengan konfirmasi `✓ Tersalin`.
+    - Tautan pembuka cepat menuju tampilan penuh di linimasa utama.
+• **Navigasi Terintegrasi**:
+  - Tombol aksi `Tulis Postingan` pada header panel langsung mengarahkan pengguna ke halaman pembuatan postingan (`/posts`).
+  - Footer kartu menampilkan ringkasan jumlah edaran dan tombol tautan `Lihat seluruh kabar & diskusikan →`.
+
+### 2. Tata Letak Dasbor Responsif (`apps/web/src/routes/dashboard.tsx`)
+• Komponen `<DashboardPostsFeed />` diletakkan pada kolom utama di bawah daftar badan usaha, menghadirkan arus kabar internal yang langsung terbaca oleh seluruh karyawan dan operator saat pertama kali membuka aplikasi.
+• Kolom kanan tetap menjaga fungsionalitas operasional yang efisien dengan `<ClockInCard />`, `<HolidayCalendar2026 />`, statistik cakupan organisasi, dan sesi aktif.
+
+### 3. Hasil Verifikasi
+• `npm --prefix apps/web run build` lolos tanpa galat (705 modul tertransformasi dalam 8.86 detik).
+• Penanganan tanggal pada feed dasbor sepenuhnya aman dari galat rendering objek `Date` React.
