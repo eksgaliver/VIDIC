@@ -247,21 +247,21 @@ function renderDailyScheduleEditor(
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-2.5">
         <div>
           <div className="flex items-center gap-2">
-            <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+            <h5 className="text-xs font-medium text-ink-2">
               Jadwal Operasional Harian (Senin – Minggu)
             </h5>
-            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-ink-2 border border-line">
+            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-2xs font-bold text-ink-2 border border-line">
               7 Hari
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-ink-3">
+          <p className="mt-0.5 text-2xs text-ink-3">
             Atur jam kerja mandiri per hari atau tentukan hari libur operasional (Day Off).
           </p>
         </div>
 
         {/* Toolbar Preset */}
-        <div className="flex flex-wrap items-center gap-1 text-[11px]">
-          <span className="text-ink-3 text-[10px] mr-1">Preset:</span>
+        <div className="flex flex-wrap items-center gap-1 text-2xs">
+          <span className="text-ink-3 text-2xs mr-1">Preset:</span>
           <button
             type="button"
             onClick={() => onApplyPreset('standard5')}
@@ -322,11 +322,11 @@ function renderDailyScheduleEditor(
                 </span>
                 <span className="text-xs font-semibold text-ink">{d.dayName}</span>
                 {isOff ? (
-                  <span className="text-[10px] font-bold rounded bg-surface-2 text-ink-3 px-1.5 py-0.5 border border-line">
+                  <span className="text-2xs font-bold rounded bg-surface-2 text-ink-3 px-1.5 py-0.5 border border-line">
                     Libur
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold rounded bg-success-subtle text-success px-1.5 py-0.5 border border-success-line">
+                  <span className="text-2xs font-bold rounded bg-success-subtle text-success px-1.5 py-0.5 border border-success-line">
                     Kerja
                   </span>
                 )}
@@ -335,7 +335,7 @@ function renderDailyScheduleEditor(
               {/* Kolom Kontrol: Toggle Masuk/Libur & Jam Kerja */}
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 {/* Switch Masuk/Libur */}
-                <div className="inline-flex rounded-control border border-line bg-surface-2 p-0.5 text-[11px]">
+                <div className="inline-flex rounded-control border border-line bg-surface-2 p-0.5 text-2xs">
                   <button
                     type="button"
                     onClick={() => onUpdateDay(d.dayOfWeek, { isOff: false })}
@@ -379,11 +379,11 @@ function renderDailyScheduleEditor(
                       }
                       className="rounded border border-line bg-surface px-2 py-1 text-xs font-mono font-medium text-ink focus:border-primary focus:outline-hidden"
                     />
-                    <span className="min-w-[80px] text-right text-[11px] font-medium text-ink-2 tabular">
+                    <span className="min-w-[80px] text-right text-2xs font-medium text-ink-2 tabular">
                       {duration}
                     </span>
                     {overnight ? (
-                      <span className="text-[10px] font-semibold text-warning" title="Melewati tengah malam">
+                      <span className="text-2xs font-semibold text-warning" title="Melewati tengah malam">
                         • Lintas Hari
                       </span>
                     ) : null}
@@ -408,7 +408,7 @@ function renderDailyScheduleEditor(
             <strong className="text-ink">{summary.totalFormatted}</strong>
           </span>
         </div>
-        <div className="text-[11px] text-ink-3">
+        <div className="text-2xs text-ink-3">
           <span className="font-semibold text-success">{summary.workingDaysCount} hari aktif</span>
           {' · '}
           <span className="font-semibold text-ink-3">{summary.offDaysCount} hari libur</span>
@@ -424,7 +424,7 @@ function renderDailyScheduleSummary(schedules: ShiftDailySchedule[]) {
   return (
     <div className="rounded-control border border-line bg-surface p-3.5 space-y-2.5">
       <div className="flex items-center justify-between">
-        <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+        <h5 className="text-xs font-medium text-ink-2">
           Rincian Jam Kerja Mingguan ({summary.workingDaysCount} Hari Aktif · {summary.offDaysCount} Libur)
         </h5>
         <span className="font-mono text-xs font-bold text-primary">
@@ -450,7 +450,7 @@ function renderDailyScheduleSummary(schedules: ShiftDailySchedule[]) {
               <div className="flex items-center justify-between">
                 <span className="font-bold text-ink">{d.dayName}</span>
                 <span
-                  className={`text-[9px] font-bold uppercase px-1 py-0.5 rounded ${
+                  className={`text-2xs font-medium px-1 py-0.5 rounded ${
                     isOff
                       ? 'bg-surface-2 text-ink-3'
                       : 'bg-primary-subtle text-primary border border-primary-line/40'
@@ -461,13 +461,13 @@ function renderDailyScheduleSummary(schedules: ShiftDailySchedule[]) {
               </div>
               {!isOff ? (
                 <>
-                  <p className="font-mono text-[11px] text-ink font-medium">
+                  <p className="font-mono text-2xs text-ink font-medium">
                     {displayTime(s?.startTime)} — {displayTime(s?.endTime)}
                   </p>
-                  <p className="text-[10px] text-ink-3">{duration}</p>
+                  <p className="text-2xs text-ink-3">{duration}</p>
                 </>
               ) : (
-                <p className="text-[11px] text-ink-3 italic pt-1">Day Off</p>
+                <p className="text-2xs text-ink-3 italic pt-1">Day Off</p>
               )}
             </div>
           )
@@ -591,12 +591,12 @@ export function EmployeeShiftSelector({
         <div>
           <div className="flex items-center gap-2">
             <h4 className="text-xs font-semibold text-ink sm:text-sm">{title}</h4>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-2xs font-semibold text-emerald-600 dark:text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               {assignedIds.length} dari {employees.length} Ditugaskan
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-ink-3">{subtitle}</p>
+          <p className="mt-0.5 text-2xs text-ink-3">{subtitle}</p>
         </div>
 
         {/* Batch Select / Deselect */}
@@ -605,7 +605,7 @@ export function EmployeeShiftSelector({
             <button
               type="button"
               onClick={handleDeselectAllVisible}
-              className="rounded-control border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors cursor-pointer"
+              className="rounded-control border border-line bg-surface px-2.5 py-1 text-2xs font-medium text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors cursor-pointer"
             >
               Lepas Semua Hasil
             </button>
@@ -613,7 +613,7 @@ export function EmployeeShiftSelector({
             <button
               type="button"
               onClick={handleSelectAllVisible}
-              className="rounded-control border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400 transition-colors cursor-pointer"
+              className="rounded-control border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-2xs font-medium text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400 transition-colors cursor-pointer"
             >
               Pilih Semua Hasil
             </button>
@@ -645,7 +645,7 @@ export function EmployeeShiftSelector({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1 text-[11px]">
+        <div className="flex flex-wrap items-center gap-1 text-2xs">
           <button
             type="button"
             onClick={() => setFilterTab('all')}
@@ -759,7 +759,7 @@ export function EmployeeShiftSelector({
                       </p>
                       {/* Checkbox Indikator Visual */}
                       <span
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-2xs font-bold transition-colors ${
                           isAssigned
                             ? 'bg-emerald-600 text-white'
                             : 'border border-line-strong bg-surface text-transparent group-hover:border-primary'
@@ -769,14 +769,14 @@ export function EmployeeShiftSelector({
                       </span>
                     </div>
 
-                    <p className="truncate text-[11px] text-ink-3">{emp.email}</p>
+                    <p className="truncate text-2xs text-ink-3">{emp.email}</p>
 
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] text-ink-2 font-medium">
+                      <span className="text-2xs text-ink-2 font-medium">
                         {emp.position || 'Staf Operasional'}
                       </span>
                       {emp.department ? (
-                        <span className="inline-flex items-center rounded bg-surface-3 px-1.5 py-0.2 text-[10px] font-medium text-ink-2">
+                        <span className="inline-flex items-center rounded bg-surface-3 px-1.5 py-0.2 text-2xs font-medium text-ink-2">
                           {emp.department.code}
                         </span>
                       ) : null}
@@ -787,8 +787,8 @@ export function EmployeeShiftSelector({
                 {/* Bagian Bawah: Status Shift Real-Time Terubah */}
                 <div className="mt-2.5 border-t border-line/40 pt-2">
                   {isAssigned ? (
-                    <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white">
+                    <div className="flex items-center gap-1 text-2xs font-medium text-emerald-700 dark:text-emerald-300">
+                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-2xs font-bold text-white">
                         ✓
                       </span>
                       {hasOtherShift ? (
@@ -805,7 +805,7 @@ export function EmployeeShiftSelector({
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1 text-[11px] text-ink-3">
+                    <div className="flex items-center gap-1 text-2xs text-ink-3">
                       <span className="h-1.5 w-1.5 rounded-full bg-ink-4 shrink-0" />
                       {wasOriginallyInThisShift ? (
                         <span className="text-amber-600 dark:text-amber-400 font-medium truncate">
@@ -1547,7 +1547,7 @@ export function ShiftsPage() {
             </SelectField>
 
             {selectedCompany ? (
-              <p className="pb-1 text-xs text-ink-2 sm:pb-2 sm:text-[13px] 2xl:text-sm">
+              <p className="pb-1 text-xs text-ink-2 sm:pb-2 sm:text-sm 2xl:text-sm">
                 <span className="font-mono font-bold text-ink">{selectedCompany.code}</span>
                 {' · '}
                 {isLoading ? 'memuat' : `${shifts.length} shift terdaftar`}
@@ -1603,9 +1603,9 @@ export function ShiftsPage() {
               />
             ) : (
               <div className="overflow-x-auto rounded-b-panel">
-                <table className="w-full min-w-[1040px] border-collapse text-left text-[13px] 2xl:text-sm">
+                <table className="w-full min-w-[1040px] border-collapse text-left text-sm 2xl:text-sm">
                   <thead>
-                    <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">
+                    <tr className="border-b border-line th">
                       <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Nama & Kode Shift</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Jam kerja</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Area operasional</th>
@@ -1637,7 +1637,7 @@ export function ShiftsPage() {
                             </span>
                           </div>
                           {isOvernight(shift.startTime, shift.endTime) ? (
-                            <p className="mt-0.5 text-[11px] font-medium text-amber-600">Melewati tengah malam</p>
+                            <p className="mt-0.5 text-2xs font-medium text-amber-600">Melewati tengah malam</p>
                           ) : null}
 
                           {/* Chips Jadwal Harian (Sen - Min) */}
@@ -1654,7 +1654,7 @@ export function ShiftsPage() {
                                     <span
                                       key={d.dayOfWeek}
                                       title={title}
-                                      className={`inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                      className={`inline-flex items-center justify-center rounded px-1.5 py-0.5 text-2xs font-bold ${
                                         isOff
                                           ? 'bg-surface-2 text-ink-3/50 line-through decoration-ink-3/40'
                                           : 'bg-primary-subtle text-primary border border-primary-line/40'
@@ -1674,7 +1674,7 @@ export function ShiftsPage() {
                                 )
                                 if (hasVaryingHours) {
                                   return (
-                                    <p className="mt-1 text-[10px] text-ink-3 font-medium">
+                                    <p className="mt-1 text-2xs text-ink-3 font-medium">
                                       • Jam berbeda per hari
                                     </p>
                                   )
@@ -1712,11 +1712,11 @@ export function ShiftsPage() {
                                 >
                                   <div className="flex items-center justify-between gap-1">
                                     <span className="font-medium text-ink truncate">{loc.name}</span>
-                                    <span className="shrink-0 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-2">
+                                    <span className="shrink-0 text-2xs font-medium px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-2">
                                       {isPolygon ? `Polygon (${polygonPoints} t)` : `Point (${loc.radiusMeters}m)`}
                                     </span>
                                   </div>
-                                  <p className="text-[11px] text-ink-3 truncate mt-0.5">
+                                  <p className="text-2xs text-ink-3 truncate mt-0.5">
                                     {loc.city} · {loc.address}
                                   </p>
                                 </div>
@@ -1823,7 +1823,7 @@ export function ShiftsPage() {
                   }`}
                 >
                   <span
-                    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                    className={`flex h-4 w-4 items-center justify-center rounded-full text-2xs font-bold ${
                       isCurrent
                         ? 'bg-primary text-primary-on'
                         : isPassed
@@ -1873,10 +1873,10 @@ export function ShiftsPage() {
                   {createForm.name.trim() ? (
                     <div className="flex items-center gap-1.5 text-xs text-ink-3">
                       <span>Kode shift:</span>
-                      <span className="font-mono font-bold text-ink rounded bg-surface-2 px-1.5 py-0.5 border border-line text-[11px]">
+                      <span className="font-mono font-bold text-ink rounded bg-surface-2 px-1.5 py-0.5 border border-line text-2xs">
                         {createForm.code || generateAutoShiftCode(createForm.name)}
                       </span>
-                      <span className="text-[11px] text-ink-3">· Dibuat otomatis</span>
+                      <span className="text-2xs text-ink-3">· Dibuat otomatis</span>
                     </div>
                   ) : null}
                 </div>
@@ -1926,7 +1926,7 @@ export function ShiftsPage() {
                       </span>
                       <Badge tone="accent">Peta Interaktif</Badge>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-ink-3">
+                    <p className="mt-0.5 text-2xs text-ink-3">
                       Tandai posisi pointer pada peta. Alamat fisik dan koordinat GPS akan otomatis tersinkronisasi. Minimal 1 titik dan bisa lebih dari 1 lokasi.
                     </p>
                   </div>
@@ -1958,7 +1958,7 @@ export function ShiftsPage() {
                       >
                         <HiOutlineLocationMarker className="h-3.5 w-3.5 shrink-0" />
                         <span className="max-w-[150px] truncate">{loc.name || `Titik #${idx + 1}`}</span>
-                        <span className={`text-[10px] px-1 rounded ${isSelected ? 'bg-white/25 text-white' : 'bg-surface text-ink-3'}`}>
+                        <span className={`text-2xs px-1 rounded ${isSelected ? 'bg-white/25 text-white' : 'bg-surface text-ink-3'}`}>
                           {loc.radiusMeters}m
                         </span>
                       </button>
@@ -1975,7 +1975,7 @@ export function ShiftsPage() {
                         <span className="font-semibold text-ink">
                           Peta Titik #{createActivePointIndex + 1}: {createForm.attendanceLocations[createActivePointIndex].name}
                         </span>
-                        <span className="text-[11px] text-ink-3">
+                        <span className="text-2xs text-ink-3">
                           Klik peta untuk memindahkan pin & isi alamat
                         </span>
                       </div>
@@ -2011,21 +2011,21 @@ export function ShiftsPage() {
                     {/* Kolom Form Atribut Titik (5 kolom) */}
                     <div className="space-y-3 rounded-control border border-line bg-surface p-3.5 lg:col-span-5">
                       <div className="flex items-center justify-between border-b border-line pb-2">
-                        <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                        <h5 className="text-xs font-medium text-ink-2">
                           Konfigurasi Titik #{createActivePointIndex + 1}
                         </h5>
                         {createForm.attendanceLocations.length > 1 ? (
                           <button
                             type="button"
                             onClick={() => handleRemoveCreatePoint(createActivePointIndex)}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-error hover:underline"
+                            className="inline-flex items-center gap-1 text-2xs font-semibold text-error hover:underline"
                             title="Hapus titik lokasi ini"
                           >
                             <HiOutlineTrash className="h-3.5 w-3.5" />
                             Hapus Titik
                           </button>
                         ) : (
-                          <span className="text-[10px] text-ink-3 italic">
+                          <span className="text-2xs text-ink-3 italic">
                             Minimal 1 titik wajib
                           </span>
                         )}
@@ -2151,11 +2151,11 @@ export function ShiftsPage() {
                           <div className="rounded border border-line bg-surface-2 p-2.5 text-xs space-y-1.5">
                             <div className="flex items-center justify-between font-semibold text-primary">
                               <span>Mode Poligon Aktif</span>
-                              <span className="font-mono text-[11px] text-ink-3">
+                              <span className="font-mono text-2xs text-ink-3">
                                 {createForm.attendanceLocations[createActivePointIndex].polygonCoordinates?.length || 0} sudut
                               </span>
                             </div>
-                            <p className="text-[11px] text-ink-3">
+                            <p className="text-2xs text-ink-3">
                               Batas presensi ditentukan oleh bidang poligon di peta.
                             </p>
                             <button
@@ -2166,7 +2166,7 @@ export function ShiftsPage() {
                                   polygonCoordinates: [],
                                 })
                               }
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                              className="inline-flex items-center gap-1 text-2xs font-semibold text-primary hover:underline"
                             >
                               ← Kembali ke Pointer (Titik & Radius)
                             </button>
@@ -2185,7 +2185,7 @@ export function ShiftsPage() {
                         </div>
                       )}
 
-                      <div className="rounded border border-line bg-surface-2 px-2.5 py-1.5 text-[11px] text-ink-3">
+                      <div className="rounded border border-line bg-surface-2 px-2.5 py-1.5 text-2xs text-ink-3">
                         Koordinat GPS:{' '}
                         <span className="font-mono text-ink font-semibold">
                           {createForm.attendanceLocations[createActivePointIndex].latitude.toFixed(6)},{' '}
@@ -2207,7 +2207,7 @@ export function ShiftsPage() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
-                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                    <h5 className="text-xs font-medium text-ink-2">
                       Informasi & Jadwal Shift
                     </h5>
                     <div className="flex items-center gap-2">
@@ -2224,7 +2224,7 @@ export function ShiftsPage() {
                         </span>
                       </p>
                       {isOvernight(createForm.startTime, createForm.endTime) ? (
-                        <p className="text-warning font-semibold text-[11px]">
+                        <p className="text-warning font-semibold text-2xs">
                           • Shift Lintas Hari (Melewati tengah malam)
                         </p>
                       ) : null}
@@ -2238,7 +2238,7 @@ export function ShiftsPage() {
                   </div>
 
                   <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
-                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                    <h5 className="text-xs font-medium text-ink-2">
                       Penugasan & Geofence
                     </h5>
                     <p className="text-xs text-ink-2">
@@ -2256,7 +2256,7 @@ export function ShiftsPage() {
                 {/* Ringkasan Titik Geofence Presensi */}
                 <div className="rounded-control border border-line bg-surface p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                    <h5 className="text-xs font-medium text-ink-2">
                       Daftar Titik Geofence Presensi ({createForm.attendanceLocations.length} Titik Terdaftar)
                     </h5>
                     <button
@@ -2272,12 +2272,12 @@ export function ShiftsPage() {
                       <div key={idx} className="rounded border border-line bg-surface-2 p-2.5 text-xs space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-semibold text-ink truncate">{loc.name}</span>
-                          <span className="shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-surface border border-line text-primary">
+                          <span className="shrink-0 text-2xs font-medium px-1.5 py-0.5 rounded bg-surface border border-line text-primary">
                             Radius {loc.radiusMeters}m
                           </span>
                         </div>
-                        <p className="text-[11px] text-ink-3 truncate">{loc.address}</p>
-                        <div className="flex items-center justify-between text-[10px] text-ink-3 pt-0.5">
+                        <p className="text-2xs text-ink-3 truncate">{loc.address}</p>
+                        <div className="flex items-center justify-between text-2xs text-ink-3 pt-0.5">
                           <span className="font-mono">
                             {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
                           </span>
@@ -2371,7 +2371,7 @@ export function ShiftsPage() {
                   }`}
                 >
                   <span
-                    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                    className={`flex h-4 w-4 items-center justify-center rounded-full text-2xs font-bold ${
                       isCurrent
                         ? 'bg-primary text-primary-on'
                         : isPassed
@@ -2420,10 +2420,10 @@ export function ShiftsPage() {
                     />
                     <div className="flex items-center gap-1.5 text-xs text-ink-3">
                       <span>Kode shift:</span>
-                      <span className="font-mono font-bold text-ink rounded bg-surface-2 px-1.5 py-0.5 border border-line text-[11px]">
+                      <span className="font-mono font-bold text-ink rounded bg-surface-2 px-1.5 py-0.5 border border-line text-2xs">
                         {editForm.code || generateAutoShiftCode(editForm.name)}
                       </span>
-                      <span className="text-[11px] text-ink-3">· Otomatis</span>
+                      <span className="text-2xs text-ink-3">· Otomatis</span>
                     </div>
                   </div>
 
@@ -2486,7 +2486,7 @@ export function ShiftsPage() {
                       </span>
                       <Badge tone="accent">Peta Interaktif</Badge>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-ink-3">
+                    <p className="mt-0.5 text-2xs text-ink-3">
                       Tandai posisi pointer pada peta. Alamat fisik dan koordinat GPS akan otomatis tersinkronisasi. Minimal 1 titik dan bisa lebih dari 1 lokasi.
                     </p>
                   </div>
@@ -2518,7 +2518,7 @@ export function ShiftsPage() {
                       >
                         <HiOutlineLocationMarker className="h-3.5 w-3.5 shrink-0" />
                         <span className="max-w-[150px] truncate">{loc.name || `Titik #${idx + 1}`}</span>
-                        <span className={`text-[10px] px-1 rounded ${isSelected ? 'bg-white/25 text-white' : 'bg-surface text-ink-3'}`}>
+                        <span className={`text-2xs px-1 rounded ${isSelected ? 'bg-white/25 text-white' : 'bg-surface text-ink-3'}`}>
                           {loc.radiusMeters}m
                         </span>
                       </button>
@@ -2535,7 +2535,7 @@ export function ShiftsPage() {
                         <span className="font-semibold text-ink">
                           Peta Titik #{editActivePointIndex + 1}: {editForm.attendanceLocations[editActivePointIndex].name}
                         </span>
-                        <span className="text-[11px] text-ink-3">
+                        <span className="text-2xs text-ink-3">
                           Klik peta untuk memindahkan pin & isi alamat
                         </span>
                       </div>
@@ -2571,21 +2571,21 @@ export function ShiftsPage() {
                     {/* Kolom Form Atribut Titik (5 kolom) */}
                     <div className="space-y-3 rounded-control border border-line bg-surface p-3.5 lg:col-span-5">
                       <div className="flex items-center justify-between border-b border-line pb-2">
-                        <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                        <h5 className="text-xs font-medium text-ink-2">
                           Konfigurasi Titik #{editActivePointIndex + 1}
                         </h5>
                         {editForm.attendanceLocations.length > 1 ? (
                           <button
                             type="button"
                             onClick={() => handleRemoveEditPoint(editActivePointIndex)}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-error hover:underline"
+                            className="inline-flex items-center gap-1 text-2xs font-semibold text-error hover:underline"
                             title="Hapus titik lokasi ini"
                           >
                             <HiOutlineTrash className="h-3.5 w-3.5" />
                             Hapus Titik
                           </button>
                         ) : (
-                          <span className="text-[10px] text-ink-3 italic">
+                          <span className="text-2xs text-ink-3 italic">
                             Minimal 1 titik wajib
                           </span>
                         )}
@@ -2711,11 +2711,11 @@ export function ShiftsPage() {
                           <div className="rounded border border-line bg-surface-2 p-2.5 text-xs space-y-1.5">
                             <div className="flex items-center justify-between font-semibold text-primary">
                               <span>Mode Poligon Aktif</span>
-                              <span className="font-mono text-[11px] text-ink-3">
+                              <span className="font-mono text-2xs text-ink-3">
                                 {editForm.attendanceLocations[editActivePointIndex].polygonCoordinates?.length || 0} sudut
                               </span>
                             </div>
-                            <p className="text-[11px] text-ink-3">
+                            <p className="text-2xs text-ink-3">
                               Batas presensi ditentukan oleh bidang poligon di peta.
                             </p>
                             <button
@@ -2726,7 +2726,7 @@ export function ShiftsPage() {
                                   polygonCoordinates: [],
                                 })
                               }
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                              className="inline-flex items-center gap-1 text-2xs font-semibold text-primary hover:underline"
                             >
                               ← Kembali ke Pointer (Titik & Radius)
                             </button>
@@ -2745,7 +2745,7 @@ export function ShiftsPage() {
                         </div>
                       )}
 
-                      <div className="rounded border border-line bg-surface-2 px-2.5 py-1.5 text-[11px] text-ink-3">
+                      <div className="rounded border border-line bg-surface-2 px-2.5 py-1.5 text-2xs text-ink-3">
                         Koordinat GPS:{' '}
                         <span className="font-mono text-ink font-semibold">
                           {editForm.attendanceLocations[editActivePointIndex].latitude.toFixed(6)},{' '}
@@ -2767,7 +2767,7 @@ export function ShiftsPage() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
-                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                    <h5 className="text-xs font-medium text-ink-2">
                       Informasi & Jadwal Shift
                     </h5>
                     <div className="flex items-center gap-2">
@@ -2784,7 +2784,7 @@ export function ShiftsPage() {
                         </span>
                       </p>
                       {isOvernight(editForm.startTime, editForm.endTime) ? (
-                        <p className="text-warning font-semibold text-[11px]">
+                        <p className="text-warning font-semibold text-2xs">
                           • Shift Lintas Hari (Melewati tengah malam)
                         </p>
                       ) : null}
@@ -2798,7 +2798,7 @@ export function ShiftsPage() {
                   </div>
 
                   <div className="rounded-control border border-line bg-surface p-3.5 space-y-2">
-                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                    <h5 className="text-xs font-medium text-ink-2">
                       Penugasan & Geofence
                     </h5>
                     <p className="text-xs text-ink-2">
@@ -2816,7 +2816,7 @@ export function ShiftsPage() {
                 {/* Ringkasan Titik Geofence Presensi */}
                 <div className="rounded-control border border-line bg-surface p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <h5 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                    <h5 className="text-xs font-medium text-ink-2">
                       Daftar Titik Geofence Presensi ({editForm.attendanceLocations.length} Titik Terdaftar)
                     </h5>
                     <button
@@ -2832,12 +2832,12 @@ export function ShiftsPage() {
                       <div key={idx} className="rounded border border-line bg-surface-2 p-2.5 text-xs space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-semibold text-ink truncate">{loc.name}</span>
-                          <span className="shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-surface border border-line text-primary">
+                          <span className="shrink-0 text-2xs font-medium px-1.5 py-0.5 rounded bg-surface border border-line text-primary">
                             Radius {loc.radiusMeters}m
                           </span>
                         </div>
-                        <p className="text-[11px] text-ink-3 truncate">{loc.address}</p>
-                        <div className="flex items-center justify-between text-[10px] text-ink-3 pt-0.5">
+                        <p className="text-2xs text-ink-3 truncate">{loc.address}</p>
+                        <div className="flex items-center justify-between text-2xs text-ink-3 pt-0.5">
                           <span className="font-mono">
                             {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
                           </span>

@@ -29,6 +29,7 @@ import {
   PageHeader,
   Panel,
   PanelHeader,
+  Select,
   SelectField,
   TextField,
 } from '@/components/base'
@@ -437,7 +438,7 @@ function SubUsersPage() {
             <div className="text-lg font-bold text-ink mt-1 tabular-nums">
               {subUsers.length} Pengguna
             </div>
-            <div className="text-[11px] text-ink-muted mt-0.5">
+            <div className="text-2xs text-ink-muted mt-0.5">
               Terkunci pada ID: {currentCompany?.id ? `${currentCompany.id.slice(0, 12)}...` : '-'}
             </div>
           </div>
@@ -447,7 +448,7 @@ function SubUsersPage() {
             <div className="text-lg font-bold text-ink mt-1">
               {otherCompanies.length > 0 ? `${otherCompanies.length} Badan Usaha Lain` : 'Belum Ada'}
             </div>
-            <div className="text-[11px] text-ink-muted mt-0.5">
+            <div className="text-2xs text-ink-muted mt-0.5">
               {otherCompanies.map((c) => c.name).join(', ') || 'Hanya 1 perusahaan di DB'}
             </div>
           </div>
@@ -458,7 +459,7 @@ function SubUsersPage() {
               <span>Terkunci Ketat 100%</span>
               <HiOutlineCheck className="h-4 w-4" />
             </div>
-            <div className="text-[11px] text-ink-muted mt-0.5">
+            <div className="text-2xs text-ink-muted mt-0.5">
               Endpoint 403 Forbidden aktif pada seluruh servis
             </div>
           </div>
@@ -480,17 +481,17 @@ function SubUsersPage() {
                   Pilih Badan Usaha Target Simulasi
                 </label>
                 {otherCompanies.length > 0 ? (
-                  <select
+                  <Select
                     value={targetCompanyId}
                     onChange={(e) => setTargetCompanyId(e.target.value)}
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+                    className="w-full"
                   >
                     {otherCompanies.map((comp) => (
                       <option key={comp.id} value={comp.id}>
                         {comp.name} ({comp.code}) — {comp.industry || 'Umum'}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
                   <p className="text-xs text-ink-muted">
                     Hanya ada satu perusahaan terdaftar. Daftarkan perusahaan kedua terlebih dahulu untuk menguji simulasi penetrasi.
@@ -533,7 +534,7 @@ function SubUsersPage() {
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-ink">{test.testName}</span>
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-bold ${
                             test.status === 403
                               ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50'
                               : 'bg-red-50 text-red-700 border border-red-200'
@@ -543,7 +544,7 @@ function SubUsersPage() {
                         </span>
                       </div>
 
-                      <div className="font-mono text-[11px] text-ink-muted bg-surface-2 px-2 py-1 rounded border border-line/60">
+                      <div className="font-mono text-2xs text-ink-muted bg-surface-2 px-2 py-1 rounded border border-line/60">
                         {test.endpoint}
                       </div>
 
@@ -678,12 +679,12 @@ function SubUsersPage() {
                             <div className="font-semibold text-ink flex items-center gap-1.5">
                               <span>{su.name}</span>
                               {isCurrentSessionUser && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-2 text-ink-muted">
+                                <span className="text-2xs px-1.5 py-0.2 rounded bg-surface-2 text-ink-muted">
                                   Anda
                                 </span>
                               )}
                             </div>
-                            <div className="text-ink-muted text-[11px]">{su.email}</div>
+                            <div className="text-ink-muted text-2xs">{su.email}</div>
                           </div>
                         </div>
                       </td>
@@ -691,7 +692,7 @@ function SubUsersPage() {
                       {/* Jabatan & Departemen */}
                       <td className="py-3 px-4">
                         <div className="font-medium text-ink">{su.position || 'Staf'}</div>
-                        <div className="text-ink-muted text-[11px]">
+                        <div className="text-ink-muted text-2xs">
                           {su.departmentName ? `${su.departmentName} (${su.departmentCode})` : 'Tanpa Departemen'}
                         </div>
                       </td>
@@ -705,11 +706,11 @@ function SubUsersPage() {
 
                       {/* Lingkup Batas Data */}
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5 text-[11px] text-ink font-medium">
+                        <div className="flex items-center gap-1.5 text-2xs text-ink font-medium">
                           <HiOutlineLockClosed className="h-3.5 w-3.5 text-emerald-600" />
                           <span>Terkunci: {currentCompany?.code || 'Perusahaan Induk'}</span>
                         </div>
-                        <div className="text-[10px] text-ink-muted">
+                        <div className="text-2xs text-ink-muted">
                           Ditolak 403 pada tenant lain
                         </div>
                       </td>
@@ -717,7 +718,7 @@ function SubUsersPage() {
                       {/* Status */}
                       <td className="py-3 px-4">
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-semibold ${
                             su.status === 'active'
                               ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
                               : 'bg-surface-2 text-ink-muted'
@@ -823,10 +824,10 @@ function SubUsersPage() {
                 <label className="block text-xs font-semibold text-ink mb-1">
                   Departemen Internal
                 </label>
-                <select
+                <Select
                   value={createForm.departmentId}
                   onChange={(e) => setCreateForm({ ...createForm, departmentId: e.target.value })}
-                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+                  className="w-full"
                 >
                   <option value="">Pilih Departemen...</option>
                   {departments.map((d) => (
@@ -834,7 +835,7 @@ function SubUsersPage() {
                       {d.name} ({d.code})
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -843,14 +844,14 @@ function SubUsersPage() {
                 <label className="block text-xs font-semibold text-ink mb-1">
                   Tingkat Hak Akses
                 </label>
-                <select
+                <Select
                   value={createForm.role}
                   onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
-                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+                  className="w-full"
                 >
                   <option value="member">Sub-User / Anggota Biasa</option>
                   <option value="admin">Admin Perusahaan (Sub-Admin)</option>
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -926,10 +927,10 @@ function SubUsersPage() {
                   <label className="block text-xs font-semibold text-ink mb-1">
                     Departemen
                   </label>
-                  <select
+                  <Select
                     value={editForm.departmentId}
                     onChange={(e) => setEditForm({ ...editForm, departmentId: e.target.value })}
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+                    className="w-full"
                   >
                     <option value="">Pilih Departemen...</option>
                     {departments.map((d) => (
@@ -937,7 +938,7 @@ function SubUsersPage() {
                         {d.name} ({d.code})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -946,28 +947,28 @@ function SubUsersPage() {
                   <label className="block text-xs font-semibold text-ink mb-1">
                     Tingkat Hak Akses
                   </label>
-                  <select
+                  <Select
                     value={editForm.role}
                     onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+                    className="w-full"
                   >
                     <option value="member">Sub-User / Anggota Biasa</option>
                     <option value="admin">Admin Perusahaan (Sub-Admin)</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1">
                     Status Akun
                   </label>
-                  <select
+                  <Select
                     value={editForm.status}
                     onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+                    className="w-full"
                   >
                     <option value="active">Aktif</option>
                     <option value="inactive">Non-aktif / Tergembok</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

@@ -1,6 +1,8 @@
 export { Button } from './Button'
 export type { ButtonProps } from './Button'
 export { TextField, TextAreaField, SelectField, CheckboxField } from './Field'
+export { Select } from './Select'
+export type { SelectOption, SelectProps } from './Select'
 export {
   Panel,
   PanelHeader,

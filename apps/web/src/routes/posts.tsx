@@ -30,6 +30,7 @@ import {
   Notice,
   PageHeader,
   Panel,
+  Select,
 } from '@/components/base'
 import { POSTS_PATH } from '@/constants/route.constant'
 import type { PostCommentItem, PostItem } from '@/@types/organization'
@@ -584,17 +585,19 @@ function PostsPage() {
                 <div className="pt-2 border-t border-line flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   {/* Pemilih Kategori & Opsi Pin */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <select
+                    <Select
                       value={composerCategory}
                       onChange={(e) => setComposerCategory(e.target.value)}
-                      className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink focus:outline-none focus:ring-1 focus:ring-ink cursor-pointer"
+                      className="w-[180px]"
+                      isSearchable={false}
+                      menuPlacement="top"
                     >
                       <option value="announcement">Pengumuman Resmi</option>
                       <option value="news">Berita Internal</option>
                       <option value="operational">Operasional & Shift</option>
                       <option value="achievement">Prestasi Tim</option>
                       <option value="general">Umum & Diskusi</option>
-                    </select>
+                    </Select>
 
                     {/* Tombol Unggah Gambar */}
                     <input
@@ -778,7 +781,7 @@ function PostsPage() {
                       <span className="text-sm font-bold text-amber-600 dark:text-amber-400">★</span>
                       <span>Pengumuman Prioritas · Disematkan oleh Manajemen</span>
                     </div>
-                    <span className="text-[11px] font-normal opacity-80">Wajib Dibaca</span>
+                    <span className="text-2xs font-normal opacity-80">Wajib Dibaca</span>
                   </div>
                 )}
 
@@ -810,7 +813,7 @@ function PostsPage() {
                           {(post.author?.role === 'admin' ||
                             post.author?.position?.toLowerCase().includes('hr')) && (
                             <span
-                              className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-600 text-surface text-[10px] font-bold"
+                              className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-600 text-surface text-2xs font-bold"
                               title="Terverifikasi Manajemen"
                             >
                               ✓
@@ -948,7 +951,7 @@ function PostsPage() {
                       </button>
                     </div>
 
-                    <div className="text-[11px] text-ink-muted hidden sm:block">
+                    <div className="text-2xs text-ink-muted hidden sm:block">
                       Status Terbuka
                     </div>
                   </div>
@@ -964,7 +967,7 @@ function PostsPage() {
                               key={comm.id}
                               className="flex items-start gap-2.5 bg-surface-2/60 rounded-xl p-2.5 text-xs border border-line/60"
                             >
-                              <div className="flex-shrink-0 h-7 w-7 rounded-full bg-surface border border-line flex items-center justify-center font-bold text-ink text-[10px]">
+                              <div className="flex-shrink-0 h-7 w-7 rounded-full bg-surface border border-line flex items-center justify-center font-bold text-ink text-2xs">
                                 {comm.authorAvatarUrl ? (
                                   <img
                                     src={resolveLogoUrl(comm.authorAvatarUrl)}
@@ -982,12 +985,12 @@ function PostsPage() {
                                       {comm.authorName || 'Karyawan'}
                                     </span>
                                     {comm.authorRole === 'admin' && (
-                                      <span className="text-[10px] text-blue-600 font-medium">
+                                      <span className="text-2xs text-blue-600 font-medium">
                                         (Admin)
                                       </span>
                                     )}
                                   </div>
-                                  <span className="text-[10px] text-ink-muted">
+                                  <span className="text-2xs text-ink-muted">
                                     {formatRelativeTime(comm.createdAt)}
                                   </span>
                                 </div>

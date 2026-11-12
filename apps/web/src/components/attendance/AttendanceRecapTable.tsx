@@ -40,9 +40,9 @@ export function AttendanceRecapTable({
         <EmptyState title="Belum ada baris presensi" description={emptyDescription} />
       ) : (
         <div className="overflow-x-auto rounded-b-panel">
-          <table className="w-full min-w-[1080px] border-collapse text-left text-[13px] 2xl:text-sm">
+          <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">
+              <tr className="border-b border-line th">
                 <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Tanggal</th>
                 <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Karyawan</th>
                 <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Shift</th>
@@ -59,7 +59,7 @@ export function AttendanceRecapTable({
                 <tr key={row.id} className="transition-colors hover:bg-surface-2">
                   <td className="whitespace-nowrap px-4 py-3.5 align-top sm:px-5 2xl:px-7 2xl:py-4">
                     <p className="font-medium text-ink">{formatDateLabel(row.attendanceDate)}</p>
-                    <p className="mt-0.5 text-[11px] text-ink-3">
+                    <p className="mt-0.5 text-2xs text-ink-3">
                       {ATTENDANCE_SOURCE_LABEL[row.source] ?? row.source}
                     </p>
                   </td>
@@ -73,7 +73,7 @@ export function AttendanceRecapTable({
                     {row.shift ? (
                       <>
                         <p className="font-medium text-ink">{row.shift.name}</p>
-                        <p className="mt-0.5 font-mono text-[11px] text-ink-3">{row.shift.code}</p>
+                        <p className="mt-0.5 font-mono text-2xs text-ink-3">{row.shift.code}</p>
                       </>
                     ) : (
                       <span className="text-xs text-ink-3">Tanpa shift</span>
@@ -82,7 +82,7 @@ export function AttendanceRecapTable({
                   <td className="whitespace-nowrap px-4 py-3.5 align-top tabular 2xl:py-4">
                     <span className="font-medium text-ink">{formatClock(row.checkInAt, row.timezone)}</span>
                     {row.lateMinutes > 0 ? (
-                      <p className="mt-0.5 text-[11px] font-medium text-warning">
+                      <p className="mt-0.5 text-2xs font-medium text-warning">
                         +{formatMinutes(row.lateMinutes)}
                       </p>
                     ) : null}
@@ -90,7 +90,7 @@ export function AttendanceRecapTable({
                   <td className="whitespace-nowrap px-4 py-3.5 align-top tabular 2xl:py-4">
                     <span className="font-medium text-ink">{formatClock(row.checkOutAt, row.timezone)}</span>
                     {row.checkInDistanceMeters !== null ? (
-                      <p className="mt-0.5 text-[11px] text-ink-3">{row.checkInDistanceMeters} m</p>
+                      <p className="mt-0.5 text-2xs text-ink-3">{row.checkInDistanceMeters} m</p>
                     ) : null}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3.5 align-top 2xl:py-4">

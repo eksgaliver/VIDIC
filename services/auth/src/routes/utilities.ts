@@ -95,3 +95,4 @@ export const utilitiesRoutes = new Elysia({ prefix: '/utilities' })
       limit: t.Optional(t.String())
     })
   })
+

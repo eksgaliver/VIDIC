@@ -8,7 +8,7 @@ import {
 import classNames from 'classnames'
 import Table from '@/components/ui/Table'
 import Pagination from '@/components/ui/Pagination'
-import Select from '@/components/ui/Select'
+import { Select } from '@/components/base'
 import Checkbox from '@/components/ui/Checkbox'
 import TableRowSkeleton from './loaders/TableRowSkeleton'
 import Loading from './Loading'
@@ -382,15 +382,16 @@ function DataTable<T>(props: DataTableProps<T>) {
                 />
                 <div style={{ minWidth: 130 }}>
                     <Select
-                        instanceId={instanceId}
-                        size="sm"
+                        id={instanceId}
+                        className="w-[130px]"
                         menuPlacement="top"
                         isSearchable={false}
-                        value={pageSizeOption.filter(
-                            (option) => option.value === pageSize,
-                        )}
-                        options={pageSizeOption}
-                        onChange={(option) => handleSelectChange(option?.value)}
+                        value={String(pageSize)}
+                        options={pageSizeOption.map((option) => ({
+                            value: String(option.value),
+                            label: option.label,
+                        }))}
+                        onChange={(event) => handleSelectChange(Number(event.target.value))}
                     />
                 </div>
             </div>

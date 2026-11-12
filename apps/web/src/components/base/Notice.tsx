@@ -43,13 +43,13 @@ export function Notice({ tone, title, children, onDismiss, className }: NoticePr
         className
       )}
     >
-      <span className={cn('mt-px shrink-0 text-[18px] leading-none', style.title)} aria-hidden="true">
+      <span className={cn('mt-px shrink-0 text-lg leading-none', style.title)} aria-hidden="true">
         {style.icon}
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className={cn('text-[13px] font-bold leading-snug', style.title)}>{title}</p>
-        <p className="mt-1 text-[13px] leading-relaxed text-ink">{children}</p>
+        <p className={cn('text-sm font-semibold leading-snug', style.title)}>{title}</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink">{children}</p>
       </div>
 
       {onDismiss ? (

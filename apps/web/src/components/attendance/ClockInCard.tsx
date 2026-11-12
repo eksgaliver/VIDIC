@@ -195,7 +195,7 @@ export function ClockInCard({ onChanged }: ClockInCardProps) {
           <>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="tabular text-2xl font-bold tracking-tightest text-ink 2xl:text-3xl">
+                <p className="tabular text-2xl font-semibold tracking-tightest text-ink">
                   {clockWithSeconds(timezone, now)}
                 </p>
                 <p className="mt-0.5 text-xs text-ink-3">
@@ -207,13 +207,13 @@ export function ClockInCard({ onChanged }: ClockInCardProps) {
             </div>
 
             {info?.shift ? (
-              <dl className="grid grid-cols-2 gap-3 rounded-control border border-line bg-surface-2 px-3.5 py-3 text-[13px]">
+              <dl className="grid grid-cols-2 gap-3 rounded-control border border-line bg-surface-2 px-3.5 py-3 text-sm">
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-ink-3">Shift</dt>
+                  <dt className="text-2xs text-ink-3">Shift</dt>
                   <dd className="mt-0.5 font-semibold text-ink">{info.shift.name}</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-ink-3">Jadwal</dt>
+                  <dt className="text-2xs text-ink-3">Jadwal</dt>
                   <dd className="mt-0.5 font-medium tabular text-ink">
                     {schedule && !schedule.isOff
                       ? `${schedule.startTime?.slice(0, 5) ?? '—'} — ${schedule.endTime?.slice(0, 5) ?? '—'}`
@@ -223,26 +223,26 @@ export function ClockInCard({ onChanged }: ClockInCardProps) {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-ink-3">Masuk</dt>
+                  <dt className="text-2xs text-ink-3">Masuk</dt>
                   <dd className="mt-0.5 font-medium tabular text-ink">
                     {formatClock(row?.checkInAt, timezone)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-ink-3">Pulang</dt>
+                  <dt className="text-2xs text-ink-3">Pulang</dt>
                   <dd className="mt-0.5 font-medium tabular text-ink">
                     {formatClock(row?.checkOutAt, timezone)}
                   </dd>
                 </div>
                 {row?.lateMinutes ? (
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-ink-3">Terlambat</dt>
+                    <dt className="text-2xs text-ink-3">Terlambat</dt>
                     <dd className="mt-0.5 font-medium text-warning">{formatMinutes(row.lateMinutes)}</dd>
                   </div>
                 ) : null}
                 {row?.workMinutes !== null && row?.workMinutes !== undefined ? (
                   <div>
-                    <dt className="text-[11px] uppercase tracking-wide text-ink-3">Durasi kerja</dt>
+                    <dt className="text-2xs text-ink-3">Durasi kerja</dt>
                     <dd className="mt-0.5 font-medium text-ink">{formatMinutes(row.workMinutes)}</dd>
                   </div>
                 ) : null}

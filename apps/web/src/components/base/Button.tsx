@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex select-none items-center justify-center gap-2 rounded-control font-semibold button-press-feedback disabled:cursor-not-allowed disabled:opacity-55',
+  'inline-flex select-none items-center justify-center gap-2 rounded-control font-medium button-press-feedback disabled:cursor-not-allowed disabled:opacity-55',
   {
     variants: {
       tone: {
@@ -14,7 +14,7 @@ const buttonVariants = cva(
         destructive: 'bg-error text-error-on shadow-1 hover:brightness-110',
       },
       size: {
-        md: 'h-10 px-4 text-[13px] sm:h-9 sm:px-3.5',
+        md: 'h-10 px-4 text-sm sm:h-9 sm:px-3.5',
         sm: 'h-9 px-3 text-xs sm:h-8',
         icon: 'h-10 w-10 sm:h-9 sm:w-9',
         iconSm: 'h-9 w-9 sm:h-8 sm:w-8',

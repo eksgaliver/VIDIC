@@ -61,8 +61,8 @@ const ConfirmDialog = (props: ConfirmDialogProps) => {
             <div className="flex min-h-0 flex-1 gap-4 px-4 py-5 sm:px-5">
                 <StatusIcon status={type} />
                 <div className="min-w-0">
-                    <h2 className="text-[15px] font-bold tracking-tight text-ink">{title}</h2>
-                    <div className="mt-1.5 text-[13px] leading-relaxed text-ink-2">{children}</div>
+                    <h2 className="text-base font-semibold tracking-tight text-ink">{title}</h2>
+                    <div className="mt-1.5 text-sm text-ink-2">{children}</div>
                 </div>
             </div>
             <DialogFooter>

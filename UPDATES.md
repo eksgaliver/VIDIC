@@ -913,3 +913,87 @@ Sistem menggunakan 5 tabel relasional terindeks dengan kaskade integritas refere
   - Nol emoji, sepenuhnya menggunakan simbol tipografi Unicode (`✓`, `✕`, `•`, `·`, `→`, `—`).
   - Navigasi baru "KPI Kinerja" terdaftar pada bilah sisi navigasi (`HiOutlineChartBar`).
   - Seluruh modul tertransformasi dan terkompilasi bersih (`npm --prefix apps/web run build` lolos tanpa galat dalam 10.77 detik).
+
+---
+
+## § 26. Target Jabatan Indikator KPI Diambil dari Pengguna Terdaftar
+
+Kolom "Target Jabatan / Posisi Khusus (Opsional)" pada formulir indikator KPI sebelumnya berupa isian bebas. Akibatnya HRD dapat mengetik jabatan yang tidak pernah ada di data karyawan, sehingga indikator tidak pernah cocok dengan siapa pun. Pilihan itu kini bersumber dari pengguna yang benar-benar terdaftar.
+
+### 1. Endpoint Baru (`services/auth/src/routes/kpi.ts`)
+• `GET /api/kpi/positions?companyId=<uuid>` mengembalikan daftar jabatan unik dari kolom `users.position` pada perusahaan tersebut, diurutkan menaik dan dibersihkan dari nilai kosong.
+• Memakai `selectDistinct` + `isNotNull` sehingga tidak ada duplikasi dan tidak ada entri kosong; perusahaan tanpa karyawan menerima `data: []` tanpa galat.
+
+### 2. Formulir Indikator (`apps/web/src/routes/kpi.tsx`)
+• `TextField` diganti `SelectField`. Opsi pertama "Semua jabatan divisi" (nilai kosong) mempertahankan arti lama kolom ini.
+• `loadPositions()` dimuat bersama periode, ringkasan, antrean tugas, dan lembar pribadi dalam satu `refreshAll()`, memakai `user.companyId` dari sesi.
+• Saat menyunting indikator lama yang jabatannya sudah tidak terdaftar, nilai tersebut tetap ditampilkan pada dropdown agar tidak hilang tanpa sepengetahuan pengguna.
+• Bila perusahaan belum memiliki jabatan sama sekali, kolom menampilkan keterangan agar posisi diisi lebih dahulu pada data karyawan.
+
+### 3. Hasil Verifikasi
+• `GET /api/kpi/positions?companyId=c6c76e1e-...` -> `200` dengan `["Direktur Operasional","Spesialis Sumber Daya Manusia","Staf Operasional Gudang","Staff Rekayasa Perangkat Lunak"]`, sesuai isi tabel `users`.
+• `npm --prefix apps/web run build` (`tsc -b && vite build`) lolos tanpa galat.
+
+---
+
+## § 27. Seluruh Select Memakai react-select & Perbaikan Tata Letak Modal KPI
+
+Kotak pilihan pada seluruh antarmuka sebelumnya masih memakai `<select>` bawaan peramban, sehingga tampilannya berbeda-beda antar sistem operasi dan tidak dapat dicari. Seluruhnya kini memakai `react-select` melalui satu komponen dasar, dan tata letak modal indikator KPI diperbaiki.
+
+### 1. Komponen Dasar (`apps/web/src/components/base/Select.tsx`)
+• `Select` membungkus `react-select` dengan token desain yang sudah ada: kontrol setinggi 40px, `radius-control`, garis `line`/`primary` saat fokus, menu `surface` dengan `shadow-md`, dan status terpilih memakai `primary-subtle`.
+• Menerima dua bentuk masukan: prop `options` (`{ value, label }`) maupun anak `<option>` seperti markup lama, termasuk hasil `.map()` dan fragment, sehingga 39 pemakaian `SelectField` tidak perlu diubah.
+• `onChange` tetap mengirim `event.target` berisi `value`, jadi seluruh penangan formulir lama (`e.target.value`) tetap bekerja.
+• Menu dirender melalui portal ke `body` dengan `zIndex` 200, sehingga tidak terpotong oleh `overflow` pada dialog maupun tabel.
+• Pencarian aktif otomatis hanya bila opsi lebih dari tujuh butir.
+
+### 2. Cakupan Penggantian
+• `SelectField` (39 titik pakai) kini memakai `Select`, sehingga halaman presensi, shift, karyawan, departemen, perusahaan, profil, sub-user, dan KPI seragam.
+• Tujuh `<select>` mentah dikonversi: pemilih periode KPI, kategori composer postingan, serta enam pemilih pada halaman sub-user (badan usaha target, departemen, hak akses, dan status akun).
+• `DataTable` yang sebelumnya memakai `Select` template kini memakai komponen dasar yang sama. Tidak ada lagi `<select>` native pada `apps/web/src`.
+
+### 3. Perbaikan Modal Indikator KPI (`apps/web/src/routes/kpi.tsx`)
+• `DialogBody` tidak memiliki padding sehingga label dan kontrol menempel ke tepi dialog; kini `px-4 py-5 sm:px-5`.
+• `<form>` di dalam dialog bukan flex, sehingga `DialogBody` yang memakai `flex-1` tidak pernah menyusut dan area teks "Panduan / Rumus Evaluasi" terpotong penutup dialog. Form kini `flex min-h-0 flex-1 flex-col`, sehingga isi menggulir dan footer tetap terlihat.
+• Jarak antar kelompok isian dinaikkan dari `space-y-4` ke `space-y-5`; dua baris isian ganda memakai `grid-cols-1 sm:grid-cols-2` agar tidak berhimpitan di layar sempit.
+• Pola yang sama diterapkan pada lima dialog lain di halaman KPI (pengajuan tugas, periode evaluasi, verifikasi tugas, penyesuaian nilai, pratinjau berkas).
+
+### 4. Hasil Verifikasi
+• `npm --prefix apps/web run build` (`tsc -b && vite build`) lolos: 772 modul (sebelumnya 706) karena `react-select` kini benar-benar dipakai; berkas JS 1.256 kB (gzip 363 kB).
+• `grep "<select"` pada `apps/web/src` tidak menemukan elemen select native tersisa.
+
+---
+
+## § 28. Aplikasi Mobile Flutter Ditulis Ulang: Beranda Karyawan Tanpa Layar Login
+
+Aplikasi mobile sebelumnya adalah alat uji berisi layar sambutan, login, sakelar mode luring, dan dasbor simulasi. Seluruh alur itu dihapus, lalu diganti satu beranda yang membaca data nyata dari gateway Bun.
+
+### 1. Yang Dihapus
+• `lib/screens/welcome_screen.dart` dan `lib/screens/login_screen.dart` beserta rutenya pada `main.dart`.
+• `lib/services/auth_service.dart` (akun tiruan dan mode luring) dan `lib/models/user_session.dart`.
+• `test/auth_service_test.dart`. Aplikasi kini langsung membuka beranda tanpa gerbang apa pun.
+
+### 2. Struktur Baru
+• `lib/core/app_config.dart`: alamat gateway per platform (emulator Android `10.0.2.2`, lainnya `localhost`) dan identitas akun uji, seluruhnya dapat ditimpa lewat `--dart-define`.
+• `lib/core/api_client.dart`: klien HTTP yang membuat sesi sekali di latar belakang, meneruskan `Authorization: Bearer`, dan menerjemahkan kegagalan jaringan, waktu habis, serta pesan galat layanan menjadi satu `ApiException`.
+• `lib/core/format.dart`: format tanggal, jam, durasi, angka desimal Indonesia, label WIB/WITA/WIT, dan sapaan menurut jam.
+• `lib/models/home_data.dart`: profil, presensi hari ini, KPI, dan kabar, lengkap dengan parser yang tahan nilai kosong.
+• `lib/screens/home_screen.dart`: beranda, `HomeRepository` sebagai kontrak data, dan `ApiHomeRepository` yang memanggil `/api/shifting/attendance/today`, `/api/kpi/my-score`, dan `/api/posts`.
+• `lib/widgets/`: kartu seksi, kartu presensi, kartu KPI, dan daftar kabar beserta lembar detail.
+
+### 3. Isi Beranda
+• Kepala: sapaan, nama, jabatan dan departemen, perusahaan, serta tanggal berjalan.
+• Presensi hari ini: shift dan jam kerja, status (belum presensi/sudah masuk/hari libur/tanpa shift), jam masuk dan pulang, keterlambatan atau durasi kerja, serta titik geofence yang berlaku.
+• Capaian KPI: skor periode aktif, batang progres, predikat bila sudah dinilai, dan setiap indikator dengan realisasi terhadap target serta bobotnya.
+• Kabar & pengumuman: tiga kabar terbaru; menekan satu kabar membuka lembar bawah berisi isi lengkap.
+• Keadaan memuat menyebut apa yang sedang diambil, keadaan galat menampilkan pesan penyebab dan tombol coba lagi, dan seluruh halaman dapat ditarik untuk menyegarkan.
+
+### 4. Catatan Teknis
+• Tidak ada plugin baru: `geolocator` dan `google_fonts` sempat ditambahkan lalu dicabut karena proyek ini belum mengaktifkan Developer Mode Windows, sehingga kebutuhan symlink plugin menggagalkan build. Konsekuensinya beranda menampilkan status presensi tanpa tombol clock-in, dan tipografi memakai font bawaan platform sampai berkas Inter tersedia di `assets/fonts/`.
+• Warna dan ukuran huruf memakai token yang sama dengan klien web (`#F6F7F9`, `#111620`, `#1668E5`, radius 14/10).
+
+### 5. Hasil Verifikasi
+• `flutter analyze` bersih tanpa temuan.
+• `flutter test` 3/3 lolos: beranda menampilkan data (nama, presensi, KPI, kabar), keadaan galat memunculkan tombol coba lagi dan memicu pemuatan ulang, serta kabar membuka lembar detail.
+• Pemeriksaan langsung ke gateway (berkas sementara, kemudian dihapus) mengembalikan data nyata: `Budi Santoso | Staff Rekayasa Perangkat Lunak | Teknologi Informasi & Rekayasa`, shift `STAFF 08:00-17:00`, `Kuartal I 2026` dengan 4 indikator, dan 2 kabar.
+• `flutter build web --release` berhasil menghasilkan `build/web` (65,2 detik).

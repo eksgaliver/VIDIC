@@ -14,7 +14,7 @@ export function AttendanceStatusBadge({ status, className, title }: AttendanceSt
     <span
       title={title ?? status.name}
       className={cn(
-        'inline-flex max-w-full items-center rounded-md px-2 py-0.5 text-[11px] font-semibold leading-5',
+        'inline-flex max-w-full items-center rounded-md px-2 py-0.5 text-2xs font-medium leading-5',
         className
       )}
       style={{ backgroundColor: status.color, color: readableInk(status.color) }}

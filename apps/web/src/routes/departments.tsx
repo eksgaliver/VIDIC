@@ -276,7 +276,7 @@ export function DepartmentsPage() {
             </SelectField>
 
             {selectedCompany ? (
-              <p className="pb-1 text-xs text-ink-2 sm:pb-2 sm:text-[13px] 2xl:text-sm">
+              <p className="pb-1 text-xs text-ink-2 sm:pb-2 sm:text-sm 2xl:text-sm">
                 <span className="font-mono font-bold text-ink">{selectedCompany.code}</span>{' '}
                 · {isLoading ? 'memuat' : `${departments.length} departemen`}
                 {mandatoryCount > 0 ? ` · ${mandatoryCount} wajib` : null}
@@ -312,9 +312,9 @@ export function DepartmentsPage() {
               />
             ) : (
               <div className="overflow-x-auto rounded-b-panel">
-                <table className="w-full min-w-[680px] border-collapse text-left text-[13px] 2xl:text-sm">
+                <table className="w-full min-w-[680px] border-collapse text-left text-sm 2xl:text-sm">
                   <thead>
-                    <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">
+                    <tr className="border-b border-line th">
                       <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Departemen</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Deskripsi</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Status</th>
@@ -326,7 +326,7 @@ export function DepartmentsPage() {
                       <tr key={dept.id} className="transition-colors hover:bg-surface-2">
                         <td className="px-4 py-3.5 align-top sm:px-5 2xl:px-7 2xl:py-4">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wide text-ink 2xl:text-xs">
+                            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-2xs font-bold tracking-wide text-ink 2xl:text-xs">
                               {dept.code}
                             </span>
                             <span className="font-semibold text-ink">{dept.name}</span>

@@ -190,6 +190,7 @@ async function listAttendanceRows(filters: AttendanceFilters) {
       statusIsAbsent: attendanceStatuses.isAbsent,
       statusIsSystem: attendanceStatuses.isSystem
     })
+
     .from(attendances)
     .innerJoin(users, eq(attendances.employeeId, users.id))
     .leftJoin(departments, eq(users.departmentId, departments.id))

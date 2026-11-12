@@ -109,14 +109,14 @@ function DashboardPage() {
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-x-4">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink 2xl:text-xs">
+                            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-2xs font-medium text-ink">
                               {company.code}
                             </span>
-                            <h3 className="truncate text-[15px] font-bold tracking-tight text-ink 2xl:text-base">
+                            <h3 className="truncate text-base font-semibold tracking-tight text-ink">
                               {company.name}
                             </h3>
                           </div>
-                          <p className="mt-1.5 text-[13px] text-ink-2 2xl:text-sm">
+                          <p className="mt-1.5 text-sm text-ink-2">
                             {location
                               ? `${location.name} · ${location.city} · ${timezoneLabel(location.timezone)}`
                               : 'Titik lokasi belum dikonfigurasi'}
@@ -132,18 +132,18 @@ function DashboardPage() {
                         </div>
                         <div className="flex items-center justify-between gap-4 sm:justify-end">
                           <StatusFromValue value={company.status} />
-                          <dl className="hidden items-center gap-4 text-[13px] sm:flex 2xl:gap-6 2xl:text-sm">
+                          <dl className="hidden items-center gap-4 text-sm sm:flex 2xl:gap-6">
                             <div className="text-right">
-                              <dt className="text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">Lokasi</dt>
-                              <dd className="tabular font-semibold text-ink">{locationCount(company)}</dd>
+                              <dt className="text-2xs text-ink-3">Lokasi</dt>
+                              <dd className="tabular font-medium text-ink">{locationCount(company)}</dd>
                             </div>
                             <div className="text-right">
-                              <dt className="text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">Kota Op.</dt>
-                              <dd className="tabular font-semibold text-primary">{operationalAreaCount(company)}</dd>
+                              <dt className="text-2xs text-ink-3">Kota op.</dt>
+                              <dd className="tabular font-medium text-primary">{operationalAreaCount(company)}</dd>
                             </div>
                             <div className="text-right">
-                              <dt className="text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">Dept.</dt>
-                              <dd className="tabular font-semibold text-ink">{departmentCount(company)}</dd>
+                              <dt className="text-2xs text-ink-3">Departemen</dt>
+                              <dd className="tabular font-medium text-ink">{departmentCount(company)}</dd>
                             </div>
                           </dl>
                         </div>
@@ -186,7 +186,7 @@ function DashboardPage() {
             <div className="border-t border-line px-4 py-3.5 sm:px-5">
               <Link
                 to={DEPARTMENTS_PATH}
-                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
               >
                 Atur departemen
                 <HiOutlineArrowRight className="h-4 w-4" />
@@ -198,12 +198,12 @@ function DashboardPage() {
             <PanelHeader title="Sesi aktif" />
             <div className="space-y-3 px-4 py-4 sm:px-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-on">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-2xs font-medium text-primary-on">
                   {(user?.name ?? 'OP').slice(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-[13px] font-semibold text-ink">{user?.name}</div>
-                  <div className="truncate font-mono text-[11px] text-ink-3">{user?.email}</div>
+                  <div className="truncate text-sm font-medium text-ink">{user?.name}</div>
+                  <div className="truncate text-xs text-ink-3">{user?.email}</div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -229,8 +229,8 @@ function SummaryRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 px-4 py-3 sm:px-5 2xl:px-6 2xl:py-4">
-      <dt className="text-[13px] text-ink-2 2xl:text-sm">{label}</dt>
-      <dd className="tabular text-[15px] font-bold text-ink 2xl:text-base">
+      <dt className="text-sm text-ink-2">{label}</dt>
+      <dd className="tabular text-base font-medium text-ink">
         {loading ? '—' : value}
       </dd>
     </div>

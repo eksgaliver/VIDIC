@@ -134,6 +134,7 @@
 
 @layer base {
   html {
+    font-size: 16px;
     /* Cegah kedip saat berganti tema: hanya warna yang bertransisi */
     transition: background-color var(--dur) var(--ease-out);
   }
@@ -142,6 +143,10 @@
     @apply bg-app font-sans text-sm text-ink antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
     text-rendering: optimizeLegibility;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 
   h1, .h1 {
@@ -183,6 +188,17 @@
   /* Angka pada data sejajar, kolom tidak bergeser */
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Label sekunder: satu-satunya gaya label non-tabel di antarmuka.
+     Huruf kecil, bobot medium, tanpa huruf kapital semua. */
+  .label {
+    @apply text-2xs font-medium tracking-label text-ink-3;
+  }
+
+  /* Judul kolom tabel: satu-satunya tempat huruf kapital diizinkan. */
+  .th {
+    @apply text-2xs font-medium uppercase tracking-label text-ink-3;
   }
 
   ::-webkit-scrollbar {

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <g stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Kelopak 1: Atas (0°) - Outline -->
+    <polygon points="100,90 86,55 100,20 114,55" fill="none" />
+    
+    <!-- Kelopak 2: Kanan Atas (72°) - Outline -->
+    <polygon points="100,90 86,55 100,20 114,55" fill="none" transform="rotate(72 100 100)" />
+    
+    <!-- Kelopak 3: Kanan Bawah (144°) - Solid -->
+    <polygon points="100,90 86,55 100,20 114,55" fill="#FFFFFF" transform="rotate(144 100 100)" />
+    
+    <!-- Kelopak 4: Kiri Bawah (216°) - Outline -->
+    <polygon points="100,90 86,55 100,20 114,55" fill="none" transform="rotate(216 100 100)" />
+    
+    <!-- Kelopak 5: Kiri Atas (288°) - Solid -->
+    <polygon points="100,90 86,55 100,20 114,55" fill="#FFFFFF" transform="rotate(288 100 100)" />
+  </g>
+
+  <!-- Elemen Dekorasi Titik & Lingkaran -->
+  <!-- Cincin Kiri Atas -->
+  <circle cx="52" cy="28" r="8" fill="none" stroke="#FFFFFF" stroke-width="4" />
+  
+  <!-- Dua Titik Kanan Atas -->
+  <circle cx="136" cy="36" r="3" fill="#FFFFFF" />
+  <circle cx="154" cy="28" r="3" fill="#FFFFFF" />
+  
+  <!-- Satu Titik Kanan Bawah -->
+  <circle cx="162" cy="158" r="3" fill="#FFFFFF" />
+  <circle cx="170" cy="128" r="8" fill="none" stroke="#FFFFFF" stroke-width="4" />
+</svg>

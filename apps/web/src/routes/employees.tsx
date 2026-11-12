@@ -421,7 +421,7 @@ export function EmployeesPage() {
             </SelectField>
 
             {selectedCompany ? (
-              <p className="pb-1 text-xs text-ink-2 sm:pb-2 sm:text-[13px] 2xl:text-sm">
+              <p className="pb-1 text-xs text-ink-2 sm:pb-2 sm:text-sm 2xl:text-sm">
                 <span className="font-mono font-bold text-ink">{selectedCompany.code}</span>
                 {' · '}
                 {isLoading ? 'memuat' : `${employees.length} karyawan`}
@@ -485,9 +485,9 @@ export function EmployeesPage() {
               />
             ) : (
               <div className="overflow-x-auto rounded-b-panel">
-                <table className="w-full min-w-[920px] border-collapse text-left text-[13px] 2xl:text-sm">
+                <table className="w-full min-w-[920px] border-collapse text-left text-sm 2xl:text-sm">
                   <thead>
-                    <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">
+                    <tr className="border-b border-line th">
                       <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Karyawan</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Posisi & departemen</th>
                       <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Shift kerja</th>
@@ -502,7 +502,7 @@ export function EmployeesPage() {
                       <tr key={employee.id} className="transition-colors hover:bg-surface-2">
                         <td className="px-4 py-3.5 align-top sm:px-5 2xl:px-7 2xl:py-4">
                           <div className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-[11px] font-bold text-primary">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-2xs font-bold text-primary">
                               {initials(employee.name)}
                             </span>
                             <div className="min-w-0">
@@ -561,7 +561,7 @@ export function EmployeesPage() {
                                 Belum Diisi ○
                               </button>
                             )}
-                            <p className="flex items-center gap-1 text-[11px] text-ink-3">
+                            <p className="flex items-center gap-1 text-2xs text-ink-3">
                               <HiOutlineMail className="h-3.5 w-3.5 text-primary" />
                               <span>Relasi Mail Aktif</span>
                             </p>
@@ -968,7 +968,7 @@ export function EmployeesPage() {
                     </span>
                   )}
                   {employeeBiodata.completedAt ? (
-                    <p className="mt-1 text-[11px] text-ink-3">
+                    <p className="mt-1 text-2xs text-ink-3">
                       Diverifikasi: {formatDate(employeeBiodata.completedAt)}
                     </p>
                   ) : null}
@@ -980,8 +980,8 @@ export function EmployeesPage() {
                 {/* 1. Kependudukan & Pajak */}
                 <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
                   <div className="flex items-center gap-2 border-b border-line pb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-primary">§ 1</span>
-                    <h5 className="text-xs font-semibold uppercase tracking-wider text-ink">Kependudukan & Pajak</h5>
+                    <span className="text-2xs font-medium text-primary">§ 1</span>
+                    <h5 className="text-sm font-medium text-ink">Kependudukan & Pajak</h5>
                   </div>
                   <dl className="space-y-2 text-xs">
                     <div>
@@ -1022,8 +1022,8 @@ export function EmployeesPage() {
                 {/* 2. Data Pribadi & Demografi */}
                 <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
                   <div className="flex items-center gap-2 border-b border-line pb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-primary">§ 2</span>
-                    <h5 className="text-xs font-semibold uppercase tracking-wider text-ink">Pribadi & Demografi</h5>
+                    <span className="text-2xs font-medium text-primary">§ 2</span>
+                    <h5 className="text-sm font-medium text-ink">Pribadi & Demografi</h5>
                   </div>
                   <dl className="space-y-2 text-xs">
                     <div className="grid grid-cols-2 gap-2">
@@ -1066,8 +1066,8 @@ export function EmployeesPage() {
                 {/* 3. Kontak & Domisili */}
                 <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
                   <div className="flex items-center gap-2 border-b border-line pb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-primary">§ 3</span>
-                    <h5 className="text-xs font-semibold uppercase tracking-wider text-ink">Kontak & Domisili</h5>
+                    <span className="text-2xs font-medium text-primary">§ 3</span>
+                    <h5 className="text-sm font-medium text-ink">Kontak & Domisili</h5>
                   </div>
                   <dl className="space-y-2 text-xs">
                     <div>
@@ -1106,8 +1106,8 @@ export function EmployeesPage() {
                 {/* 4. Pendidikan & Rekening Bank */}
                 <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
                   <div className="flex items-center gap-2 border-b border-line pb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-primary">§ 4</span>
-                    <h5 className="text-xs font-semibold uppercase tracking-wider text-ink">Pendidikan & Payroll</h5>
+                    <span className="text-2xs font-medium text-primary">§ 4</span>
+                    <h5 className="text-sm font-medium text-ink">Pendidikan & Payroll</h5>
                   </div>
                   <dl className="space-y-2 text-xs">
                     <div>
@@ -1131,7 +1131,7 @@ export function EmployeesPage() {
                         ) : null}
                       </dd>
                       {employeeBiodata.bankAccountHolder ? (
-                        <p className="text-[11px] text-ink-3 mt-0.5">
+                        <p className="text-2xs text-ink-3 mt-0.5">
                           a.n. {employeeBiodata.bankAccountHolder}
                         </p>
                       ) : null}

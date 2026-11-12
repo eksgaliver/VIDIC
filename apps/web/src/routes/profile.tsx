@@ -453,11 +453,11 @@ export function ProfilePage() {
           <HiOutlineDocumentText className="h-4 w-4" />
           <span>Biodata Karyawan</span>
           {biodata?.isCompleted ? (
-            <span className="rounded bg-success/20 px-1.5 py-0.5 text-[10px] text-success">
+            <span className="rounded bg-success/20 px-1.5 py-0.5 text-2xs text-success">
               Lengkap ✓
             </span>
           ) : (
-            <span className="rounded bg-warning/20 px-1.5 py-0.5 text-[10px] text-warning">
+            <span className="rounded bg-warning/20 px-1.5 py-0.5 text-2xs text-warning">
               Belum Lengkap ○
             </span>
           )}
@@ -488,7 +488,7 @@ export function ProfilePage() {
           <HiOutlineMail className="h-4 w-4" />
           <span>Kotak Surat (Mail)</span>
           {mails.length > 0 && (
-            <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${unreadMailCount > 0 ? 'bg-primary text-primary-on' : 'bg-surface-3 text-ink-2'}`}>
+            <span className={`rounded-full px-1.5 py-0.2 text-2xs font-bold ${unreadMailCount > 0 ? 'bg-primary text-primary-on' : 'bg-surface-3 text-ink-2'}`}>
               {mails.length}
             </span>
           )}
@@ -863,7 +863,7 @@ export function ProfilePage() {
               </div>
 
               <div className="flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[11px] leading-snug text-ink-3">
+                <p className="text-2xs leading-snug text-ink-3">
                   Akun demo pengembangan kembali ke nilai awal saat layanan auth dimulai ulang.
                 </p>
                 <div className="flex shrink-0 items-center gap-2">
@@ -894,7 +894,7 @@ export function ProfilePage() {
               <PanelHeader title="Ringkasan" />
               <div className="space-y-4 px-3.5 py-4 sm:px-5 2xl:px-6 2xl:py-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-[13px] font-bold text-primary-on">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-primary-on">
                     {user?.avatarUrl ? (
                       <img
                         src={resolveLogoUrl(user.avatarUrl)}
@@ -906,12 +906,12 @@ export function ProfilePage() {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-[14px] font-bold text-ink">{user?.name ?? 'Pengguna'}</div>
-                    <div className="truncate font-mono text-[11px] text-ink-3">{user?.email ?? '—'}</div>
+                    <div className="truncate text-sm font-medium text-ink">{user?.name ?? 'Pengguna'}</div>
+                    <div className="truncate font-mono text-2xs text-ink-3">{user?.email ?? '—'}</div>
                   </div>
                 </div>
 
-                <dl className="divide-y divide-line text-[13px]">
+                <dl className="divide-y divide-line text-sm">
                   <div className="flex items-baseline justify-between gap-3 py-2.5">
                     <dt className="text-ink-2">Peran</dt>
                     <dd className="font-semibold text-ink">{roleLabel(user?.role)}</dd>
@@ -945,7 +945,7 @@ export function ProfilePage() {
               <div className="space-y-4 px-3.5 py-4 sm:px-5 2xl:px-6 2xl:py-5">
                 <div className="flex items-start gap-2.5">
                   <HiOutlineShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-                  <div className="min-w-0 text-[13px] leading-relaxed text-ink-2">
+                  <div className="min-w-0 text-sm leading-relaxed text-ink-2">
                     Token akses berlaku tujuh hari dan disimpan di perangkat ini. Keluar akan menghapus
                     sesi lokal seketika.
                   </div>
@@ -953,17 +953,17 @@ export function ProfilePage() {
 
                 <div className="flex items-start gap-2.5">
                   <HiOutlineBadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <div className="min-w-0 text-[13px] leading-relaxed text-ink-2">
+                  <div className="min-w-0 text-sm leading-relaxed text-ink-2">
                     Perubahan nama dan surel diverifikasi ulang oleh layanan auth sebelum disimpan.
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
                   <HiOutlineIdentification className="mt-0.5 h-4 w-4 shrink-0 text-ink-3" />
-                  <div className="min-w-0 text-[13px] leading-relaxed text-ink-2">
+                  <div className="min-w-0 text-sm leading-relaxed text-ink-2">
                     ID akun
                     <span
-                      className="mt-1 block truncate font-mono text-[11px] text-ink-3"
+                      className="mt-1 block truncate font-mono text-2xs text-ink-3"
                       title={user?.id}
                     >
                       {user?.id ?? '—'}
@@ -1019,7 +1019,7 @@ export function ProfilePage() {
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-ink">{m.senderName || m.senderEmail}</span>
                           {!m.isRead && (
-                            <span className="rounded bg-primary px-1.5 py-0.2 text-[9px] font-bold text-primary-on">
+                            <span className="rounded bg-primary px-1.5 py-0.2 text-2xs font-medium text-primary-on">
                               Baru
                             </span>
                           )}
@@ -1028,12 +1028,12 @@ export function ProfilePage() {
                         <p className="text-xs text-ink-3 truncate mt-0.5 max-w-xl">{m.body}</p>
                       </div>
                     </div>
-                    <div className="shrink-0 text-right text-[11px] text-ink-3">
+                    <div className="shrink-0 text-right text-2xs text-ink-3">
                       <div className="flex items-center gap-1 justify-end">
                         <HiOutlineClock className="h-3 w-3" />
                         <span>{formatDateTime(m.sentAt || m.createdAt)}</span>
                       </div>
-                      <span className="mt-1 inline-block text-[10px] uppercase font-mono tracking-wider text-ink-3">
+                      <span className="mt-1 inline-block text-2xs text-ink-3">
                         {m.category}
                       </span>
                     </div>

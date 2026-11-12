@@ -158,7 +158,7 @@ export function AppLayout() {
             <HiOutlineMenu className="h-5 w-5" />
           </button>
 
-          <span className="truncate text-sm font-semibold text-ink 2xl:text-[15px]">
+          <span className="truncate text-sm font-semibold text-ink">
             {currentNavItem?.title ?? appName}
           </span>
 
@@ -269,7 +269,7 @@ function Sidebar({
             />
             <span
               className={cn(
-                'truncate text-[13px] font-bold tracking-tight text-ink 2xl:text-sm',
+                'truncate text-sm font-semibold tracking-tight text-ink',
                 collapsed && 'lg:hidden'
               )}
             >
@@ -301,7 +301,7 @@ function Sidebar({
               <div key={section.key} className={cn(sectionIndex > 0 && 'mt-4 2xl:mt-5')}>
                 <div
                   className={cn(
-                    'px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3',
+                    'px-3 pb-1.5 label',
                     collapsed && 'lg:hidden'
                   )}
                 >
@@ -325,36 +325,22 @@ function Sidebar({
                           aria-current={active ? 'page' : undefined}
                           title={collapsed ? item.title : undefined}
                           className={cn(
-                            'group relative flex min-h-[44px] items-center gap-3 rounded-control px-3 py-2.5 text-[13px] font-medium transition-colors duration-150 2xl:text-[14px]',
+                            'group relative flex min-h-[44px] items-center gap-3 rounded-control px-3 py-2.5 text-sm font-medium transition-colors duration-150',
                             active ? 'text-primary' : 'text-ink-2 hover:text-ink',
                             collapsed && 'lg:justify-center lg:px-0'
                           )}
                         >
-                          {active ? (
-                            <>
-                              <motion.span
-                                layoutId="sidebar-active-pill"
-                                className="absolute inset-0 rounded-control bg-primary-subtle"
-                                transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }}
-                                aria-hidden="true"
-                              />
-                              <motion.span
-                                layoutId="sidebar-active-rail"
-                                className="absolute left-0 top-1/2 -mt-2.5 h-5 w-[3px] rounded-r-full bg-primary"
-                                transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-                                aria-hidden="true"
-                              />
-                            </>
-                          ) : (
-                            <span
-                              className="absolute inset-0 rounded-control bg-transparent transition-colors duration-150 group-hover:bg-surface-2"
-                              aria-hidden="true"
-                            />
-                          )}
+                          <span
+                            className={cn(
+                              'absolute inset-0 rounded-control transition-colors duration-150',
+                              active ? 'bg-primary-subtle' : 'bg-transparent group-hover:bg-surface-2'
+                            )}
+                            aria-hidden="true"
+                          />
 
                           <Icon
                             className={cn(
-                              'relative z-10 h-[18px] w-[18px] shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 2xl:h-5 2xl:w-5',
+                              'relative z-10 h-[18px] w-[18px] shrink-0 2xl:h-5 2xl:w-5',
                               active && 'text-primary'
                             )}
                           />
@@ -370,7 +356,7 @@ function Sidebar({
                           {item.badge ? (
                             <span
                               className={cn(
-                                'relative z-10 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-ink-3',
+                                'relative z-10 rounded bg-surface-2 px-1.5 py-0.5 text-2xs font-medium text-ink-3',
                                 active && 'bg-surface',
                                 collapsed && 'lg:hidden'
                               )}
@@ -378,25 +364,6 @@ function Sidebar({
                               {item.badge}
                             </span>
                           ) : null}
-                          {active ? (
-                            <span
-                              className={cn(
-                                'relative z-10 ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary',
-                                collapsed && 'lg:hidden'
-                              )}
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <span
-                              className={cn(
-                                'relative z-10 ml-auto w-3 shrink-0 text-right text-[13px] text-ink-3 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100',
-                                collapsed && 'lg:hidden'
-                              )}
-                              aria-hidden="true"
-                            >
-                              →
-                            </span>
-                          )}
                         </Link>
                       </li>
                     )
@@ -433,7 +400,7 @@ function Sidebar({
               )}
             >
               <div className="relative shrink-0">
-                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-primary text-[11px] font-bold text-primary-on 2xl:h-10 2xl:w-10 2xl:text-xs">
+                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-primary text-2xs font-medium text-primary-on 2xl:h-10 2xl:w-10">
                   {avatarUrl ? (
                     <img
                       src={resolveLogoUrl(avatarUrl)}
@@ -444,17 +411,11 @@ function Sidebar({
                     initials(userName)
                   )}
                 </div>
-                <span
-                  className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-success"
-                  title="Sesi aktif"
-                >
-                  <span className="sr-only">Sesi aktif</span>
-                </span>
               </div>
               <div className={cn('min-w-0 flex-1', collapsed && 'lg:hidden')}>
                 <div
                   className={cn(
-                    'truncate text-[13px] font-semibold text-ink 2xl:text-sm',
+                    'truncate text-sm font-medium text-ink',
                     profileActive && 'text-primary'
                   )}
                 >
@@ -462,16 +423,6 @@ function Sidebar({
                 </div>
                 <div className="truncate text-xs text-ink-3">{userEmail}</div>
               </div>
-              <span
-                className={cn(
-                  'shrink-0 text-[13px] text-ink-3 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100',
-                  profileActive && 'text-primary opacity-100',
-                  collapsed && 'lg:hidden'
-                )}
-                aria-hidden="true"
-              >
-                →
-              </span>
             </Link>
             <button
               onClick={onLogout}

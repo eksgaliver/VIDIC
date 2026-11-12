@@ -38,12 +38,12 @@ export function PanelHeader({
       )}
     >
       <div className="min-w-0">
-        <h2 className="text-[15px] font-bold tracking-tight text-ink 2xl:text-base">{title}</h2>
-        {description ? <p className="mt-1 text-[13px] text-ink-2 2xl:text-sm">{description}</p> : null}
+        <h2 className="text-base font-semibold tracking-tight text-ink">{title}</h2>
+        {description ? <p className="mt-1 text-sm text-ink-2">{description}</p> : null}
       </div>
       {actions || meta ? (
         <div className="flex shrink-0 items-center gap-3">
-          {meta ? <span className="text-xs tabular text-ink-3 2xl:text-[13px]">{meta}</span> : null}
+          {meta ? <span className="text-xs tabular text-ink-3">{meta}</span> : null}
           {actions}
         </div>
       ) : null}
@@ -61,8 +61,8 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between 2xl:mb-8">
       <div className="max-w-2xl 2xl:max-w-4xl">
-        <h1 className="text-xl font-bold tracking-tightest text-ink sm:text-2xl 2xl:text-3xl">{title}</h1>
-        {description ? <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2 2xl:text-sm">{description}</p> : null}
+        <h1 className="text-2xl font-semibold tracking-tightest text-ink">{title}</h1>
+        {description ? <p className="mt-1.5 text-sm text-ink-2">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
     </div>
@@ -81,7 +81,7 @@ export function FormSection({ title, description, children, className }: FormSec
   return (
     <div className={cn('space-y-4 border-t border-line pt-5 first:border-0 first:pt-0', className)}>
       <div>
-        <h3 className="text-[13px] font-bold text-ink">{title}</h3>
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
         {description ? <p className="mt-1 text-xs leading-relaxed text-ink-2">{description}</p> : null}
       </div>
       {children}
@@ -106,9 +106,9 @@ export function DialogHeading({ title, description, actions, className }: Dialog
       )}
     >
       <div className="min-w-0 pr-10">
-        <h2 className="text-[15px] font-bold tracking-tight text-ink 2xl:text-base">{title}</h2>
+        <h2 className="text-base font-semibold tracking-tight text-ink">{title}</h2>
         {description ? (
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-2 2xl:text-sm">{description}</p>
+          <p className="mt-1 text-sm text-ink-2">{description}</p>
         ) : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}

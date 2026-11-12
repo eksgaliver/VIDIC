@@ -23,7 +23,7 @@ export const loginRoute = createRoute({
 })
 
 const inputClass =
-  'h-11 w-full rounded-control border border-line bg-surface pl-10 pr-3.5 text-[14px] text-ink transition-[border-color,background-color] duration-150 hover:border-line-strong focus:border-primary sm:h-10'
+  'h-11 w-full rounded-control border border-line bg-surface pl-10 pr-3.5 text-sm text-ink transition-[border-color,background-color] duration-150 hover:border-line-strong focus:border-primary sm:h-10'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -86,7 +86,7 @@ export function LoginPage() {
               alt=""
               className="hidden h-8 w-auto 2xl:h-9 dark:block"
             />
-            <span className="text-[15px] font-bold tracking-tight text-ink 2xl:text-base">{appName}</span>
+            <span className="text-sm font-semibold tracking-tight text-ink">{appName}</span>
           </div>
           <ThemeToggle />
         </div>
@@ -94,8 +94,8 @@ export function LoginPage() {
         <div className="flex flex-1 items-center justify-center py-8 2xl:py-12">
           <div className="w-full max-w-[390px] 2xl:max-w-[430px]">
             <div className="mb-7 2xl:mb-9">
-              <h1 className="text-2xl font-bold tracking-tightest text-ink 2xl:text-3xl">Masuk ke portal</h1>
-              <p className="mt-2 text-[13px] leading-relaxed text-ink-2 2xl:text-sm">
+              <h1 className="text-2xl font-semibold tracking-tightest text-ink">Masuk ke portal</h1>
+              <p className="mt-2 text-sm text-ink-2">
                 Sesi berlaku tujuh hari. Kredensial diverifikasi oleh layanan auth melalui gateway.
               </p>
             </div>
@@ -115,7 +115,7 @@ export function LoginPage() {
               <div>
                 <label
                   htmlFor="login-email"
-                  className="mb-1.5 block text-[13px] font-semibold text-ink-2"
+                  className="mb-1.5 block text-xs font-medium text-ink-2"
                 >
                   Alamat surel
                 </label>
@@ -129,7 +129,7 @@ export function LoginPage() {
                     placeholder="nama@perusahaan.co.id"
                     required
                     autoComplete="email"
-                    className={cn(inputClass, 'font-mono text-[13px]')}
+                    className={cn(inputClass, 'font-mono')}
                   />
                 </div>
               </div>
@@ -138,11 +138,11 @@ export function LoginPage() {
                 <div className="mb-1.5 flex items-baseline justify-between">
                   <label
                     htmlFor="login-password"
-                    className="block text-[13px] font-semibold text-ink-2"
+                    className="block text-xs font-medium text-ink-2"
                   >
                     Kata sandi
                   </label>
-                  <span className="text-[11px] text-ink-3">minimal 6 karakter</span>
+                  <span className="text-2xs text-ink-3">minimal 6 karakter</span>
                 </div>
                 <div className="relative">
                   <HiOutlineLockClosed className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-3" />
@@ -164,10 +164,10 @@ export function LoginPage() {
             </form>
 
             <div className="mt-6 rounded-control border border-line bg-surface px-3.5 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+              <p className="label">
                 Kredensial awal layanan auth
               </p>
-              <dl className="mt-2 space-y-1 text-[12px]">
+              <dl className="mt-2 space-y-1 text-xs">
                 <div className="flex justify-between gap-3">
                   <dt className="text-ink-2">Surel</dt>
                   <dd className="font-mono text-ink">admin@srikaya.id</dd>
@@ -177,14 +177,14 @@ export function LoginPage() {
                   <dd className="font-mono text-ink">rahasia123</dd>
                 </div>
               </dl>
-              <p className="mt-2 text-[11px] leading-snug text-ink-3">
+              <p className="mt-2 text-2xs leading-snug text-ink-3">
                 Berlaku setelah layanan auth dimulai ulang, selama profil belum diubah.
               </p>
             </div>
           </div>
         </div>
 
-        <p className="text-[11px] text-ink-3">
+        <p className="text-2xs text-ink-3">
           &copy; 2026 {appName} &middot; Layanan berjalan di Bun, antarmuka di Node.js
         </p>
       </div>
@@ -200,7 +200,7 @@ export function LoginPage() {
             <h2 className="text-2xl font-bold leading-snug tracking-tight">
               Portal operasional kehadiran
             </h2>
-            <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-white/85">
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/85">
               Satu tempat untuk mengatur badan usaha, titik geofence absensi, dan struktur departemen.
             </p>
           </div>

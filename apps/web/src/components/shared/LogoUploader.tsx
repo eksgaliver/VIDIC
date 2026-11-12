@@ -163,7 +163,7 @@ export function LogoUploader({
           ) : (
             <div className="flex flex-col items-center justify-center text-ink-3">
               <HiOutlinePhotograph className="h-8 w-8 stroke-[1.2]" />
-              <span className="text-[10px] font-medium">Belum ada</span>
+              <span className="text-2xs font-medium">Belum ada</span>
             </div>
           )}
 
@@ -219,7 +219,7 @@ export function LogoUploader({
             )}
           </div>
 
-          <p className="mt-1.5 text-[11px] text-ink-3">
+          <p className="mt-1.5 text-2xs text-ink-3">
             Format PNG, JPG, WEBP hingga 10 MB. Server Bun akan mengompresi otomatis ke format WebP HD (komputasi tinggi, tanpa kehilangan ketajaman).
           </p>
         </div>
@@ -227,7 +227,7 @@ export function LogoUploader({
 
       {/* Notifikasi Statistik Kompresi WebP */}
       {stats && (
-        <div className="flex items-center gap-1.5 rounded-md border border-success-line bg-success-subtle px-2.5 py-1 text-[11px] font-medium text-success">
+        <div className="flex items-center gap-1.5 rounded-md border border-success-line bg-success-subtle px-2.5 py-1 text-2xs font-medium text-success">
           <HiOutlineCheckCircle className="h-3.5 w-3.5 shrink-0" />
           <span>
             Terkonversi ke WebP: {(stats.compressedSize / 1024).toFixed(1)} KB (hemat {stats.compressionRatio}) · Resolusi {stats.width}×{stats.height} px
@@ -237,7 +237,7 @@ export function LogoUploader({
 
       {/* Notifikasi Galat */}
       {uploadError && (
-        <p className="text-[11px] font-medium text-error">{uploadError}</p>
+        <p className="text-2xs font-medium text-error">{uploadError}</p>
       )}
     </div>
   )

@@ -21,7 +21,7 @@ export function Badge({ tone = 'neutral', children, className }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-semibold leading-5',
+        'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-2xs font-medium leading-5',
         toneClass[tone],
         className
       )}
@@ -54,7 +54,7 @@ interface StatusProps {
 
 export function Status({ label, tone = 'success', className }: StatusProps) {
   return (
-    <span className={cn('inline-flex items-center gap-2 text-[13px] font-medium text-ink', className)}>
+    <span className={cn('inline-flex items-center gap-2 text-sm font-medium text-ink', className)}>
       <StatusDot tone={tone} />
       {label}
     </span>

@@ -185,9 +185,9 @@ export function AttendanceStatusMaster({
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-left text-[13px] 2xl:text-sm">
+            <table className="w-full min-w-[860px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">
+                <tr className="border-b border-line th">
                   <th className="px-4 py-2.5 font-semibold sm:px-5 2xl:px-7 2xl:py-3.5">Status</th>
                   <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Sifat</th>
                   <th className="px-4 py-2.5 font-semibold 2xl:py-3.5">Urutan</th>
@@ -202,7 +202,7 @@ export function AttendanceStatusMaster({
                     <td className="px-4 py-3.5 align-top sm:px-5 2xl:px-7 2xl:py-4">
                       <div className="flex items-center gap-2">
                         <AttendanceStatusBadge status={item} />
-                        <span className="font-mono text-[11px] text-ink-3">{item.code}</span>
+                        <span className="font-mono text-2xs text-ink-3">{item.code}</span>
                         {item.isSystem ? <Badge tone="accent">Sistem</Badge> : null}
                       </div>
                       {item.description ? (
@@ -332,7 +332,7 @@ export function AttendanceStatusMaster({
                   aria-label="Warna khusus"
                   className="h-7 w-10 cursor-pointer rounded border border-line bg-surface p-0.5"
                 />
-                <span className="font-mono text-[11px] text-ink-3">{draft.color}</span>
+                <span className="font-mono text-2xs text-ink-3">{draft.color}</span>
               </div>
             </div>
 

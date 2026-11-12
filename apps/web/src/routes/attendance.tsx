@@ -479,7 +479,7 @@ function SummaryTile({
 
   return (
     <div className="px-4 py-3.5 sm:px-5 2xl:px-6 2xl:py-4">
-      <dt className="text-[11px] uppercase tracking-wide text-ink-3 2xl:text-xs">{label}</dt>
+      <dt className="text-2xs text-ink-3">{label}</dt>
       <dd className={cn('tabular mt-1 text-xl font-bold 2xl:text-2xl', toneClass)}>{value}</dd>
     </div>
   )

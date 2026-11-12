@@ -10,7 +10,7 @@ export const insertCompanySchema = createInsertSchema(companies, {
   email: (schema) => schema.email('Alamat surel tidak valid'),
   phone: (schema) => schema.max(50, 'Nomor telepon maksimal 50 karakter').optional(),
   industry: (schema) => schema.max(100, 'Sektor industri maksimal 100 karakter').optional(),
-  website: (schema) => schema.url('Tautan situs web tidak valid').optional().or(schema.literal('')),
+  website: (schema) => schema.url('Tautan situs web tidak valid').or(z.literal('')).optional(),
   status: (schema) => z.enum(['active', 'suspended', 'inactive']).default('active')
 }).omit({
   id: true,

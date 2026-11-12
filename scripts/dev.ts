@@ -1,8 +1,10 @@
 import { spawn, type Subprocess } from 'bun'
+import { appName, webEnv } from '../services/auth/src/lib/app-env'
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
-const appName = process.env.APP_NAME || 'Srikaya Enterprise'
+// Nama aplikasi dan API URL dibaca dari env Vite (apps/web/.env) supaya
+// orkestrator, layanan Bun, dan antarmuka web memakai nilai yang sama.
 const authPort = Number(process.env.AUTH_SERVICE_PORT || 3001)
 const shiftingPort = Number(process.env.SHIFTING_SERVICE_PORT || 3003)
 const storagePort = Number(process.env.STORAGE_SERVICE_PORT || 3002)
@@ -84,8 +86,8 @@ const services: ServiceConfig[] = [
       CLIENT_PORT: String(clientPort),
       VITE_PORT: String(clientPort),
       PORT: String(clientPort),
-      VITE_APP_NAME: process.env.VITE_APP_NAME || appName,
-      VITE_API_URL: process.env.VITE_API_URL || `http://localhost:${gatewayPort}/api`
+      VITE_APP_NAME: appName,
+      VITE_API_URL: webEnv.VITE_API_URL || `http://localhost:${gatewayPort}/api`
     }
   }
 ]

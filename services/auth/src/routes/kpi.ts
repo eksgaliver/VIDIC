@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia'
-import { and, desc, eq, sql, inArray } from 'drizzle-orm'
+import { and, desc, eq, sql, inArray, isNotNull } from 'drizzle-orm'
 import { jwt } from '@elysiajs/jwt'
 import { db } from '../db'
 import {
@@ -1238,4 +1238,28 @@ export const kpiRoutes = new Elysia({ prefix: '/kpi' })
       }),
     }
   )
+
+  // 14. Daftar Jabatan Pengguna Terdaftar (sumber pilihan Target Jabatan indikator)
+  .get('/positions', async ({ query }) => {
+    try {
+      const conditions = [isNotNull(users.position)]
+      if (query.companyId) {
+        conditions.push(eq(users.companyId, query.companyId))
+      }
+
+      const rows = await db
+        .selectDistinct({ position: users.position })
+        .from(users)
+        .where(and(...conditions))
+        .orderBy(users.position)
+
+      const positions = rows
+        .map((row) => row.position?.trim())
+        .filter((value): value is string => Boolean(value))
+
+      return { success: true, data: positions }
+    } catch {
+      return { success: true, data: [] }
+    }
+  })
 

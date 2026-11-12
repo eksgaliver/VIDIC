@@ -5,13 +5,13 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react'
-import { HiOutlineChevronDown } from 'react-icons/hi'
 import { cn } from '@/lib/utils'
+import { Select } from './Select'
 
 const controlBase =
-  'w-full rounded-control border border-line bg-surface px-3 text-[13px] text-ink transition-[border-color,background-color] duration-150 hover:border-line-strong focus:border-primary disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3'
+  'w-full rounded-control border border-line bg-surface px-3 text-sm text-ink transition-[border-color,background-color] duration-150 hover:border-line-strong focus:border-primary disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3'
 
-const labelBase = 'block text-xs font-semibold text-ink-2'
+const labelBase = 'block text-xs font-medium text-ink-2'
 
 function RequiredMark({ shown }: { shown: boolean }) {
   if (!shown) return null
@@ -39,7 +39,7 @@ function FieldShell({ label, htmlFor, required, hint, className, children }: She
         <RequiredMark shown={!!required} />
       </label>
       {children}
-      {hint ? <p className="text-[11px] leading-snug text-ink-3">{hint}</p> : null}
+      {hint ? <p className="text-xs leading-snug text-ink-3">{hint}</p> : null}
     </div>
   )
 }
@@ -129,11 +129,11 @@ export function CheckboxField({ label, hint, id, className, ...rest }: CheckboxF
           className="h-4 w-4 shrink-0 cursor-pointer rounded-sm border border-line-strong bg-surface accent-[var(--primary)]"
           {...rest}
         />
-        <label htmlFor={inputId} className="cursor-pointer text-[13px] font-medium text-ink">
+        <label htmlFor={inputId} className="cursor-pointer text-sm font-medium text-ink">
           {label}
         </label>
       </div>
-      {hint ? <p className="pl-[26px] text-[11px] leading-snug text-ink-3">{hint}</p> : null}
+      {hint ? <p className="pl-[26px] text-xs leading-snug text-ink-3">{hint}</p> : null}
     </div>
   )
 }
@@ -146,33 +146,23 @@ export interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement
   children: ReactNode
 }
 
-export function SelectField({
-  label,
-  hint,
-  required,
-  className,
-  selectClassName,
-  children,
-  ...rest
-}: SelectFieldProps) {
+export function SelectField(props: SelectFieldProps) {
   const id = useId()
+  const { label, hint, required, className, selectClassName, children, value, defaultValue, onChange, disabled, name } = props
+
   return (
     <FieldShell label={label} htmlFor={id} required={required} hint={hint} className={className}>
-      <div className="relative">
-        <select
-          id={id}
-          required={required}
-          className={cn(
-            controlBase,
-            'h-10 cursor-pointer appearance-none pr-9 sm:h-9',
-            selectClassName
-          )}
-          {...rest}
-        >
-          {children}
-        </select>
-        <HiOutlineChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
-      </div>
+      <Select
+        id={id}
+        name={name}
+        value={value as string | number | undefined}
+        defaultValue={defaultValue as string | number | undefined}
+        onChange={onChange}
+        disabled={disabled}
+        className={selectClassName}
+      >
+        {children}
+      </Select>
     </FieldShell>
   )
 }

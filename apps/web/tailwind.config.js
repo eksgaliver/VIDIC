@@ -29,6 +29,11 @@ export default {
       fhd: '1920px',
     },
     extend: {
+      // Tangga ukuran tunggal. Tidak ada teks di bawah 11px, dan tidak ada
+      // ukuran arbitrer seperti text-[10px] / text-[13px] di komponen.
+      fontSize: {
+        '2xs': ['0.6875rem', { lineHeight: '1rem' }]
+      },
       colors: {
         // Token permukaan & tinta dari CSS variables
         app: 'var(--app)',
@@ -91,6 +96,7 @@ export default {
       },
       letterSpacing: {
         tightest: '-0.02em',
+        label: '0.01em'
       },
       transitionTimingFunction: {
         out: 'cubic-bezier(0.22, 1, 0.36, 1)',

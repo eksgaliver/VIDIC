@@ -34,6 +34,7 @@ import {
   Notice,
   PageHeader,
   Panel,
+  Select,
   SelectField,
   TextAreaField,
   TextField,
@@ -113,6 +114,7 @@ export function KpiPage() {
   const [summaryData, setSummaryData] = React.useState<KpiSummaryData | null>(null)
   const [myKpiData, setMyKpiData] = React.useState<MyKpiData | null>(null)
   const [taskQueue, setTaskQueue] = React.useState<EmployeeKpiTask[]>([])
+  const [positions, setPositions] = React.useState<string[]>([])
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = React.useState<string>('all')
 
   // Expanded State untuk Accordion Karyawan di Dasbor Admin
@@ -260,6 +262,22 @@ export function KpiPage() {
     }
   }, [user?.companyId])
 
+  // Muat Daftar Jabatan Pengguna Terdaftar
+  const loadPositions = React.useCallback(async () => {
+    try {
+      let endpoint = `${getBaseUrl()}/api/kpi/positions`
+      if (user?.companyId) endpoint += `?companyId=${user.companyId}`
+
+      const res = await fetch(endpoint)
+      const json = await res.json()
+      if (json.success && Array.isArray(json.data)) {
+        setPositions(json.data)
+      }
+    } catch {
+      // Abaikan galat jaringan
+    }
+  }, [user?.companyId])
+
   // Muat Lembar KPI Karyawan Pribadi
   const loadMyKpi = React.useCallback(async () => {
     if (!token) return
@@ -285,11 +303,11 @@ export function KpiPage() {
     setIsLoading(true)
     setErrorMsg(null)
     try {
-      await Promise.all([loadPeriods(), loadAdminSummary(), loadTaskQueue(), loadMyKpi()])
+      await Promise.all([loadPeriods(), loadAdminSummary(), loadTaskQueue(), loadMyKpi(), loadPositions()])
     } finally {
       setIsLoading(false)
     }
-  }, [loadPeriods, loadAdminSummary, loadTaskQueue, loadMyKpi])
+  }, [loadPeriods, loadAdminSummary, loadTaskQueue, loadMyKpi, loadPositions])
 
   React.useEffect(() => {
     refreshAll()
@@ -614,6 +632,14 @@ export function KpiPage() {
     return summaryData.departments.filter((d) => d.id === selectedDepartmentFilter)
   }, [summaryData, selectedDepartmentFilter])
 
+  // Pilihan Target Jabatan: jabatan pengguna terdaftar + nilai yang sedang diedit
+  const positionOptions = React.useMemo(() => {
+    const list = [...positions]
+    const current = itemForm.targetPosition.trim()
+    if (current && !list.includes(current)) list.push(current)
+    return list.sort((a, b) => a.localeCompare(b, 'id'))
+  }, [positions, itemForm.targetPosition])
+
   const activePeriodObj = summaryData?.activePeriod || periods.find((p) => p.id === selectedPeriodId)
 
   return (
@@ -709,17 +735,18 @@ export function KpiPage() {
         {periods.length > 1 && (
           <div className="flex items-center gap-2">
             <span className="text-ink-3">Ganti Periode:</span>
-            <select
+            <Select
               value={selectedPeriodId}
               onChange={(e) => setSelectedPeriodId(e.target.value)}
-              className="rounded-control border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-primary"
+              className="w-56"
+              isSearchable={false}
             >
               {periods.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.status === 'active' ? 'Aktif' : 'Tutup'})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
       </div>
@@ -768,7 +795,7 @@ export function KpiPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-ink-3">Antrean Verifikasi Tugas</span>
                 {taskQueue.length > 0 && (
-                  <span className="rounded-full bg-warning-subtle px-2 py-0.5 text-[10px] font-bold text-warning">
+                  <span className="rounded-full bg-warning-subtle px-2 py-0.5 text-2xs font-bold text-warning">
                     Perlu Tindakan
                   </span>
                 )}
@@ -821,7 +848,7 @@ export function KpiPage() {
             >
               <span>Antrean Verifikasi Tugas Mandiri</span>
               {taskQueue.length > 0 && (
-                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-2xs font-bold text-primary">
                   {taskQueue.length}
                 </span>
               )}
@@ -873,11 +900,11 @@ export function KpiPage() {
                         <span className="font-mono text-xs font-bold text-ink-3">[{dept.code}]</span>
                         <h2 className="text-base font-bold text-ink">{dept.name}</h2>
                         {dept.isBalanced ? (
-                          <span className="rounded-full bg-success-subtle px-2 py-0.5 text-[10px] font-semibold text-success">
+                          <span className="rounded-full bg-success-subtle px-2 py-0.5 text-2xs font-semibold text-success">
                             ✓ Total Bobot 100% Seimbang
                           </span>
                         ) : (
-                          <span className="rounded-full bg-warning-subtle px-2 py-0.5 text-[10px] font-semibold text-warning">
+                          <span className="rounded-full bg-warning-subtle px-2 py-0.5 text-2xs font-semibold text-warning">
                             Total Bobot {dept.totalWeight}% (Perlu Diseimbangkan)
                           </span>
                         )}
@@ -908,7 +935,7 @@ export function KpiPage() {
                     {/* BAGIAN A: DAFTAR INDIKATOR SASARAN DIVISI */}
                     <div>
                       <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                        <h3 className="text-sm font-medium text-ink">
                           Indikator Sasaran Divisi ({dept.kpiItems.length} Indikator)
                         </h3>
                         <span className="text-xs text-ink-3">
@@ -952,7 +979,7 @@ export function KpiPage() {
                                     <td className="px-4 py-3">
                                       <div className="font-semibold text-ink">{item.title}</div>
                                       {item.description && (
-                                        <div className="text-[11px] text-ink-3 line-clamp-1">
+                                        <div className="text-2xs text-ink-3 line-clamp-1">
                                           {item.description}
                                         </div>
                                       )}
@@ -1006,7 +1033,7 @@ export function KpiPage() {
                     {/* BAGIAN B: LEMBAR EVALUASI KARYAWAN DI DIVISI INI */}
                     <div className="pt-2">
                       <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                        <h3 className="text-sm font-medium text-ink">
                           Karyawan & Lembar Evaluasi ({dept.assessments.length} Orang)
                         </h3>
                         <span className="text-xs text-ink-3">
@@ -1088,7 +1115,7 @@ export function KpiPage() {
                                           style={{ width: `${Math.min(100, scoreNum)}%` }}
                                         />
                                       </div>
-                                      <div className="mt-1 text-right text-[10px] font-mono text-ink-3">
+                                      <div className="mt-1 text-right text-2xs font-mono text-ink-3">
                                         {scoreNum.toFixed(1)}% Capaian
                                       </div>
                                     </div>
@@ -1133,7 +1160,7 @@ export function KpiPage() {
                                             <tr key={empItem.id} className="hover:bg-surface-2/30">
                                               <td className="px-3.5 py-2.5">
                                                 <div className="font-semibold text-ink">{empItem.title}</div>
-                                                <div className="text-[11px] text-ink-3">
+                                                <div className="text-2xs text-ink-3">
                                                   Satuan: {empItem.measurementUnit}
                                                 </div>
                                               </td>
@@ -1169,7 +1196,7 @@ export function KpiPage() {
                                                     setAdjustingItem(empItem)
                                                     setManualActualValue(String(empItem.actualValue))
                                                   }}
-                                                  className="rounded-md border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-2 hover:bg-surface-2 hover:text-ink"
+                                                  className="rounded-md border border-line bg-surface px-2.5 py-1 text-2xs font-semibold text-ink-2 hover:bg-surface-2 hover:text-ink"
                                                 >
                                                   Sesuaikan Nilai
                                                 </button>
@@ -1232,20 +1259,20 @@ export function KpiPage() {
                         <tr key={task.id} className="hover:bg-surface-2/40 transition-colors">
                           <td className="px-4 py-3.5">
                             <div className="font-bold text-ink">{task.employeeName}</div>
-                            <div className="text-[11px] text-ink-3">
+                            <div className="text-2xs text-ink-3">
                               {task.departmentName} • {task.employeePosition || 'Staf'}
                             </div>
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="font-semibold text-ink">{task.itemTitle}</div>
-                            <div className="text-[11px] text-ink-3">
+                            <div className="text-2xs text-ink-3">
                               Target: {formatNumber(task.targetValue)} {task.measurementUnit}
                             </div>
                           </td>
                           <td className="px-4 py-3.5 max-w-xs">
                             <div className="font-semibold text-ink">{task.title}</div>
                             {task.notes && (
-                              <div className="text-[11px] text-ink-2 line-clamp-2 mt-0.5">
+                              <div className="text-2xs text-ink-2 line-clamp-2 mt-0.5">
                                 {task.notes}
                               </div>
                             )}
@@ -1261,7 +1288,7 @@ export function KpiPage() {
                               <button
                                 type="button"
                                 onClick={() => setPreviewEvidenceUrl(task.evidenceUrl!)}
-                                className="inline-flex items-center gap-1 rounded-md border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary-subtle"
+                                className="inline-flex items-center gap-1 rounded-md border border-line bg-surface px-2.5 py-1 text-2xs font-semibold text-primary hover:bg-primary-subtle"
                               >
                                 <HiOutlineDocumentText className="h-3.5 w-3.5" />
                                 Lihat Bukti
@@ -1539,8 +1566,8 @@ export function KpiPage() {
           title="Ajukan Bukti Tugas Mandiri (*Task Submission*)"
           description="Laporkan tugas atau pekerjaan yang telah Anda selesaikan beserta lampiran dokumen bukti ke cloud storage S3 untuk diverifikasi penilai KPI."
         />
-        <form onSubmit={handleSubmitTask}>
-          <DialogBody className="space-y-4">
+        <form onSubmit={handleSubmitTask} className="flex min-h-0 flex-1 flex-col">
+          <DialogBody className="space-y-5 px-4 py-5 sm:px-5">
             {/* Pilihan Indikator Sasaran */}
             <SelectField
               label="Indikator Sasaran KPI"
@@ -1604,7 +1631,7 @@ export function KpiPage() {
                       <HiOutlineCheck className="h-4 w-4" />
                       <span>Berkas tersimpan di S3</span>
                     </div>
-                    <div className="font-mono text-[11px] text-ink-3 truncate max-w-sm mx-auto">
+                    <div className="font-mono text-2xs text-ink-3 truncate max-w-sm mx-auto">
                       {taskForm.evidenceUrl}
                     </div>
                     <button
@@ -1635,7 +1662,7 @@ export function KpiPage() {
                       <HiOutlineUpload className="h-4 w-4" />
                       {isUploadingEvidence ? 'Mengunggah ke S3...' : 'Pilih Berkas Lampiran (S3)'}
                     </label>
-                    <p className="mt-1 text-[11px] text-ink-3">
+                    <p className="mt-1 text-2xs text-ink-3">
                       Mendukung PDF, Foto JPG/PNG, Dokumen Word, atau ZIP (Maks 20 MB).
                     </p>
                   </div>
@@ -1665,8 +1692,8 @@ export function KpiPage() {
           title="Pengaturan Periode Evaluasi & Grace Period"
           description="Atur rentang waktu evaluasi kinerja secara fleksibel, termasuk toleransi waktu perpanjangan (Grace Period) untuk karyawan."
         />
-        <form onSubmit={handleSavePeriod}>
-          <DialogBody className="space-y-4">
+        <form onSubmit={handleSavePeriod} className="flex min-h-0 flex-1 flex-col">
+          <DialogBody className="space-y-5 px-4 py-5 sm:px-5">
             <TextField
               label="Nama Periode Evaluasi"
               required
@@ -1739,8 +1766,8 @@ export function KpiPage() {
           title={editingItem ? 'Edit Indikator Sasaran Divisi' : 'Tambah Indikator Sasaran Divisi'}
           description="Tentukan butir capaian kinerja terukur, target kuantitatif, dan bobot persentase penilaian."
         />
-        <form onSubmit={handleSaveItem}>
-          <DialogBody className="space-y-4">
+        <form onSubmit={handleSaveItem} className="flex min-h-0 flex-1 flex-col">
+          <DialogBody className="space-y-5 px-4 py-5 sm:px-5">
             {!editingItem && (
               <SelectField
                 label="Divisi / Departemen"
@@ -1764,7 +1791,7 @@ export function KpiPage() {
               onChange={(e) => setItemForm({ ...itemForm, title: e.target.value })}
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <SelectField
                 label="Kategori Sasaran"
                 value={itemForm.category}
@@ -1786,7 +1813,7 @@ export function KpiPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField
                 label="Target Nilai"
                 required
@@ -1809,12 +1836,23 @@ export function KpiPage() {
               />
             </div>
 
-            <TextField
+            <SelectField
               label="Target Jabatan / Posisi Khusus (Opsional)"
-              placeholder="Kosongkan jika berlaku untuk seluruh staf divisi"
+              hint={
+                positionOptions.length > 0
+                  ? 'Pilihan diambil dari jabatan pengguna yang terdaftar di perusahaan ini.'
+                  : 'Belum ada jabatan terdaftar. Isi posisi pada data karyawan terlebih dahulu.'
+              }
               value={itemForm.targetPosition}
               onChange={(e) => setItemForm({ ...itemForm, targetPosition: e.target.value })}
-            />
+            >
+              <option value="">Semua jabatan divisi</option>
+              {positionOptions.map((position) => (
+                <option key={position} value={position}>
+                  {position}
+                </option>
+              ))}
+            </SelectField>
 
             <TextAreaField
               label="Panduan / Rumus Evaluasi"
@@ -1846,7 +1884,7 @@ export function KpiPage() {
           title="Verifikasi Tugas Mandiri Karyawan"
           description="Tinjau kesesuaian bukti kerja. Menyetujui tugas akan menambahkan nilai progres ke realisasi KPI karyawan."
         />
-        <DialogBody className="space-y-4">
+        <DialogBody className="space-y-4 px-4 py-5 sm:px-5">
           {reviewingTask && (
             <div className="rounded-lg border border-line bg-surface-2/40 p-3.5 space-y-1.5 text-xs">
               <div>
@@ -1924,8 +1962,8 @@ export function KpiPage() {
           title="Sesuaikan Nilai Realisasi Capaian"
           description="Ubah nilai capaian riil secara langsung. Skor terbobot dan predikat akhir karyawan akan dihitung ulang secara otomatis."
         />
-        <form onSubmit={handleSaveManualActual}>
-          <DialogBody className="space-y-4">
+        <form onSubmit={handleSaveManualActual} className="flex min-h-0 flex-1 flex-col">
+          <DialogBody className="space-y-5 px-4 py-5 sm:px-5">
             {adjustingItem && (
               <div className="rounded-lg border border-line bg-surface-2/40 p-3 text-xs space-y-1">
                 <div className="font-bold text-ink">{adjustingItem.title}</div>
@@ -1966,7 +2004,7 @@ export function KpiPage() {
           title="Pratinjau Berkas Bukti Tugas (S3)"
           description="Lampiran dokumen kerja yang disimpan pada Cloud Object Storage."
         />
-        <DialogBody>
+        <DialogBody className="px-4 py-5 sm:px-5">
           {previewEvidenceUrl && (
             <div className="space-y-3">
               <div className="max-h-[60vh] flex items-center justify-center overflow-auto rounded-lg bg-surface-2 p-2">
@@ -1980,7 +2018,7 @@ export function KpiPage() {
                   <div className="py-12 text-center text-xs text-ink-3 space-y-2">
                     <HiOutlineDocumentText className="mx-auto h-12 w-12 text-primary" />
                     <p className="font-medium text-ink">Dokumen Lampiran (Format Dokumen / PDF)</p>
-                    <p className="text-[11px] font-mono">{previewEvidenceUrl}</p>
+                    <p className="text-2xs font-mono">{previewEvidenceUrl}</p>
                   </div>
                 )}
               </div>

@@ -142,7 +142,7 @@ export function OperationalAreaSelector({
       {!readOnly && (
         <div className="rounded-control border border-line bg-surface p-4 shadow-1">
           <div className="mb-3">
-            <h4 className="text-[13px] font-bold text-ink">
+            <h4 className="text-sm font-bold text-ink">
               Pilih Wilayah & Kota Operasional di Indonesia
             </h4>
             <p className="mt-0.5 text-xs text-ink-2">
@@ -152,14 +152,14 @@ export function OperationalAreaSelector({
 
           {/* Filter Kepulauan Indonesia */}
           <div className="mb-3 flex flex-wrap items-center gap-1.5 border-b border-line pb-2.5">
-            <span className="text-[11px] font-semibold text-ink-3">Wilayah:</span>
+            <span className="text-2xs font-semibold text-ink-3">Wilayah:</span>
             {['Semua', 'Jawa', 'Sumatera', 'Bali-NusaTenggara', 'Kalimantan', 'Sulawesi', 'Maluku-Papua'].map(
               (island) => (
                 <button
                   key={island}
                   type="button"
                   onClick={() => setIslandFilter(island)}
-                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                  className={`rounded-md px-2 py-0.5 text-2xs font-medium transition-colors ${
                     islandFilter === island
                       ? 'bg-primary text-primary-on font-semibold'
                       : 'bg-surface-2 text-ink-2 hover:bg-line hover:text-ink'
@@ -200,9 +200,9 @@ export function OperationalAreaSelector({
                     >
                       <span className="truncate">{prov.name}</span>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] text-ink-3">({prov.timezoneLabel})</span>
+                        <span className="text-2xs text-ink-3">({prov.timezoneLabel})</span>
                         {countInProv > 0 && (
-                          <span className="rounded-full bg-primary/20 px-1.5 py-0.2 text-[10px] font-bold text-primary">
+                          <span className="rounded-full bg-primary/20 px-1.5 py-0.2 text-2xs font-bold text-primary">
                             {countInProv}
                           </span>
                         )}
@@ -219,7 +219,7 @@ export function OperationalAreaSelector({
                 <label className="block text-xs font-semibold text-ink-2">
                   Kota di <span className="font-bold text-primary">{activeProvince.name}</span>
                 </label>
-                <div className="flex items-center gap-1.5 text-[11px]">
+                <div className="flex items-center gap-1.5 text-2xs">
                   <button
                     type="button"
                     onClick={handleSelectAllCities}
@@ -282,7 +282,7 @@ export function OperationalAreaSelector({
       {/* 2. Ringkasan Wilayah Operasional Terpilih */}
       <div className="rounded-control border border-line bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
-          <h4 className="text-[13px] font-bold text-ink">
+          <h4 className="text-sm font-bold text-ink">
             Daftar Cakupan Operasional ({groupedSummary.length} Provinsi, {value.length} Kota/Kabupaten)
           </h4>
           {value.length > 0 && !readOnly && (
@@ -309,7 +309,7 @@ export function OperationalAreaSelector({
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-ink">{provName}</span>
-                    <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-bold text-primary border border-primary/20">
+                    <span className="rounded bg-surface px-1.5 py-0.5 text-2xs font-bold text-primary border border-primary/20">
                       {cities.length} Kota Operasional
                     </span>
                   </div>
@@ -322,7 +322,7 @@ export function OperationalAreaSelector({
                         )
                         onChange(remaining)
                       }}
-                      className="text-[11px] font-medium text-error hover:underline"
+                      className="text-2xs font-medium text-error hover:underline"
                       title="Hapus seluruh kota di provinsi ini"
                     >
                       Hapus Provinsi

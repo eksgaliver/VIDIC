@@ -192,12 +192,12 @@ export function AvatarUploader({ user, disabled = false, onUpdated }: AvatarUplo
           )}
         </div>
 
-        <p className="text-[11px] leading-snug text-ink-3">
+        <p className="text-2xs leading-snug text-ink-3">
           PNG, JPG, atau WEBP hingga 10 MB. Server memotong ke rasio 1:1, lalu mengompres ke WebP.
         </p>
 
-        {successMsg && <p className="text-[11px] font-medium text-success">{successMsg}</p>}
-        {errorMsg && <p className="text-[11px] font-medium text-error">{errorMsg}</p>}
+        {successMsg && <p className="text-2xs font-medium text-success">{successMsg}</p>}
+        {errorMsg && <p className="text-2xs font-medium text-error">{errorMsg}</p>}
       </div>
 
       <input

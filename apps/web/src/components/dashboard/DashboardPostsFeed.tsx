@@ -230,7 +230,7 @@ export function DashboardPostsFeed() {
                         <span className="font-bold text-amber-600 dark:text-amber-400">★</span>
                         <span>Pengumuman Prioritas · Disematkan Manajemen</span>
                       </div>
-                      <span className="text-[11px] font-normal opacity-75">Wajib Dibaca</span>
+                      <span className="text-2xs font-normal opacity-75">Wajib Dibaca</span>
                     </div>
                   ) : null}
 
@@ -254,13 +254,13 @@ export function DashboardPostsFeed() {
                         {/* Nama & Penanda Waktu */}
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-[13px] text-ink truncate">
+                            <span className="font-semibold text-sm text-ink truncate">
                               {post.author?.name || 'Karyawan'}
                             </span>
                             {(post.author?.role === 'admin' ||
                               post.author?.position?.toLowerCase().includes('hr')) ? (
                               <span
-                                className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-blue-600 text-surface text-[9px] font-bold"
+                                className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-blue-600 text-surface text-2xs font-bold"
                                 title="Terverifikasi Manajemen"
                               >
                                 ✓
@@ -272,7 +272,7 @@ export function DashboardPostsFeed() {
                             </span>
                           </div>
 
-                          <div className="text-[11px] text-ink-3 truncate">
+                          <div className="text-2xs text-ink-3 truncate">
                             {post.author?.position || 'Staf'}
                             {post.author?.department?.name ? ` · ${post.author.department.name}` : ''}
                           </div>
@@ -288,11 +288,11 @@ export function DashboardPostsFeed() {
                     {/* Konten Postingan */}
                     <div className="space-y-1.5">
                       {post.title ? (
-                        <h4 className="text-sm sm:text-base font-bold text-ink tracking-tight leading-snug">
+                        <h4 className="text-base font-semibold text-ink tracking-tight leading-snug">
                           {post.title}
                         </h4>
                       ) : null}
-                      <p className="text-[13px] sm:text-sm text-ink-2 whitespace-pre-wrap leading-relaxed line-clamp-4">
+                      <p className="text-sm text-ink-2 whitespace-pre-wrap leading-relaxed line-clamp-4">
                         {post.content}
                       </p>
                     </div>

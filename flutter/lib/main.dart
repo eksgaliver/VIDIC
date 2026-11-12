@@ -1,29 +1,22 @@
 import 'package:flutter/material.dart';
-import 'screens/welcome_screen.dart';
-import 'screens/login_screen.dart';
+
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SrikayaMobileApp());
+  runApp(const SrikayaApp());
 }
 
-class SrikayaMobileApp extends StatelessWidget {
-  const SrikayaMobileApp({super.key});
+class SrikayaApp extends StatelessWidget {
+  const SrikayaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Srikaya Mobile Testing',
+      title: 'Srikaya',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const WelcomeScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomeScreen(),
-      },
+      theme: AppTheme.light,
+      home: const HomeScreen(),
     );
   }
 }
