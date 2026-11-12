@@ -5,6 +5,15 @@ import {
 } from 'react-icons/hi'
 import { Panel, PanelHeader } from '@/components/base'
 
+// Ambil base URL gateway dari environment (sama dengan lib/api.ts)
+const getBaseUrl = (): string => {
+  const configured = import.meta.env.VITE_API_URL
+  if (configured) {
+    try { return new URL(configured).origin } catch { /* ignore */ }
+  }
+  return window.location.origin
+}
+
 export interface HolidayItem {
   date: string // "YYYY-MM-DD"
   day: string // "Kamis", "Jumat", etc.
@@ -111,7 +120,7 @@ export function HolidayCalendar2026() {
   // Sinkronisasi data API
   const fetchHolidayData = React.useCallback(async () => {
     try {
-      const response = await fetch('https://tanggalmerah.upset.dev/api/holidays?year=2026')
+      const response = await fetch(`${getBaseUrl()}/api/utilities/holidays?year=2026`)
       if (!response.ok) throw new Error(`HTTP error ${response.status}`)
       const json = await response.json()
       if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -233,7 +242,7 @@ export function HolidayCalendar2026() {
               {MONTH_NAMES[activeMonthIndex]} {currentYear}
             </h4>
             {activeMonthHolidays.length > 0 ? (
-              <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-600 dark:text-rose-400">
+              <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-2xs font-semibold text-rose-600 dark:text-rose-400">
                 {activeMonthHolidays.length} libur
               </span>
             ) : null}
@@ -248,7 +257,7 @@ export function HolidayCalendar2026() {
                 setActiveMonthIndex(m)
                 setSelectedDate(todayStr)
               }}
-              className="rounded px-2 py-1 text-[11px] font-medium text-ink-2 hover:bg-surface-2 transition-colors cursor-pointer"
+              className="rounded px-2 py-1 text-2xs font-medium text-ink-2 hover:bg-surface-2 transition-colors cursor-pointer"
             >
               Hari ini
             </button>
@@ -274,7 +283,7 @@ export function HolidayCalendar2026() {
         {/* Matriks Kalender Minimalis */}
         <div className="space-y-1">
           {/* Header Hari */}
-          <div className="grid grid-cols-7 text-center text-[11px] font-medium text-ink-3">
+          <div className="grid grid-cols-7 text-center text-2xs font-medium text-ink-3">
             {DAY_LABELS.map((label, idx) => (
               <div
                 key={label}
@@ -372,7 +381,7 @@ export function HolidayCalendar2026() {
           {/* Daftar Ringkas Libur Bulan Ini */}
           {activeMonthHolidays.length > 0 ? (
             <div className="rounded-lg bg-surface-2/60 p-2.5 space-y-1.5">
-              <p className="text-[11px] font-semibold text-ink-2">
+              <p className="text-2xs font-semibold text-ink-2">
                 Hari libur di bulan {MONTH_NAMES[activeMonthIndex]}:
               </p>
               <div className="space-y-1">
@@ -380,13 +389,13 @@ export function HolidayCalendar2026() {
                   <div
                     key={h.date}
                     onClick={() => setSelectedDate(h.date)}
-                    className="flex items-center justify-between text-[11px] hover:text-primary cursor-pointer transition-colors"
+                    className="flex items-center justify-between text-2xs hover:text-primary cursor-pointer transition-colors"
                   >
                     <span className="truncate text-ink-2 font-medium">
                       • {h.date.slice(8, 10)} {MONTH_NAMES[activeMonthIndex].slice(0, 3)}: {h.name}
                     </span>
                     <span
-                      className={`ml-2 shrink-0 rounded px-1 text-[9px] font-bold ${
+                      className={`ml-2 shrink-0 rounded px-1 text-2xs font-bold ${
                         h.type === 'holiday'
                           ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
                           : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
@@ -399,13 +408,13 @@ export function HolidayCalendar2026() {
               </div>
             </div>
           ) : (
-            <p className="text-[11px] text-ink-3 italic">
+            <p className="text-2xs text-ink-3">
               Tidak ada hari libur nasional atau cuti bersama di bulan {MONTH_NAMES[activeMonthIndex]}.
             </p>
           )}
 
           {/* Legenda Titik Minimalis */}
-          <div className="flex items-center gap-3 text-[11px] text-ink-3 pt-1">
+          <div className="flex items-center gap-3 text-2xs text-ink-3 pt-1">
             <span className="inline-flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> Libur Nasional
             </span>

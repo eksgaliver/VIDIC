@@ -34,3 +34,53 @@
 - Perform surgical edits via targeted line changes rather than rewrites.
 - Fetch current library documentation via Context7 (`npx ctx7@latest docs <libraryId> "<query>"`) when working with external APIs and libraries.
 
+## 5. Service & Route Registry (Wajib Dipatuhi)
+
+Setiap halaman atau endpoint baru WAJIB didaftarkan. Tidak ada pengecualian.
+
+### Frontend — setiap halaman baru wajib masuk ke:
+- `apps/web/src/constants/route.constant.ts` — konstanta path
+- `apps/web/src/configs/navigation.config.ts` — item navigasi sidebar
+- `apps/web/src/router.ts` — route tree TanStack Router
+
+### Backend — setiap route/endpoint baru wajib masuk ke:
+- File route terkait di `services/<service>/src/routes/`
+- Di-mount via `.use()` di `services/<service>/src/index.ts`
+- Didokumentasikan di `UPDATES.md` pada section yang relevan
+
+### Aturan Isolasi Service (Strict):
+- **DILARANG** melakukan `fetch()` langsung dari web client ke URL eksternal (domain selain gateway).
+- Semua request ke API pihak ketiga WAJIB diproksikan melalui `services/gateway` atau `services/auth`.
+- Gunakan `${getBaseUrl()}/api/...` untuk semua request dari frontend.
+- Pelanggaran: `fetch('https://external-api.com/...')` di dalam komponen React manapun.
+
+### Daftar Halaman Aktif (diperbarui tiap sesi):
+| Path | File | Akses |
+|------|------|-------|
+| `/` | `dashboard.tsx` | Admin & Member |
+| `/attendance` | `attendance.tsx` | Admin & Member |
+| `/kpi` | `kpi.tsx` | Admin & Member |
+| `/posts` | `posts.tsx` | Admin & Member |
+| `/employees` | `employees.tsx` | Admin |
+| `/departments` | `departments.tsx` | Admin |
+| `/shifts` | `shifts.tsx` | Admin |
+| `/companies` | `companies.tsx` | Admin |
+| `/sub-users` | `sub-users.tsx` | Admin |
+| `/profile` | `profile.tsx` | Admin & Member |
+
+### Daftar Endpoint Aktif (diperbarui tiap sesi):
+| Service | Prefix | Deskripsi |
+|---------|--------|-----------|
+| auth | `/api/auth/*` | Autentikasi, profil, biodata, mail |
+| auth | `/api/companies/*` | CRUD perusahaan & lokasi |
+| auth | `/api/departments/*` | CRUD departemen |
+| auth | `/api/employees/*` | CRUD karyawan |
+| auth | `/api/kpi/*` | Periode, item, penilaian, tugas KPI |
+| auth | `/api/posts/*` | CRUD postingan internal |
+| auth | `/api/subusers/*` | Sub-akun admin |
+| auth | `/api/upload/*` | Upload file ke S3 |
+| auth | `/api/utilities/*` | Proxy API eksternal (holiday, geocoding) |
+| shifting | `/api/attendance/*` | Presensi, shift, laporan |
+| storage | `/api/storage/*` | Penyimpanan file lokal |
+| gateway | `/api/health` | Health check gateway |
+

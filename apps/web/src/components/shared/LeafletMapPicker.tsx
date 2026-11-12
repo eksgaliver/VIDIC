@@ -8,6 +8,15 @@ import {
 } from 'react-icons/hi'
 import { Button } from '@/components/base'
 
+// Base URL gateway — semua request eksternal diproksikan melalui backend
+const getBaseUrl = (): string => {
+  const configured = import.meta.env.VITE_API_URL
+  if (configured) {
+    try { return new URL(configured).origin } catch { /* ignore */ }
+  }
+  return window.location.origin
+}
+
 export type MapTypeOption = 'roadmap' | 'satellite' | 'osm'
 export type GeofenceMode = 'point' | 'polygon'
 
@@ -187,7 +196,7 @@ export function LeafletMapPicker({
       setIsResolvingAddress(true)
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
+          `${getBaseUrl()}/api/utilities/geocode/reverse?lat=${lat}&lon=${lng}`
         )
         if (!res.ok) throw new Error('Geocoding request failed')
         const data = await res.json()
@@ -698,9 +707,8 @@ export function LeafletMapPicker({
     if (!searchQuery.trim()) return
 
     try {
-      const q = encodeURIComponent(`${searchQuery.trim()}, Indonesia`)
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${q}&countrycodes=id&limit=1`
+        `${getBaseUrl()}/api/utilities/geocode/search?q=${encodeURIComponent(searchQuery.trim())}&limit=1`
       )
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {
@@ -862,7 +870,7 @@ export function LeafletMapPicker({
 
         {/* Toolbar Operasi Poligon (Muncul saat Mode Poligon Aktif) */}
         {!readOnly && currentMode === 'polygon' && (
-          <div className="absolute left-3 top-13 z-[1000] flex flex-wrap items-center gap-1.5 rounded-md border border-[#dadce0] bg-white/95 p-1.5 text-[11px] font-medium text-ink shadow-md backdrop-blur-sm">
+          <div className="absolute left-3 top-13 z-[1000] flex flex-wrap items-center gap-1.5 rounded-md border border-[#dadce0] bg-white/95 p-1.5 text-2xs font-medium text-ink shadow-md backdrop-blur-sm">
             <button
               type="button"
               onClick={handleSwitchToPoint}
@@ -897,7 +905,7 @@ export function LeafletMapPicker({
                 </button>
               </>
             )}
-            <span className="border-l border-line pl-2 font-mono text-[10px] text-ink-2">
+            <span className="border-l border-line pl-2 font-mono text-2xs text-ink-2">
               {currentPolygon.length} sudut · {polygonArea.toLocaleString('id-ID')} m²
             </span>
           </div>
@@ -966,17 +974,17 @@ export function LeafletMapPicker({
               {provinceName || 'Indonesia'}
             </span>
             {isResolvingAddress && (
-              <span className="animate-pulse text-[10px] text-[#1a73e8] font-semibold">
+              <span className="animate-pulse text-2xs text-[#1a73e8] font-semibold">
                 · Mendeteksi alamat...
               </span>
             )}
           </div>
           {lastResolvedAddress?.fullAddress ? (
-            <p className="mt-0.5 line-clamp-1 text-[11px] text-[#5f6368]">
+            <p className="mt-0.5 line-clamp-1 text-2xs text-[#5f6368]">
               {lastResolvedAddress.fullAddress}
             </p>
           ) : (
-            <p className="mt-0.5 text-[11px] text-[#70757a]">
+            <p className="mt-0.5 text-2xs text-[#70757a]">
               Klik atau geser peta untuk mengisi alamat otomatis
             </p>
           )}
@@ -1014,7 +1022,7 @@ export function LeafletMapPicker({
                   ±{radiusMeters}m
                 </span>
               </div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] text-ink-3">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-2xs text-ink-3">
                 <span>
                   Lat: <span className="font-mono tabular text-ink">{latitude.toFixed(6)}</span>
                 </span>
@@ -1030,14 +1038,14 @@ export function LeafletMapPicker({
                 <span className="font-semibold text-ink">Geofence Perimeter Khusus (Polygon):</span>
                 <span className="font-bold text-[#1a73e8]">{currentPolygon.length} Titik Sudut</span>
               </div>
-              <p className="text-[11px] text-ink-2">
+              <p className="text-2xs text-ink-2">
                 Estimasi cakupan luas area tapak kerja:{' '}
                 <span className="font-bold font-mono text-ink">
                   {polygonArea.toLocaleString('id-ID')} m²
                 </span>
                 {polygonArea > 10000 ? ` (${(polygonArea / 10000).toFixed(2)} hektar)` : ''}
               </p>
-              <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-ink-3">
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-2xs text-ink-3">
                 <HiOutlineCheckCircle className="h-3.5 w-3.5 text-success" />
                 <span>Karyawan hanya dapat presensi jika berada di dalam perimeter poligon ini.</span>
               </div>

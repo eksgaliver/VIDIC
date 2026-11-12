@@ -11,7 +11,9 @@ import { uploadRoutes } from './routes/upload'
 import { postRoutes } from './routes/posts'
 import { subUserRoutes } from './routes/subusers'
 import { kpiRoutes } from './routes/kpi'
+import { utilitiesRoutes } from './routes/utilities'
 import { handleAvatarUpload, deleteStoredAvatar } from './handlers/uploadHandler'
+import { appName } from './lib/app-env'
 
 export { companyRoutes } from './routes/companies'
 export { departmentRoutes } from './routes/departments'
@@ -20,6 +22,7 @@ export { uploadRoutes } from './routes/upload'
 export { postRoutes } from './routes/posts'
 export { subUserRoutes } from './routes/subusers'
 export { kpiRoutes } from './routes/kpi'
+export { utilitiesRoutes } from './routes/utilities'
 
 interface AuthUser {
   id: string
@@ -36,7 +39,7 @@ interface AuthUser {
 // Inisialisasi user demo untuk lingkungan pengembangan
 const DEMO_USER: AuthUser = {
   id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-  name: process.env.APP_NAME ? `${process.env.APP_NAME} Operator` : 'Srikaya Operator',
+  name: `${appName} Operator`,
   email: 'admin@srikaya.id',
   passwordHash: await Bun.password.hash('rahasia123', { algorithm: 'bcrypt', cost: 10 }),
   avatarUrl: null,
@@ -191,6 +194,12 @@ async function seedDefaultData() {
           status: 'active'
         }).returning()
         adminId = adminUser.id
+      }
+
+      // Nama akun demo mengikuti APP_NAME. Rapikan nilai lama yang masih memakai
+      // nama aplikasi sebelumnya supaya tidak berbeda dengan antarmuka web.
+      if (existingAdmin && existingAdmin.name !== DEMO_USER.name && /^.+ Operator$/.test(existingAdmin.name)) {
+        await db.update(users).set({ name: DEMO_USER.name, updatedAt: new Date() }).where(eq(users.id, existingAdmin.id))
       }
 
       const existingEmployees = await db.select().from(users).where(eq(users.email, 'budi.santoso@srikaya.id')).limit(1)
@@ -926,6 +935,7 @@ export const authApp = new Elysia()
   .use(postRoutes)
   .use(subUserRoutes)
   .use(kpiRoutes)
+  .use(utilitiesRoutes)
 
 // Jalankan server jika dieksekusi langsung
 if (import.meta.main) {
